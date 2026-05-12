@@ -1,0 +1,10 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/((?!assets/|styles.css|app.js|pricing.js|supabase-config.js|login.html|favicon.ico).*)",
+      "destination": "/index.html"
+    }
+  ]
+}

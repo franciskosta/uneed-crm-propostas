@@ -1,0 +1,15 @@
+{
+  "name": "uneed-crm-propostas",
+  "version": "1.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node email-server.js",
+    "build": "node build-vercel.js"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}

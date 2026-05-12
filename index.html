@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>UNEED Propostas CRM</title>
+    <link rel="icon" href="./assets/favicon.ico" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark"><img src="./assets/uneed-logo-branco.png" alt="UNEED" /></div>
+        </div>
+
+        <div class="side-panel">
+          <label for="monthTarget">Meta mensal</label>
+          <div class="target-input">
+            <input id="monthTarget" type="number" min="0" step="50" />
+            <span>EUR</span>
+          </div>
+          <div class="target-meter">
+            <div id="targetMeterFill"></div>
+          </div>
+          <p id="targetSummary"></p>
+        </div>
+
+        <div class="side-panel side-panel-recurring">
+          <label>Avenças</label>
+          <strong id="sideRecurringValue">0 EUR/mês</strong>
+          <div class="target-meter">
+            <div id="sideRecurringFill"></div>
+          </div>
+          <p id="sideRecurringSummary"></p>
+        </div>
+
+        <nav class="nav-tabs" aria-label="Secções">
+          <button class="nav-tab is-active" data-view="dashboard">Dashboard</button>
+          <button class="nav-tab" data-view="proposal">Proposta</button>
+          <button class="nav-tab" data-view="clients">Clientes</button>
+          <button class="nav-tab" data-view="pipeline">Pipeline</button>
+          <button class="nav-tab" data-view="recurring">Avenças</button>
+          <button class="nav-tab" data-view="history">Histórico</button>
+          <button class="nav-tab" data-view="settings">Configuração</button>
+        </nav>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Gestão comercial local</p>
+            <h1>Propostas, follow-ups e faturação UNEED</h1>
+          </div>
+          <div class="topbar-actions">
+            <span class="sync-status" id="syncStatus">A iniciar...</span>
+            <button class="button ghost" id="exportDataBtn">Exportar dados</button>
+            <button class="button ghost" id="importDataBtn">Importar</button>
+            <button class="button primary" id="newProposalBtn">Nova proposta</button>
+            <button class="button ghost" id="logoutBtn">Sair</button>
+            <input id="importFile" type="file" accept="application/json" hidden />
+          </div>
+        </header>
+
+        <section class="view is-active" id="view-dashboard">
+          <div class="metric-grid">
+            <article class="metric-card">
+              <span>Pipeline aberto</span>
+              <strong id="metricPipeline">0 EUR</strong>
+            </article>
+            <article class="metric-card">
+              <span>Faturado este mês</span>
+              <strong id="metricBilled">0 EUR</strong>
+            </article>
+            <article class="metric-card">
+              <span>Taxa de fecho</span>
+              <strong id="metricCloseRate">0%</strong>
+            </article>
+            <article class="metric-card">
+              <span>Follow-ups pendentes</span>
+              <strong id="metricFollowups">0</strong>
+            </article>
+          </div>
+
+          <div class="dashboard-grid">
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Próximas ações</h2>
+                <button class="icon-button" id="sortFollowupsBtn" title="Ordenar">↕</button>
+              </div>
+              <div class="action-list" id="nextActions"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Metas e evolução</h2>
+              </div>
+              <div class="achievement-list" id="achievements"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-proposal">
+          <div class="proposal-layout">
+            <form class="editor panel" id="proposalForm">
+              <div class="panel-heading">
+                <h2>Pedido e orçamento</h2>
+                <button class="button danger proposal-management" id="deleteProposalBtn" type="button">Eliminar</button>
+              </div>
+
+              <input id="proposalId" type="hidden" />
+
+              <div class="proposal-summary proposal-management" id="proposalSummary"></div>
+
+              <div class="product-picker">
+                <label>
+                  Produto UNEED
+                  <select id="quickProductSelect"></select>
+                </label>
+                <button class="button accent" id="quickAddProductBtn" type="button">Adicionar produto</button>
+                <button class="button ghost" id="clearServicesBtn" type="button">Limpar serviços</button>
+              </div>
+
+              <div class="quick-actions proposal-management" aria-label="Ações rápidas da proposta">
+                <button class="button ghost" id="followup3Btn" type="button">Follow-up +3 dias</button>
+                <button class="button ghost" id="followup7Btn" type="button">Follow-up +7 dias</button>
+                <button class="button ghost" id="markAcceptedBtn" type="button">Marcar aceite</button>
+                <button class="button ghost" id="markBilledBtn" type="button">Marcar faturado</button>
+              </div>
+
+              <div class="form-grid">
+                <label>
+                  Cliente
+                  <input id="clientName" required placeholder="Ex: Maria Silva" />
+                </label>
+                <label>
+                  Empresa
+                  <input id="companyName" placeholder="Ex: Clínica Aurora" />
+                </label>
+                <label>
+                  NIF
+                  <input id="clientNif" inputmode="numeric" placeholder="Ex: 500000000" />
+                </label>
+                <label>
+                  Email
+                  <input id="clientEmail" type="email" placeholder="cliente@email.pt" />
+                </label>
+                <label>
+                  Telefone
+                  <input id="clientPhone" placeholder="+351 900 000 000" />
+                </label>
+                <label class="proposal-management">
+                  Origem
+                  <select id="leadSource">
+                    <option>Instagram</option>
+                    <option>Referência</option>
+                    <option>Website UNEED</option>
+                    <option>WhatsApp</option>
+                    <option>Outro</option>
+                  </select>
+                </label>
+                <label class="proposal-management">
+                  Estado
+                  <select id="proposalStatus"></select>
+                </label>
+                <label class="proposal-management">
+                  Data de follow-up
+                  <input id="followupDate" type="date" />
+                </label>
+                <label>
+                  Validade da proposta
+                  <input id="validUntil" type="date" />
+                </label>
+              </div>
+
+              <label>
+                Link da amostra
+                <input id="sampleUrl" type="url" placeholder="https://..." />
+              </label>
+
+              <div class="service-editor">
+                <div class="panel-heading compact">
+                  <h3>Serviços</h3>
+                  <button class="button ghost" id="addCustomServiceBtn" type="button">Adicionar linha</button>
+                </div>
+                <div id="serviceRows"></div>
+              </div>
+
+              <div class="form-grid totals-grid">
+                <label>
+                  Desconto
+                  <input id="discount" type="number" min="0" step="1" />
+                </label>
+                <label>
+                  IVA
+                  <select id="vatMode">
+                    <option value="0">Sem IVA</option>
+                    <option value="23">IVA 23%</option>
+                  </select>
+                </label>
+                <label class="proposal-management">
+                  Entrada recebida
+                  <input id="paidAmount" type="number" min="0" step="1" />
+                </label>
+                <label class="proposal-management">
+                  Total faturado
+                  <input id="billedAmount" type="number" min="0" step="1" />
+                </label>
+              </div>
+
+              <label>
+                NIB/IBAN para pagamento
+                <input id="paymentIban" placeholder="Ex: PT50 0000 0000 0000 0000 0000 0" />
+              </label>
+
+              <label class="proposal-management">
+                Notas internas
+                <textarea id="internalNotes" rows="3" placeholder="Materiais em falta, contexto comercial, objeções..."></textarea>
+              </label>
+
+              <label>
+                Observações para o orçamento
+                <textarea id="proposalNotes" rows="3" placeholder="Condições, próximos passos, prazo previsto..."></textarea>
+              </label>
+
+              <section class="activity-box proposal-management">
+                <div class="panel-heading compact">
+                  <h3>Histórico comercial</h3>
+                </div>
+                <div class="activity-inputs">
+                  <select id="activityType">
+                    <option>Contacto</option>
+                    <option>Email enviado</option>
+                    <option>Chamada</option>
+                    <option>WhatsApp</option>
+                    <option>Reunião</option>
+                    <option>Pagamento</option>
+                    <option>Nota interna</option>
+                  </select>
+                  <input id="activityNote" placeholder="Ex: cliente pediu ajuste ao pacote..." />
+                  <button class="button ghost" id="addActivityBtn" type="button">Adicionar</button>
+                </div>
+                <div class="activity-list" id="activityList"></div>
+              </section>
+
+              <div class="form-actions">
+                <button class="button primary" type="submit">Guardar proposta</button>
+                <button class="button accent" id="printProposalBtn" type="button">Gerar PDF</button>
+                <button class="button ghost proposal-management" id="emailFollowupBtn" type="button">Email follow-up</button>
+              </div>
+            </form>
+
+            <section class="preview-wrap">
+              <div class="proposal-sheet" id="proposalPreview"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="view" id="view-clients">
+          <div class="clients-toolbar">
+            <input id="clientSearchInput" placeholder="Pesquisar cliente, empresa, NIF ou email..." />
+          </div>
+          <div class="clients-grid" id="clientsGrid"></div>
+        </section>
+
+        <section class="view" id="view-pipeline">
+          <div class="pipeline-toolbar">
+            <input id="searchInput" placeholder="Pesquisar cliente, empresa ou serviço..." />
+            <select id="statusFilter">
+              <option value="">Todos os estados</option>
+            </select>
+          </div>
+          <div class="kanban" id="kanban"></div>
+        </section>
+
+        <section class="view" id="view-recurring">
+          <div class="recurring-hero panel">
+            <div>
+              <p class="eyebrow">Receita previsível</p>
+              <h2>Avenças ativas</h2>
+              <p>Todas as propostas faturadas com serviços mensais entram aqui automaticamente.</p>
+            </div>
+            <div class="recurring-total">
+              <span>A faturar em avenças</span>
+              <strong id="recurringMonthlyValue">0 EUR</strong>
+            </div>
+          </div>
+
+          <div class="metric-grid recurring-metrics">
+            <article class="metric-card">
+              <span>Avenças ativas</span>
+              <strong id="recurringCount">0</strong>
+            </article>
+            <article class="metric-card">
+              <span>Ticket médio mensal</span>
+              <strong id="recurringAverage">0 EUR</strong>
+            </article>
+            <article class="metric-card">
+              <span>Progresso da meta</span>
+              <strong id="recurringProgress">0%</strong>
+            </article>
+            <article class="metric-card">
+              <span>Falta para a meta</span>
+              <strong id="recurringMissing">0 EUR</strong>
+            </article>
+          </div>
+
+          <div class="dashboard-grid">
+            <section class="panel recurring-goal-card">
+              <div class="panel-heading">
+                <h2>Meta de avenças</h2>
+              </div>
+              <label>
+                Receita mensal recorrente desejada
+                <div class="target-input light">
+                  <input id="recurringTarget" type="number" min="0" step="25" />
+                  <span>EUR/mês</span>
+                </div>
+              </label>
+              <div class="target-meter light">
+                <div id="recurringTargetFill"></div>
+              </div>
+              <p id="recurringSummary"></p>
+              <div class="achievement-list" id="recurringAchievements"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Ranking de avenças</h2>
+              </div>
+              <div class="action-list" id="recurringLeaderboard"></div>
+            </section>
+          </div>
+
+          <section class="panel recurring-list-panel">
+            <div class="panel-heading">
+              <h2>Contratos ativos</h2>
+            </div>
+            <div class="recurring-list" id="recurringList"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-history">
+          <div class="history-grid" id="historyGrid"></div>
+        </section>
+
+        <section class="view" id="view-settings">
+          <div class="settings-grid">
+            <form class="panel" id="brandForm">
+              <div class="panel-heading">
+                <h2>Marca</h2>
+              </div>
+              <label>
+                Nome comercial
+                <input id="brandName" />
+              </label>
+              <label>
+                Email
+                <input id="brandEmail" type="email" />
+              </label>
+              <label>
+                Telefone
+                <input id="brandPhone" />
+              </label>
+              <label>
+                Website
+                <input id="brandWebsite" type="url" />
+              </label>
+              <label>
+                NIB/IBAN padrão
+                <input id="brandIban" placeholder="PT50 ..." />
+              </label>
+              <label>
+                Cor principal
+                <input id="brandColor" type="color" />
+              </label>
+              <button class="button primary" type="submit">Guardar marca</button>
+            </form>
+
+            <form class="panel" id="catalogForm">
+              <div class="panel-heading">
+                <h2>Catálogo de serviços</h2>
+                <div class="panel-actions">
+                  <button class="button ghost" id="syncPricingBtn" type="button">Usar tabela UNEED</button>
+                  <button class="button ghost" id="addCatalogServiceBtn" type="button">Novo serviço</button>
+                </div>
+              </div>
+              <div id="catalogRows"></div>
+              <button class="button primary" type="submit">Guardar catálogo</button>
+            </form>
+
+            <section class="panel pricing-panel">
+              <div class="panel-heading">
+                <h2>Tabela de preços dinâmica</h2>
+              </div>
+              <p class="pricing-note" id="pricingNote"></p>
+              <div id="pricingMatrix"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal" id="successModal" aria-hidden="true">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="successModalTitle">
+        <strong id="successModalTitle">Proposta guardada</strong>
+        <p>A proposta foi gravada e sincronizada com o CRM.</p>
+        <button class="button primary" id="closeSuccessModal" type="button">OK</button>
+      </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./supabase-config.js"></script>
+    <script src="./pricing.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

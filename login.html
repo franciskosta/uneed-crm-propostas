@@ -26,6 +26,18 @@
           <button class="button accent" type="submit">Entrar</button>
           <p class="login-error" id="loginError" role="alert"></p>
         </form>
+        <form id="resetForm" class="is-hidden">
+          <label>
+            Nova password
+            <input id="newPassword" type="password" autocomplete="new-password" required minlength="8" />
+          </label>
+          <label>
+            Confirmar nova password
+            <input id="confirmPassword" type="password" autocomplete="new-password" required minlength="8" />
+          </label>
+          <button class="button accent" type="submit">Guardar nova password</button>
+          <p class="login-error" id="resetError" role="alert"></p>
+        </form>
       </section>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -37,16 +49,46 @@
         return window.supabase.createClient(config.url, config.anonKey);
       }
 
-      const authMode = supabaseClient() ? "supabase" : "local";
+      function authParams() {
+        const params = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        hashParams.forEach((value, key) => params.set(key, value));
+        return params;
+      }
+
+      async function prepareRecoverySession(client, params) {
+        const accessToken = params.get("access_token");
+        const refreshToken = params.get("refresh_token");
+        if (accessToken && refreshToken) {
+          await client.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+        }
+        if (params.get("code")) {
+          await client.auth.exchangeCodeForSession(window.location.href);
+        }
+      }
+
+      const client = supabaseClient();
+      const params = authParams();
+      const isRecovery = params.get("type") === "recovery" || params.has("access_token") || params.has("code");
+      const authMode = client ? "supabase" : "local";
       document.querySelector("#loginMode").textContent = authMode === "supabase"
         ? "Modo online: Supabase Auth ativo."
         : "Modo local: Supabase ainda não configurado. Usa geral@uneed.pt / uneed-local.";
+
+      let recoverySessionPromise = Promise.resolve();
+      if (client && isRecovery) {
+        document.querySelector("#loginForm").classList.add("is-hidden");
+        document.querySelector("#resetForm").classList.remove("is-hidden");
+        document.querySelector("#loginMode").textContent = "Recuperação ativa: define uma nova password para continuar.";
+        recoverySessionPromise = prepareRecoverySession(client, params).catch(() => {
+          document.querySelector("#resetError").textContent = "O link de recuperação expirou. Pede um novo email no Supabase.";
+        });
+      }
 
       document.querySelector("#loginForm").addEventListener("submit", async (event) => {
         event.preventDefault();
         const error = document.querySelector("#loginError");
         error.textContent = "";
-        const client = supabaseClient();
         if (client) {
           const { error: authError } = await client.auth.signInWithPassword({
             email: document.querySelector("#loginEmail").value,
@@ -73,6 +115,33 @@
           return;
         }
         error.textContent = "Modo local: usa geral@uneed.pt / uneed-local, ou configura a anon public key do Supabase.";
+      });
+
+      document.querySelector("#resetForm").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const error = document.querySelector("#resetError");
+        error.textContent = "";
+        const password = document.querySelector("#newPassword").value;
+        const confirmation = document.querySelector("#confirmPassword").value;
+        if (password !== confirmation) {
+          error.textContent = "As passwords não coincidem.";
+          return;
+        }
+        if (!client) {
+          error.textContent = "Supabase não está configurado neste ambiente.";
+          return;
+        }
+        await recoverySessionPromise;
+        const { error: updateError } = await client.auth.updateUser({ password });
+        if (updateError) {
+          error.textContent = "Não foi possível atualizar a password. Pede um novo link de recuperação.";
+          return;
+        }
+        document.querySelector("#loginMode").textContent = "Password atualizada. A entrar no CRM...";
+        window.history.replaceState({}, document.title, "/login.html");
+        setTimeout(() => {
+          window.location.href = "/";
+        }, 700);
       });
     </script>
   </body>

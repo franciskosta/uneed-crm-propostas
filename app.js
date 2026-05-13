@@ -1,5 +1,16 @@
 const STORAGE_KEY = "uneed-proposals-crm-v1";
 
+function isPasswordRecoveryUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  hashParams.forEach((value, key) => params.set(key, value));
+  return params.get("type") === "recovery" || params.has("access_token") || params.has("code");
+}
+
+if (isPasswordRecoveryUrl()) {
+  window.location.replace(`/login.html${window.location.search}${window.location.hash}`);
+}
+
 const statuses = [
   "Novo pedido",
   "Em análise",

@@ -60,6 +60,10 @@ body {
   margin-top: 22px;
 }
 
+.login-card form.is-hidden {
+  display: none;
+}
+
 .login-card .button {
   justify-content: center;
   margin-top: 4px;

@@ -11,6 +11,10 @@ if (isPasswordRecoveryUrl()) {
   window.location.replace(`/login.html${window.location.search}${window.location.hash}`);
 }
 
+if (window.location.pathname.replace(/\/$/, "") === "/suporte") {
+  window.location.replace(`/suporte.html${window.location.search}${window.location.hash}`);
+}
+
 const statuses = [
   "Novo pedido",
   "Em análise",

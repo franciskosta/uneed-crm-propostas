@@ -3,7 +3,11 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/((?!assets/|styles.css|app.js|pricing.js|supabase-config.js|login.html|favicon.ico).*)",
+      "source": "/suporte",
+      "destination": "/suporte.html"
+    },
+    {
+      "source": "/((?!assets/|styles.css|app.js|pricing.js|suporte.js|supabase-config.js|login.html|suporte.html|favicon.ico).*)",
       "destination": "/index.html"
     }
   ]

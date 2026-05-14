@@ -392,7 +392,10 @@ async function serveStatic(request, response) {
   const url = new URL(request.url, `http://${request.headers.host}`);
   const publicPaths = new Set([
     "/login.html",
+    "/suporte",
+    "/suporte.html",
     "/styles.css",
+    "/suporte.js",
     "/supabase-config.js",
     "/assets/favicon.ico",
     "/assets/uneed-logo-branco.png",
@@ -413,7 +416,8 @@ async function serveStatic(request, response) {
   }
 
   const safePath = path.normalize(decodeURIComponent(url.pathname)).replace(/^(\.\.[/\\])+/, "");
-  const filePath = path.join(root, safePath === "/" ? "index.html" : safePath);
+  const resolvedPath = safePath === "/" ? "index.html" : safePath === "/suporte" ? "suporte.html" : safePath;
+  const filePath = path.join(root, resolvedPath);
   serveFile(filePath, response);
 }
 

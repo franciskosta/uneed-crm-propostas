@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Suporte UNEED</title>
+    <link rel="icon" href="./assets/favicon.ico" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body class="support-page">
+    <main class="support-shell">
+      <section class="support-card">
+        <img class="login-logo" src="./assets/uneed-logo-login.png" alt="UNEED" />
+        <p class="eyebrow">Suporte a clientes</p>
+        <h1>Enviar pedido de suporte</h1>
+        <p class="support-intro">Descreva o pedido com o máximo de contexto possível. A UNEED recebe o ticket no CRM e acompanha a resolução.</p>
+
+        <form id="supportForm">
+          <div class="form-grid">
+            <label>
+              Nome
+              <input id="supportName" required placeholder="O seu nome" />
+            </label>
+            <label>
+              Empresa
+              <input id="supportCompany" placeholder="Nome da empresa" />
+            </label>
+            <label>
+              Email
+              <input id="supportEmail" type="email" required placeholder="email@empresa.pt" />
+            </label>
+            <label>
+              Telefone
+              <input id="supportPhone" placeholder="+351 900 000 000" />
+            </label>
+            <label>
+              Tipo de pedido
+              <select id="supportCategory">
+                <option>Alterações no website</option>
+                <option>Landing page</option>
+                <option>Email profissional</option>
+                <option>Domínio/alojamento</option>
+                <option>Sistema de marcações</option>
+                <option>Erro técnico</option>
+                <option>Suporte geral</option>
+              </select>
+            </label>
+            <label>
+              Urgência
+              <select id="supportPriority">
+                <option>Normal</option>
+                <option>Baixa</option>
+                <option>Alta</option>
+                <option>Urgente</option>
+              </select>
+            </label>
+          </div>
+
+          <label>
+            Link do projeto/site
+            <input id="supportProjectUrl" type="url" placeholder="https://..." />
+          </label>
+          <label>
+            Assunto
+            <input id="supportSubject" required placeholder="Ex: Alterar textos da página inicial" />
+          </label>
+          <label>
+            Descrição do pedido
+            <textarea id="supportMessage" rows="7" required placeholder="Explique o que pretende, onde acontece e qual o resultado esperado."></textarea>
+          </label>
+
+          <button class="button accent" type="submit">Enviar pedido</button>
+          <p class="support-status" id="supportStatus" role="status"></p>
+        </form>
+      </section>
+    </main>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./supabase-config.js"></script>
+    <script src="./suporte.js"></script>
+  </body>
+</html>

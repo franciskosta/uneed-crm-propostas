@@ -26,6 +26,17 @@ const statuses = [
 
 const recurringMilestones = [250, 500, 1000, 2500, 5000, 10000];
 
+const ticketStatuses = [
+  "Novo",
+  "Em análise",
+  "A aguardar cliente",
+  "Em resolução",
+  "Resolvido",
+  "Fechado",
+];
+
+const ticketPriorities = ["Baixa", "Normal", "Alta", "Urgente"];
+
 function pricingItems() {
   return (window.UNEED_PRICING?.categories || []).flatMap((category) => (
     (category.items || []).map((item) => ({ ...item, category: category.title }))
@@ -140,6 +151,7 @@ function loadState() {
     monthTarget: 5000,
     recurringTarget: 1000,
     proposals: seedProposals,
+    tickets: [],
   };
 }
 
@@ -237,6 +249,7 @@ async function loadSupabaseState() {
   hydratePricingDefaults();
   activeId = state.proposals[0]?.id || activeId;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  await loadSupportTickets();
   renderAll();
   isHydratingFromServer = false;
   setSyncStatus("Supabase ligado", "success");
@@ -280,6 +293,7 @@ function migrateBrandDefaults() {
   if (!("iban" in state.brand)) state.brand.iban = "";
   if (!state.brand.color || state.brand.color === "#111111") state.brand.color = "#181d49";
   if (!("recurringTarget" in state)) state.recurringTarget = 1000;
+  state.tickets ||= [];
   saveState();
 }
 
@@ -417,6 +431,85 @@ function recurringProposals() {
   return state.proposals.filter((proposal) => recurringMonthlyValue(proposal) > 0);
 }
 
+function normalizeTicket(ticket = {}) {
+  return {
+    id: ticket.id || crypto.randomUUID(),
+    code: ticket.code || `UNEED-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9999)).padStart(4, "0")}`,
+    clientName: ticket.clientName || ticket.client_name || "",
+    companyName: ticket.companyName || ticket.company_name || "",
+    email: ticket.email || "",
+    phone: ticket.phone || "",
+    projectUrl: ticket.projectUrl || ticket.project_url || "",
+    category: ticket.category || "Suporte geral",
+    priority: ticket.priority || "Normal",
+    status: ticket.status || "Novo",
+    subject: ticket.subject || "",
+    message: ticket.message || "",
+    internalNotes: ticket.internalNotes || ticket.internal_notes || "",
+    createdAt: ticket.createdAt || ticket.created_at || new Date().toISOString(),
+    updatedAt: ticket.updatedAt || ticket.updated_at || ticket.created_at || new Date().toISOString(),
+  };
+}
+
+function ticketIsOpen(ticket) {
+  return !["Resolvido", "Fechado"].includes(ticket.status);
+}
+
+async function loadSupportTickets() {
+  const client = getSupabaseClient();
+  if (!client) return;
+  try {
+    const { data, error } = await client
+      .from("support_tickets")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) return;
+    state.tickets = (data || []).map(normalizeTicket);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Se a tabela ainda não existir, a tab Tickets continua em modo local.
+  }
+}
+
+async function updateTicket(id, patch) {
+  const ticket = state.tickets.find((item) => item.id === id);
+  if (!ticket) return;
+  Object.assign(ticket, patch, { updatedAt: new Date().toISOString() });
+  saveState();
+  renderTickets();
+
+  const client = getSupabaseClient();
+  if (!client) return;
+  const payload = {};
+  if ("status" in patch) payload.status = patch.status;
+  if ("priority" in patch) payload.priority = patch.priority;
+  if ("internalNotes" in patch) payload.internal_notes = patch.internalNotes;
+  payload.updated_at = ticket.updatedAt;
+  try {
+    await client.from("support_tickets").update(payload).eq("id", id);
+    setSyncStatus("Ticket atualizado", "success");
+  } catch {
+    setSyncStatus("Ticket guardado localmente", "error");
+  }
+}
+
+function ticketEmailHref(ticket) {
+  const subject = encodeURIComponent(`Re: ${ticket.code} - ${ticket.subject || "Pedido de suporte UNEED"}`);
+  const body = encodeURIComponent(
+    `Olá ${ticket.clientName || ""},\n\nRecebemos o teu pedido de suporte (${ticket.code}) e estamos a analisar.\n\nResumo do pedido:\n${ticket.message || ""}\n\nObrigado,\nUNEED`,
+  );
+  return `mailto:${ticket.email || ""}?subject=${subject}&body=${body}`;
+}
+
+function safeExternalUrl(url) {
+  try {
+    const parsed = new URL(url);
+    return ["http:", "https:"].includes(parsed.protocol) ? parsed.href : "";
+  } catch {
+    return "";
+  }
+}
+
 function recurringMilestoneStatus(monthly) {
   const reached = recurringMilestones.filter((value) => monthly >= value);
   const next = recurringMilestones.find((value) => monthly < value) || null;
@@ -480,6 +573,15 @@ function fillStatusSelects() {
   const statusFilter = qs("#statusFilter");
   proposalStatus.innerHTML = statuses.map((status) => `<option>${status}</option>`).join("");
   statusFilter.innerHTML = `<option value="">Todos os estados</option>${statuses.map((status) => `<option>${status}</option>`).join("")}`;
+
+  const ticketStatusFilter = qs("#ticketStatusFilter");
+  const ticketPriorityFilter = qs("#ticketPriorityFilter");
+  if (ticketStatusFilter) {
+    ticketStatusFilter.innerHTML = `<option value="">Todos os estados</option>${ticketStatuses.map((status) => `<option>${status}</option>`).join("")}`;
+  }
+  if (ticketPriorityFilter) {
+    ticketPriorityFilter.innerHTML = `<option value="">Todas as prioridades</option>${ticketPriorities.map((priority) => `<option>${priority}</option>`).join("")}`;
+  }
 }
 
 function renderQuickProductSelect() {
@@ -1067,6 +1169,80 @@ function renderPipeline() {
     .join("");
 }
 
+function renderTickets() {
+  const board = qs("#ticketsBoard");
+  if (!board) return;
+  state.tickets ||= [];
+  const term = (qs("#ticketSearchInput")?.value || "").trim().toLowerCase();
+  const statusFilter = qs("#ticketStatusFilter")?.value || "";
+  const priorityFilter = qs("#ticketPriorityFilter")?.value || "";
+  const tickets = [...state.tickets]
+    .map(normalizeTicket)
+    .filter((ticket) => {
+      const haystack = [
+        ticket.code,
+        ticket.clientName,
+        ticket.companyName,
+        ticket.email,
+        ticket.phone,
+        ticket.projectUrl,
+        ticket.category,
+        ticket.priority,
+        ticket.status,
+        ticket.subject,
+        ticket.message,
+      ].join(" ").toLowerCase();
+      return (!term || haystack.includes(term)) &&
+        (!statusFilter || ticket.status === statusFilter) &&
+        (!priorityFilter || ticket.priority === priorityFilter);
+    })
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+
+  qs("#ticketMetricNew").textContent = String(state.tickets.filter((ticket) => ticket.status === "Novo").length);
+  qs("#ticketMetricOpen").textContent = String(state.tickets.filter(ticketIsOpen).length);
+  qs("#ticketMetricUrgent").textContent = String(state.tickets.filter((ticket) => ticket.priority === "Urgente").length);
+  qs("#ticketMetricResolved").textContent = String(state.tickets.filter((ticket) => ["Resolvido", "Fechado"].includes(ticket.status)).length);
+  qs("#supportPublicUrl").textContent = `${window.location.origin}/suporte`;
+
+  board.innerHTML = tickets
+    .map((ticket) => {
+      const urgent = ticket.priority === "Urgente";
+      const created = ticket.createdAt ? new Date(ticket.createdAt).toLocaleString("pt-PT") : "";
+      return `
+        <article class="ticket-card ${urgent ? "is-urgent" : ""}" data-ticket-id="${escapeAttr(ticket.id)}">
+          <header class="ticket-head">
+            <div>
+              <span class="ticket-code">${escapeHtml(ticket.code)}</span>
+              <strong>${escapeHtml(ticket.subject || "Pedido sem assunto")}</strong>
+              <p>${escapeHtml([ticket.companyName, ticket.clientName, ticket.email].filter(Boolean).join(" · "))}</p>
+            </div>
+            <span class="ticket-priority">${escapeHtml(ticket.priority)}</span>
+          </header>
+          <div class="ticket-message">${escapeHtml(ticket.message || "Sem descrição.")}</div>
+          <div class="ticket-meta-grid">
+            <div><span>Categoria</span><strong>${escapeHtml(ticket.category)}</strong></div>
+            <div><span>Entrada</span><strong>${escapeHtml(created)}</strong></div>
+            <div><span>Projeto</span><strong>${safeExternalUrl(ticket.projectUrl) ? `<a href="${escapeAttr(safeExternalUrl(ticket.projectUrl))}" target="_blank" rel="noopener">Abrir</a>` : "Sem link"}</strong></div>
+          </div>
+          <label>
+            Notas internas
+            <textarea data-ticket-notes="${escapeAttr(ticket.id)}" rows="2" placeholder="Ex: responder até amanhã, pedir acesso, aguardar conteúdos...">${escapeHtml(ticket.internalNotes)}</textarea>
+          </label>
+          <div class="ticket-actions">
+            <select data-ticket-status="${escapeAttr(ticket.id)}">
+              ${ticketStatuses.map((status) => `<option ${status === ticket.status ? "selected" : ""}>${status}</option>`).join("")}
+            </select>
+            <select data-ticket-priority="${escapeAttr(ticket.id)}">
+              ${ticketPriorities.map((priority) => `<option ${priority === ticket.priority ? "selected" : ""}>${priority}</option>`).join("")}
+            </select>
+            <a class="button ghost mini" href="${ticketEmailHref(ticket)}">Responder</a>
+          </div>
+        </article>
+      `;
+    })
+    .join("") || `<div class="empty">Ainda não há tickets. Partilha o link /suporte com os clientes.</div>`;
+}
+
 function renderRecurring() {
   const list = qs("#recurringList");
   if (!list) return;
@@ -1306,6 +1482,7 @@ function renderAll() {
   renderForm();
   renderDashboard();
   renderPipeline();
+  renderTickets();
   renderRecurring();
   renderClients();
   renderHistory();
@@ -1522,6 +1699,34 @@ function bindEvents() {
     if (handleEmailReminderClick(event)) return;
     const item = event.target.closest("[data-open]");
     if (item) openProposal(item.dataset.open);
+  });
+
+  qs("#ticketSearchInput").addEventListener("input", renderTickets);
+  qs("#ticketStatusFilter").addEventListener("change", renderTickets);
+  qs("#ticketPriorityFilter").addEventListener("change", renderTickets);
+  qs("#refreshTicketsBtn").addEventListener("click", async () => {
+    await loadSupportTickets();
+    renderTickets();
+    showSuccessModal("Tickets atualizados a partir do Supabase.");
+  });
+  qs("#copySupportUrlBtn").addEventListener("click", () => {
+    const url = `${window.location.origin}/suporte`;
+    navigator.clipboard?.writeText(url).catch(() => {});
+    showSuccessModal(`Link de suporte copiado: ${url}`);
+  });
+  qs("#ticketsBoard").addEventListener("change", (event) => {
+    const status = event.target.closest("[data-ticket-status]");
+    if (status) {
+      updateTicket(status.dataset.ticketStatus, { status: status.value });
+      return;
+    }
+    const priority = event.target.closest("[data-ticket-priority]");
+    if (priority) {
+      updateTicket(priority.dataset.ticketPriority, { priority: priority.value });
+      return;
+    }
+    const notes = event.target.closest("[data-ticket-notes]");
+    if (notes) updateTicket(notes.dataset.ticketNotes, { internalNotes: notes.value.trim() });
   });
 
   qs("#clientSearchInput").addEventListener("input", renderClients);

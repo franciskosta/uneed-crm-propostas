@@ -6,9 +6,11 @@ const outDir = path.join(root, "dist");
 const files = [
   "index.html",
   "login.html",
+  "suporte.html",
   "styles.css",
   "app.js",
   "pricing.js",
+  "suporte.js",
 ];
 
 fs.rmSync(outDir, { recursive: true, force: true });

@@ -40,6 +40,7 @@
           <button class="nav-tab" data-view="proposal">Proposta</button>
           <button class="nav-tab" data-view="clients">Clientes</button>
           <button class="nav-tab" data-view="pipeline">Pipeline</button>
+          <button class="nav-tab" data-view="tickets">Tickets</button>
           <button class="nav-tab" data-view="recurring">Avenças</button>
           <button class="nav-tab" data-view="history">Histórico</button>
           <button class="nav-tab" data-view="settings">Configuração</button>
@@ -56,6 +57,7 @@
             <span class="sync-status" id="syncStatus">A iniciar...</span>
             <button class="button ghost" id="exportDataBtn">Exportar dados</button>
             <button class="button ghost" id="importDataBtn">Importar</button>
+            <a class="button ghost" href="/suporte" target="_blank" rel="noopener">Portal suporte</a>
             <button class="button primary" id="newProposalBtn">Nova proposta</button>
             <button class="button ghost" id="logoutBtn">Sair</button>
             <input id="importFile" type="file" accept="application/json" hidden />
@@ -271,6 +273,53 @@
             </select>
           </div>
           <div class="kanban" id="kanban"></div>
+        </section>
+
+        <section class="view" id="view-tickets">
+          <div class="tickets-hero panel">
+            <div>
+              <p class="eyebrow">Suporte UNEED</p>
+              <h2>Tickets de clientes</h2>
+              <p>Pedidos submetidos pelo formulário público entram aqui automaticamente.</p>
+            </div>
+            <div class="tickets-public-link">
+              <span>Link para clientes</span>
+              <strong id="supportPublicUrl">/suporte</strong>
+              <button class="button ghost mini" id="copySupportUrlBtn" type="button">Copiar</button>
+            </div>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric-card">
+              <span>Novos</span>
+              <strong id="ticketMetricNew">0</strong>
+            </article>
+            <article class="metric-card">
+              <span>Em aberto</span>
+              <strong id="ticketMetricOpen">0</strong>
+            </article>
+            <article class="metric-card">
+              <span>Urgentes</span>
+              <strong id="ticketMetricUrgent">0</strong>
+            </article>
+            <article class="metric-card">
+              <span>Resolvidos</span>
+              <strong id="ticketMetricResolved">0</strong>
+            </article>
+          </div>
+
+          <div class="ticket-toolbar">
+            <input id="ticketSearchInput" placeholder="Pesquisar ticket, cliente, email ou projeto..." />
+            <select id="ticketStatusFilter">
+              <option value="">Todos os estados</option>
+            </select>
+            <select id="ticketPriorityFilter">
+              <option value="">Todas as prioridades</option>
+            </select>
+            <button class="button ghost" id="refreshTicketsBtn" type="button">Atualizar</button>
+          </div>
+
+          <div class="tickets-board" id="ticketsBoard"></div>
         </section>
 
         <section class="view" id="view-recurring">

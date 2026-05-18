@@ -1437,34 +1437,38 @@ function renderSettings() {
     .map(
       (service, index) => `
         <div class="catalog-row" data-index="${index}">
-          <label class="catalog-name catalog-field-wide">
-            Nome do serviço
-            <input type="text" value="${escapeAttr(service.name)}" data-catalog-field="name" aria-label="Serviço" />
-          </label>
+          <div class="catalog-card-head">
+            <label class="catalog-name">
+              Nome do serviço
+              <input type="text" value="${escapeAttr(service.name)}" data-catalog-field="name" aria-label="Serviço" />
+            </label>
+            <label class="catalog-price">
+              Preço
+              <input type="number" min="0" step="1" value="${Number(service.price || 0)}" data-catalog-field="price" aria-label="Preço" />
+            </label>
+            <button class="remove-row" type="button" data-remove-catalog="${index}" title="Remover serviço" aria-label="Remover serviço">×</button>
+          </div>
+          <div class="catalog-meta-grid">
+            <label>
+              Categoria
+              <input type="text" value="${escapeAttr(service.category || "")}" data-catalog-field="category" placeholder="Ex: UNEED LEADS" />
+            </label>
+            <label>
+              Modalidade
+              <select data-catalog-field="billing">
+                ${["Pronto pagamento", "Mensal", "Anual", "Setup"].map((option) => `<option ${option === (service.billing || "Pronto pagamento") ? "selected" : ""}>${option}</option>`).join("")}
+              </select>
+            </label>
+            <label>
+              Compromisso
+              <input type="text" value="${escapeAttr(service.commitment || "")}" data-catalog-field="commitment" placeholder="Ex: mínimo 12 meses" />
+            </label>
+          </div>
           <label>
-            Preço
-            <input type="number" min="0" step="1" value="${Number(service.price || 0)}" data-catalog-field="price" aria-label="Preço" />
-          </label>
-          <button class="remove-row" type="button" data-remove-catalog="${index}" title="Remover">×</button>
-          <label>
-            Categoria
-            <input type="text" value="${escapeAttr(service.category || "")}" data-catalog-field="category" placeholder="Ex: UNEED LEADS" />
-          </label>
-          <label>
-            Modalidade
-            <select data-catalog-field="billing">
-              ${["Pronto pagamento", "Mensal", "Anual", "Setup"].map((option) => `<option ${option === (service.billing || "Pronto pagamento") ? "selected" : ""}>${option}</option>`).join("")}
-            </select>
-          </label>
-          <label>
-            Compromisso
-            <input type="text" value="${escapeAttr(service.commitment || "")}" data-catalog-field="commitment" placeholder="Ex: mínimo 12 meses" />
-          </label>
-          <label class="catalog-field-wide">
             Legenda/subtítulo
             <input type="text" value="${escapeAttr(service.pitch || "")}" data-catalog-field="pitch" placeholder="Frase curta que aparece por baixo do serviço" />
           </label>
-          <label class="catalog-field-full">
+          <label>
             O que inclui
             <textarea rows="3" data-catalog-field="includes" placeholder="Itens incluídos no serviço">${escapeHtml(service.includes || "")}</textarea>
           </label>

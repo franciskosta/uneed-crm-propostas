@@ -415,6 +415,11 @@ h3 {
   color: #a33a24;
 }
 
+input[type="color"] {
+  min-height: 44px;
+  padding: 6px;
+}
+
 .icon-button {
   display: grid;
   width: 38px;
@@ -466,11 +471,17 @@ h3 {
   font-size: 26px;
 }
 
-.dashboard-grid,
-.settings-grid {
+.dashboard-grid {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
   gap: 18px;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.82fr) minmax(520px, 1.18fr);
+  gap: 18px;
+  align-items: start;
 }
 
 .clients-toolbar {
@@ -895,6 +906,26 @@ h3 {
   justify-content: flex-end;
 }
 
+#catalogForm .panel-heading {
+  align-items: flex-start;
+}
+
+#catalogForm .panel-heading h2 {
+  max-width: 220px;
+  font-size: 22px;
+  line-height: 1.08;
+}
+
+#catalogForm .panel-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  min-width: 180px;
+}
+
+#catalogForm .panel-actions .button {
+  width: 100%;
+}
+
 .panel-heading.compact {
   margin-top: 8px;
   margin-bottom: 10px;
@@ -1128,12 +1159,13 @@ textarea {
 }
 
 .catalog-row {
-  grid-template-columns: minmax(180px, 1.4fr) 120px 36px;
-  align-items: end;
-  padding: 14px;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  align-items: stretch;
+  padding: 16px;
   border: 1px solid var(--line);
   border-radius: 12px;
-  background: #fff;
+  background: linear-gradient(180deg, #fff 0%, #fbfcff 100%);
 }
 
 .service-row input,
@@ -1144,6 +1176,22 @@ textarea {
   min-width: 0;
 }
 
+.catalog-card-head,
+.catalog-meta-grid {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
+}
+
+.catalog-card-head {
+  grid-template-columns: minmax(0, 1fr) 132px 40px;
+  align-items: end;
+}
+
+.catalog-meta-grid {
+  grid-template-columns: minmax(0, 1fr) 160px minmax(160px, 1fr);
+}
+
 .catalog-row label {
   display: grid;
   gap: 6px;
@@ -1152,17 +1200,13 @@ textarea {
   font-weight: 800;
 }
 
-.catalog-field-wide {
-  grid-column: span 2;
-}
-
-.catalog-field-full {
-  grid-column: 1 / -1;
-}
-
 .catalog-name {
   display: grid;
   gap: 4px;
+}
+
+.catalog-price input {
+  text-align: right;
 }
 
 .service-row input[type="checkbox"] {
@@ -1749,9 +1793,9 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .catalog-field-wide,
-  .catalog-field-full {
-    grid-column: 1;
+  .catalog-card-head,
+  .catalog-meta-grid {
+    grid-template-columns: 1fr;
   }
 
   .nav-tabs {

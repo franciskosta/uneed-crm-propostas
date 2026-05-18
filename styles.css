@@ -471,6 +471,10 @@ input[type="color"] {
   font-size: 26px;
 }
 
+.fiscal-grid {
+  margin-top: 14px;
+}
+
 .dashboard-grid {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
@@ -1287,6 +1291,10 @@ textarea {
   color: #fff;
 }
 
+.quote-no-qr .quote-head {
+  grid-template-columns: 1fr auto;
+}
+
 .quote-logo {
   display: inline-grid;
   width: 154px;
@@ -1429,6 +1437,7 @@ textarea {
   color: var(--muted);
   font-size: 11px;
   line-height: 1.4;
+  white-space: pre-line;
 }
 
 .quote-table em {
@@ -1438,6 +1447,7 @@ textarea {
   font-size: 12px;
   font-style: normal;
   font-weight: 800;
+  white-space: pre-line;
 }
 
 .quote-total,
@@ -1455,6 +1465,10 @@ textarea {
 
 .payment-block {
   align-self: end;
+}
+
+.payment-block p {
+  white-space: pre-line;
 }
 
 .total-box {
@@ -1476,6 +1490,13 @@ textarea {
   border-bottom: 0;
   padding-top: 12px;
   font-size: 24px;
+  font-weight: 900;
+}
+
+.total-line.net {
+  margin-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.22);
+  border-bottom: 0;
   font-weight: 900;
 }
 
@@ -1941,6 +1962,10 @@ textarea {
     background: linear-gradient(135deg, #111639 0%, #181d49 100%) !important;
     color: #fff !important;
     border-bottom: 0;
+  }
+
+  .quote-no-qr .quote-head {
+    grid-template-columns: 1fr auto;
   }
 
   .quote-logo {

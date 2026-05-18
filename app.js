@@ -102,6 +102,8 @@ const seedProposals = [
     ],
     discount: 120,
     vatMode: "0",
+    withholdingMode: "0",
+    paymentTerms: "50% na adjudicação + 50% na entrega.",
     paymentIban: "",
     paidAmount: 0,
     billedAmount: 0,
@@ -149,6 +151,7 @@ function loadState() {
       phone: "+351 934 419 375",
       website: "https://uneed.pt",
       iban: "",
+      paymentTerms: "50% na adjudicação + 50% na entrega.",
       color: "#181d49",
     },
     catalog: defaultCatalog,
@@ -295,8 +298,14 @@ function migrateBrandDefaults() {
   if (!state.brand.phone || state.brand.phone === "+351 900 000 000") state.brand.phone = "+351 934 419 375";
   if (!state.brand.website) state.brand.website = "https://uneed.pt";
   if (!("iban" in state.brand)) state.brand.iban = "";
+  if (!("paymentTerms" in state.brand)) state.brand.paymentTerms = "50% na adjudicação + 50% na entrega.";
   if (!state.brand.color || state.brand.color === "#111111") state.brand.color = "#181d49";
   if (!("recurringTarget" in state)) state.recurringTarget = 1000;
+  state.proposals ||= [];
+  state.proposals.forEach((proposal) => {
+    if (!("withholdingMode" in proposal)) proposal.withholdingMode = "0";
+    if (!("paymentTerms" in proposal)) proposal.paymentTerms = state.brand.paymentTerms || "";
+  });
   state.tickets ||= [];
   saveState();
 }
@@ -355,8 +364,13 @@ function eur(value) {
   return Number(value || 0).toLocaleString("pt-PT", {
     style: "currency",
     currency: "EUR",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: Number(value || 0) % 1 ? 2 : 0,
+    maximumFractionDigits: 2,
   });
+}
+
+function parseRate(value) {
+  return Number(String(value || "0").replace(",", "."));
 }
 
 function today() {
@@ -365,6 +379,12 @@ function today() {
 
 function monthKey(dateString = today()) {
   return dateString.slice(0, 7);
+}
+
+function quarterKey(dateString = today()) {
+  const date = new Date(dateString);
+  const quarter = Math.floor(date.getMonth() / 3) + 1;
+  return `${date.getFullYear()}-T${quarter}`;
 }
 
 function selectedServices(proposal) {
@@ -381,11 +401,28 @@ function totals(proposal) {
   const beforeDiscount = subtotal(proposal);
   const discount = Math.min(Number(proposal.discount || 0), beforeDiscount);
   const taxable = beforeDiscount - discount;
-  const vat = taxable * (Number(proposal.vatMode || 0) / 100);
+  const vatRate = parseRate(proposal.vatMode);
+  const withholdingRate = parseRate(proposal.withholdingMode);
+  const vat = taxable * (vatRate / 100);
+  const withholding = taxable * (withholdingRate / 100);
   const total = taxable + vat;
+  const receivable = total - withholding;
   const paid = Number(proposal.paidAmount || 0);
   const billed = Number(proposal.billedAmount || 0);
-  return { beforeDiscount, discount, taxable, vat, total, paid, billed, open: Math.max(total - paid, 0) };
+  return {
+    beforeDiscount,
+    discount,
+    taxable,
+    vat,
+    vatRate,
+    withholding,
+    withholdingRate,
+    total,
+    receivable,
+    paid,
+    billed,
+    open: Math.max(receivable - paid, 0),
+  };
 }
 
 function recognizedRevenue(proposal) {
@@ -410,6 +447,40 @@ function monthlyStats(month) {
   const won = proposals.filter((proposal) => ["Aceite", "Em desenvolvimento", "Concluído", "Faturado"].includes(proposal.status)).length;
   const lost = proposals.filter((proposal) => proposal.status === "Perdido").length;
   return { month, sent, billed, recurring, won, lost, count: proposals.length };
+}
+
+function fiscalStats(month = monthKey()) {
+  return state.proposals
+    .filter((proposal) => proposal.status === "Faturado" && revenueMonth(proposal) === month)
+    .reduce(
+      (sum, proposal) => {
+        const value = totals(proposal);
+        sum.taxable += value.taxable;
+        sum.vat += value.vat;
+        sum.withholding += value.withholding;
+        sum.invoiced += value.total;
+        sum.receivable += value.receivable;
+        return sum;
+      },
+      { taxable: 0, vat: 0, withholding: 0, invoiced: 0, receivable: 0 },
+    );
+}
+
+function fiscalQuarterStats(quarter = quarterKey()) {
+  return state.proposals
+    .filter((proposal) => proposal.status === "Faturado" && quarterKey(proposal.updatedAt || proposal.createdAt || today()) === quarter)
+    .reduce(
+      (sum, proposal) => {
+        const value = totals(proposal);
+        sum.taxable += value.taxable;
+        sum.vat += value.vat;
+        sum.withholding += value.withholding;
+        sum.invoiced += value.total;
+        sum.receivable += value.receivable;
+        return sum;
+      },
+      { taxable: 0, vat: 0, withholding: 0, invoiced: 0, receivable: 0 },
+    );
 }
 
 function billingTotals(proposal) {
@@ -575,6 +646,8 @@ function emptyProposal() {
     services: [],
     discount: 0,
     vatMode: "0",
+    withholdingMode: "0",
+    paymentTerms: state.brand.paymentTerms || "50% na adjudicação + 50% na entrega.",
     paymentIban: "",
     paidAmount: 0,
     billedAmount: 0,
@@ -779,6 +852,8 @@ function renderForm() {
   qs("#sampleUrl").value = proposal.sampleUrl || "";
   qs("#discount").value = proposal.discount || 0;
   qs("#vatMode").value = proposal.vatMode || "0";
+  qs("#withholdingMode").value = proposal.withholdingMode || "0";
+  qs("#paymentTerms").value = proposal.paymentTerms || state.brand.paymentTerms || "";
   qs("#paymentIban").value = proposal.paymentIban || state.brand.iban || "";
   qs("#paidAmount").value = proposal.paidAmount || 0;
   qs("#billedAmount").value = proposal.billedAmount || 0;
@@ -800,7 +875,7 @@ function renderForm() {
             </div>
           </div>
           <input type="number" min="1" step="1" value="${Number(service.qty || 1)}" data-field="qty" aria-label="Quantidade" />
-          <input type="number" min="0" step="1" value="${Number(service.price || 0)}" data-field="price" aria-label="Preço" />
+          <input type="number" min="0" step="0.01" value="${Number(service.price || 0)}" data-field="price" aria-label="Preço" />
           <button class="remove-row" type="button" data-remove-service="${index}" title="Remover">×</button>
         </div>
       `;
@@ -824,6 +899,8 @@ function readForm() {
   proposal.sampleUrl = qs("#sampleUrl").value.trim();
   proposal.discount = Number(qs("#discount").value || 0);
   proposal.vatMode = qs("#vatMode").value;
+  proposal.withholdingMode = qs("#withholdingMode").value;
+  proposal.paymentTerms = qs("#paymentTerms").value.trim();
   proposal.paymentIban = qs("#paymentIban").value.trim();
   proposal.paidAmount = Number(qs("#paidAmount").value || 0);
   proposal.billedAmount = Number(qs("#billedAmount").value || 0);
@@ -856,8 +933,8 @@ function renderProposalSummary(proposal) {
       <strong>${eur(sum.total)}</strong>
     </div>
     <div class="summary-pill">
-      <span>Por receber</span>
-      <strong>${eur(sum.open)}</strong>
+      <span>Líquido</span>
+      <strong>${eur(sum.receivable)}</strong>
     </div>
     <div class="summary-pill ${overdue ? "alert" : ""}">
       <span>Follow-up</span>
@@ -945,7 +1022,7 @@ function renderPreview() {
     : "";
 
   qs("#proposalPreview").innerHTML = `
-    <article class="quote-page" style="--brand:${escapeAttr(brand.color)}">
+    <article class="quote-page ${proposal.sampleUrl ? "" : "quote-no-qr"}" style="--brand:${escapeAttr(brand.color)}">
       <header class="quote-head">
         <div>
           <div class="quote-logo"><img src="./assets/uneed-logo-branco.png" alt="UNEED" /></div>
@@ -955,13 +1032,7 @@ function renderPreview() {
         <div class="quote-meta">
           <strong>${escapeHtml(brand.name)}</strong>
           <span>${escapeHtml(brand.email)}<br>${escapeHtml(brand.phone)}<br>${escapeHtml(brand.website)}</span>
-          <div class="qr">
-            ${
-              qrImageUrl
-                ? `<img src="${qrImageUrl}" alt="QR code da amostra" /><span class="print-url">${escapeHtml(proposal.sampleUrl)}</span>`
-                : `<span>QR</span>`
-            }
-          </div>
+          ${qrImageUrl ? `<div class="qr"><img src="${qrImageUrl}" alt="QR code da amostra" /><span class="print-url">${escapeHtml(proposal.sampleUrl)}</span></div>` : ""}
         </div>
       </header>
 
@@ -1016,6 +1087,7 @@ function renderPreview() {
           <div class="quote-block payment-block">
             <span>Observações e pagamento</span>
             <p>${escapeHtml(proposal.proposalNotes || "Proposta válida até à data indicada. O projeto inicia após aprovação e pagamento da entrada acordada.")}</p>
+            ${proposal.paymentTerms ? `<p><strong>Pagamento:</strong> ${escapeHtml(proposal.paymentTerms)}</p>` : ""}
             ${recurring ? `<p><strong>Avenças:</strong> as mensalidades funcionam por débito direto através da GoCardless. O cliente autoriza o mandato antes da primeira cobrança e recebe aviso antes dos pagamentos. A GoCardless opera pagamentos bancários por débito direto/SEPA e aplica mecanismos de segurança e proteção do pagador.</p>` : ""}
             ${iban ? `<p><strong>NIB/IBAN:</strong> ${escapeHtml(iban)}</p>` : ""}
             ${proposal.sampleUrl ? `<p><strong>Amostra:</strong> ${escapeHtml(proposal.sampleUrl)}</p>` : ""}
@@ -1026,7 +1098,9 @@ function renderPreview() {
             <div class="total-line"><span>Anual</span><strong>${eur(split.annual)}</strong></div>
             <div class="total-line"><span>Desconto</span><strong>${eur(sum.discount)}</strong></div>
             <div class="total-line"><span>IVA</span><strong>${eur(sum.vat)}</strong></div>
+            ${sum.withholding ? `<div class="total-line"><span>Retenção</span><strong>-${eur(sum.withholding)}</strong></div>` : ""}
             <div class="total-line grand"><span>Total ref.</span><strong>${eur(sum.total)}</strong></div>
+            ${sum.withholding ? `<div class="total-line net"><span>Líquido a receber</span><strong>${eur(sum.receivable)}</strong></div>` : ""}
           </div>
         </section>
       </div>
@@ -1047,6 +1121,7 @@ function renderDashboard() {
   const billed = proposals
     .filter((p) => monthKey(p.updatedAt || p.createdAt || today()) === currentMonth)
     .reduce((sum, p) => sum + recognizedRevenue(p), 0);
+  const fiscal = fiscalQuarterStats();
   const closed = proposals.filter((p) => ["Aceite", "Em desenvolvimento", "Concluído", "Faturado"].includes(p.status)).length;
   const decided = proposals.filter((p) => ["Aceite", "Em desenvolvimento", "Concluído", "Faturado", "Perdido"].includes(p.status)).length;
   const followups = proposals.filter((p) => p.followupDate && !["Faturado", "Perdido"].includes(p.status));
@@ -1055,6 +1130,10 @@ function renderDashboard() {
   qs("#metricBilled").textContent = eur(billed);
   qs("#metricCloseRate").textContent = `${decided ? Math.round((closed / decided) * 100) : 0}%`;
   qs("#metricFollowups").textContent = String(followups.length);
+  qs("#metricTaxable").textContent = eur(fiscal.taxable);
+  qs("#metricVatDue").textContent = eur(fiscal.vat);
+  qs("#metricWithheld").textContent = eur(fiscal.withholding);
+  qs("#metricReceivable").textContent = eur(fiscal.receivable);
 
   const ordered = [...followups].sort((a, b) => {
     return followupAscending
@@ -1431,6 +1510,7 @@ function renderSettings() {
   qs("#brandPhone").value = state.brand.phone || "";
   qs("#brandWebsite").value = state.brand.website || "";
   qs("#brandIban").value = state.brand.iban || "";
+  qs("#brandPaymentTerms").value = state.brand.paymentTerms || "";
   qs("#brandColor").value = state.brand.color || "#111111";
 
   qs("#catalogRows").innerHTML = state.catalog
@@ -1444,7 +1524,7 @@ function renderSettings() {
             </label>
             <label class="catalog-price">
               Preço
-              <input type="number" min="0" step="1" value="${Number(service.price || 0)}" data-catalog-field="price" aria-label="Preço" />
+              <input type="number" min="0" step="0.01" value="${Number(service.price || 0)}" data-catalog-field="price" aria-label="Preço" />
             </label>
             <button class="remove-row" type="button" data-remove-catalog="${index}" title="Remover serviço" aria-label="Remover serviço">×</button>
           </div>
@@ -1466,7 +1546,7 @@ function renderSettings() {
           </div>
           <label>
             Legenda/subtítulo
-            <input type="text" value="${escapeAttr(service.pitch || "")}" data-catalog-field="pitch" placeholder="Frase curta que aparece por baixo do serviço" />
+            <textarea rows="2" data-catalog-field="pitch" placeholder="Frase curta que aparece por baixo do serviço">${escapeHtml(service.pitch || "")}</textarea>
           </label>
           <label>
             O que inclui
@@ -1647,8 +1727,8 @@ function bindEvents() {
     const proposal = readForm();
     const sum = totals(proposal);
     qs("#proposalStatus").value = "Faturado";
-    qs("#billedAmount").value = Math.round(sum.total);
-    qs("#paidAmount").value = Math.round(Math.max(Number(proposal.paidAmount || 0), sum.total));
+    qs("#billedAmount").value = sum.total.toFixed(2);
+    qs("#paidAmount").value = Math.max(Number(proposal.paidAmount || 0), sum.receivable).toFixed(2);
     addActivity("Pagamento", `Proposta marcada como faturada no valor de ${eur(sum.total)}.`);
   });
 
@@ -1816,6 +1896,7 @@ function bindEvents() {
       phone: qs("#brandPhone").value.trim(),
       website: qs("#brandWebsite").value.trim(),
       iban: qs("#brandIban").value.trim(),
+      paymentTerms: qs("#brandPaymentTerms").value.trim(),
       color: qs("#brandColor").value,
     };
     saveState();

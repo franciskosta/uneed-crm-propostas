@@ -49,21 +49,21 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 12px;
   background: #fff;
-  padding: 30px;
+  padding: 34px 30px 30px;
   box-shadow: 0 28px 90px rgba(0, 0, 0, 0.26);
 }
 
 .login-logo {
   display: block;
-  width: min(280px, 82%);
+  width: min(190px, 62%);
   height: auto;
-  margin-bottom: 28px;
+  margin: 0 auto 34px;
 }
 
 .login-card form {
   display: grid;
   gap: 14px;
-  margin-top: 22px;
+  margin-top: 0;
 }
 
 .login-card form.is-hidden {
@@ -84,6 +84,10 @@ body {
   color: var(--muted);
   font-size: 13px;
   line-height: 1.4;
+}
+
+.login-mode.is-hidden {
+  display: none;
 }
 
 .login-error {
@@ -471,6 +475,14 @@ input[type="color"] {
   font-size: 26px;
 }
 
+.metric-card small {
+  display: block;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
 .fiscal-grid {
   margin-top: 14px;
 }
@@ -813,6 +825,31 @@ input[type="color"] {
   align-items: start;
 }
 
+.client-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #eef2f7;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.status-pill.is-active {
+  background: #e7f8f3;
+  color: #08745f;
+}
+
 .client-head > div {
   min-width: 0;
 }
@@ -942,6 +979,49 @@ input[type="color"] {
 .pricing-note {
   margin-top: -4px;
   color: var(--muted);
+}
+
+.catalog-toolbar {
+  margin-bottom: 14px;
+}
+
+.catalog-toolbar label {
+  display: grid;
+  max-width: 340px;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.catalog-accordion {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.catalog-accordion summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.catalog-accordion summary strong {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.catalog-group {
+  display: grid;
+  gap: 12px;
+  padding: 0 14px 14px;
 }
 
 .pricing-category {
@@ -1170,6 +1250,7 @@ textarea {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: linear-gradient(180deg, #fff 0%, #fbfcff 100%);
+  margin-bottom: 0;
 }
 
 .service-row input,

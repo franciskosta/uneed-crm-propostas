@@ -88,18 +88,22 @@
             <article class="metric-card">
               <span>Base faturada trimestre</span>
               <strong id="metricTaxable">0 EUR</strong>
+              <small id="fiscalQuarterLabel">Trimestre atual</small>
             </article>
             <article class="metric-card">
               <span>IVA a entregar trimestre</span>
               <strong id="metricVatDue">0 EUR</strong>
+              <small id="vatDueHint">Pagamento previsto.</small>
             </article>
             <article class="metric-card">
               <span>Retido na fonte trimestre</span>
               <strong id="metricWithheld">0 EUR</strong>
+              <small id="withheldYearHint">Ano: 0 EUR acumulados</small>
             </article>
             <article class="metric-card">
               <span>Líquido a receber trimestre</span>
               <strong id="metricReceivable">0 EUR</strong>
+              <small>Depois de retenção na fonte.</small>
             </article>
           </div>
 
@@ -358,7 +362,7 @@
             <div>
               <p class="eyebrow">Receita previsível</p>
               <h2>Avenças ativas</h2>
-              <p>Todas as propostas faturadas com serviços mensais entram aqui automaticamente.</p>
+              <p>Todas as propostas faturadas com serviços mensais entram aqui automaticamente e continuam ativas mês a mês até mudares o estado.</p>
             </div>
             <div class="recurring-total">
               <span>A faturar em avenças</span>
@@ -458,6 +462,10 @@
                 Cor principal
                 <input id="brandColor" type="color" />
               </label>
+              <label>
+                Retenção na fonte acumulada desde janeiro
+                <input id="yearlyWithheldAdjustment" type="number" min="0" step="0.01" placeholder="Valor manual já retido este ano" />
+              </label>
               <button class="button primary" type="submit">Guardar marca</button>
             </form>
 
@@ -468,6 +476,14 @@
                   <button class="button ghost" id="syncPricingBtn" type="button">Usar tabela UNEED</button>
                   <button class="button ghost" id="addCatalogServiceBtn" type="button">Novo serviço</button>
                 </div>
+              </div>
+              <div class="catalog-toolbar">
+                <label>
+                  Filtrar categoria
+                  <select id="catalogCategoryFilter">
+                    <option value="">Todas as categorias</option>
+                  </select>
+                </label>
               </div>
               <div id="catalogRows"></div>
               <button class="button primary" type="submit">Guardar catálogo</button>

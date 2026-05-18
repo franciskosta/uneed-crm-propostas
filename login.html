@@ -11,9 +11,7 @@
     <main class="login-shell">
       <section class="login-card">
         <img class="login-logo" src="./assets/uneed-logo-login.png" alt="UNEED" />
-        <p class="eyebrow">Acesso seguro</p>
-        <h1>Entrar no CRM UNEED</h1>
-        <p class="login-mode" id="loginMode">A verificar modo de autenticação...</p>
+        <p class="login-mode is-hidden" id="loginMode"></p>
         <form id="loginForm">
           <label>
             Email
@@ -71,15 +69,17 @@
       const params = authParams();
       const isRecovery = params.get("type") === "recovery" || params.has("access_token") || params.has("code");
       const authMode = client ? "supabase" : "local";
-      document.querySelector("#loginMode").textContent = authMode === "supabase"
-        ? "Modo online: Supabase Auth ativo."
-        : "Modo local: Supabase ainda não configurado. Usa geral@uneed.pt / uneed-local.";
+      if (authMode === "local") {
+        document.querySelector("#loginMode").textContent = "Modo local: usa geral@uneed.pt / uneed-local.";
+        document.querySelector("#loginMode").classList.remove("is-hidden");
+      }
 
       let recoverySessionPromise = Promise.resolve();
       if (client && isRecovery) {
         document.querySelector("#loginForm").classList.add("is-hidden");
         document.querySelector("#resetForm").classList.remove("is-hidden");
         document.querySelector("#loginMode").textContent = "Recuperação ativa: define uma nova password para continuar.";
+        document.querySelector("#loginMode").classList.remove("is-hidden");
         recoverySessionPromise = prepareRecoverySession(client, params).catch(() => {
           document.querySelector("#resetError").textContent = "O link de recuperação expirou. Pede um novo email no Supabase.";
         });

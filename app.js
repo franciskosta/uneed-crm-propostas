@@ -17,12 +17,21 @@ if (window.location.pathname.replace(/\/$/, "") === "/suporte") {
 
 const statuses = [
   "Novo pedido",
-  "Em análise",
   "Orçamento enviado",
   "Follow-up",
   "Aceite",
   "Em desenvolvimento",
-  "A aguardar cliente",
+  "Concluído",
+  "Faturado",
+  "Perdido",
+];
+
+const pipelineStatuses = [
+  "Novo pedido",
+  "Orçamento enviado",
+  "Follow-up",
+  "Aceite",
+  "Em desenvolvimento",
   "Concluído",
   "Faturado",
   "Perdido",
@@ -133,6 +142,7 @@ hydratePricingDefaults();
 isHydratingFromServer = false;
 let activeId = state.proposals[0]?.id || null;
 let followupAscending = true;
+let catalogCategoryFilter = "";
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -157,6 +167,9 @@ function loadState() {
     catalog: defaultCatalog,
     monthTarget: 5000,
     recurringTarget: 1000,
+    fiscal: {
+      yearlyWithheldAdjustment: 0,
+    },
     proposals: seedProposals,
     tickets: [],
   };
@@ -301,8 +314,12 @@ function migrateBrandDefaults() {
   if (!("paymentTerms" in state.brand)) state.brand.paymentTerms = "50% na adjudicação + 50% na entrega.";
   if (!state.brand.color || state.brand.color === "#111111") state.brand.color = "#181d49";
   if (!("recurringTarget" in state)) state.recurringTarget = 1000;
+  state.fiscal ||= {};
+  if (!("yearlyWithheldAdjustment" in state.fiscal)) state.fiscal.yearlyWithheldAdjustment = 0;
   state.proposals ||= [];
   state.proposals.forEach((proposal) => {
+    if (proposal.status === "Em análise") proposal.status = "Novo pedido";
+    if (proposal.status === "A aguardar cliente") proposal.status = "Follow-up";
     if (!("withholdingMode" in proposal)) proposal.withholdingMode = "0";
     if (!("paymentTerms" in proposal)) proposal.paymentTerms = state.brand.paymentTerms || "";
   });
@@ -387,6 +404,39 @@ function quarterKey(dateString = today()) {
   return `${date.getFullYear()}-T${quarter}`;
 }
 
+function quarterMeta(quarter = quarterKey()) {
+  const [yearText, quarterText] = String(quarter).split("-T");
+  const year = Number(yearText);
+  const number = Number(quarterText || 1);
+  const labels = {
+    1: "1.º trimestre",
+    2: "2.º trimestre",
+    3: "3.º trimestre",
+    4: "4.º trimestre",
+  };
+  const periods = {
+    1: "janeiro a março",
+    2: "abril a junho",
+    3: "julho a setembro",
+    4: "outubro a dezembro",
+  };
+  const dueMonths = {
+    1: 4,
+    2: 8,
+    3: 10,
+    4: 1,
+  };
+  const dueYear = number === 4 ? year + 1 : year;
+  const dueMonth = dueMonths[number] || 4;
+  const paymentDate = new Date(Date.UTC(dueYear, dueMonth, 25));
+  return {
+    key: quarter,
+    label: `${labels[number] || `${number}.º trimestre`} de ${year}`,
+    period: periods[number] || "",
+    paymentDue: paymentDate.toLocaleDateString("pt-PT", { day: "2-digit", month: "long", year: "numeric" }),
+  };
+}
+
 function selectedServices(proposal) {
   return (proposal.services || []).filter((service) => service.selected && Number(service.qty) > 0);
 }
@@ -468,15 +518,32 @@ function fiscalStats(month = monthKey()) {
 
 function fiscalQuarterStats(quarter = quarterKey()) {
   return state.proposals
-    .filter((proposal) => proposal.status === "Faturado" && quarterKey(proposal.updatedAt || proposal.createdAt || today()) === quarter)
+    .filter((proposal) => proposal.status === "Faturado")
     .reduce(
       (sum, proposal) => {
-        const value = totals(proposal);
-        sum.taxable += value.taxable;
-        sum.vat += value.vat;
-        sum.withholding += value.withholding;
-        sum.invoiced += value.total;
-        sum.receivable += value.receivable;
+        const revenueDate = proposal.updatedAt || proposal.createdAt || today();
+        const split = splitTaxableByBilling(proposal);
+        if (quarterKey(revenueDate) === quarter) {
+          addFiscal(sum, fiscalFromTaxable(split.once + split.annual, proposal));
+        }
+        addFiscal(sum, fiscalFromTaxable(split.monthly, proposal, monthsInQuarter(quarter, revenueDate)));
+        return sum;
+      },
+      { taxable: 0, vat: 0, withholding: 0, invoiced: 0, receivable: 0 },
+    );
+}
+
+function fiscalYearStats(year = new Date().getFullYear()) {
+  return state.proposals
+    .filter((proposal) => proposal.status === "Faturado")
+    .reduce(
+      (sum, proposal) => {
+        const revenueDate = proposal.updatedAt || proposal.createdAt || today();
+        const split = splitTaxableByBilling(proposal);
+        if (new Date(revenueDate).getFullYear() === Number(year)) {
+          addFiscal(sum, fiscalFromTaxable(split.once + split.annual, proposal));
+        }
+        addFiscal(sum, fiscalFromTaxable(split.monthly, proposal, monthsInYear(year, revenueDate)));
         return sum;
       },
       { taxable: 0, vat: 0, withholding: 0, invoiced: 0, receivable: 0 },
@@ -495,6 +562,74 @@ function billingTotals(proposal) {
     },
     { once: 0, monthly: 0, annual: 0 },
   );
+}
+
+function splitTaxableByBilling(proposal) {
+  const beforeDiscount = subtotal(proposal);
+  const discount = Math.min(Number(proposal.discount || 0), beforeDiscount);
+  const split = billingTotals(proposal);
+  const applyDiscountShare = (value) => {
+    if (!beforeDiscount) return 0;
+    return Math.max(value - discount * (value / beforeDiscount), 0);
+  };
+  return {
+    once: applyDiscountShare(split.once),
+    monthly: applyDiscountShare(split.monthly),
+    annual: applyDiscountShare(split.annual),
+  };
+}
+
+function fiscalFromTaxable(taxable, proposal, multiplier = 1) {
+  const base = Number(taxable || 0) * multiplier;
+  const vat = base * (parseRate(proposal.vatMode) / 100);
+  const withholding = base * (parseRate(proposal.withholdingMode) / 100);
+  return {
+    taxable: base,
+    vat,
+    withholding,
+    invoiced: base + vat,
+    receivable: base + vat - withholding,
+  };
+}
+
+function addFiscal(target, value) {
+  target.taxable += value.taxable;
+  target.vat += value.vat;
+  target.withholding += value.withholding;
+  target.invoiced += value.invoiced;
+  target.receivable += value.receivable;
+  return target;
+}
+
+function monthsInQuarter(quarter = quarterKey(), activeFrom = today()) {
+  const meta = quarterMeta(quarter);
+  const [yearText, quarterText] = String(quarter).split("-T");
+  const year = Number(yearText);
+  const number = Number(quarterText || 1);
+  const startMonth = (number - 1) * 3;
+  const now = new Date();
+  const start = new Date(activeFrom);
+  let count = 0;
+  for (let month = startMonth; month < startMonth + 3; month++) {
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0);
+    if (monthStart > now && meta.key === quarterKey()) continue;
+    if (monthEnd >= start) count += 1;
+  }
+  return count;
+}
+
+function monthsInYear(year = new Date().getFullYear(), activeFrom = today()) {
+  const now = new Date();
+  const start = new Date(activeFrom);
+  let count = 0;
+  for (let month = 0; month < 12; month++) {
+    const monthStart = new Date(year, month, 1);
+    const monthEnd = new Date(year, month + 1, 0);
+    if (monthStart > now) continue;
+    if (monthEnd >= start) count += 1;
+  }
+  return count;
 }
 
 function recurringMonthlyValue(proposal) {
@@ -716,8 +851,9 @@ function updateProposal(id, patch) {
   const proposal = state.proposals.find((item) => item.id === id);
   if (!proposal) return;
   if (patch.status === "Faturado" && !Number(proposal.billedAmount || 0)) {
-    patch.billedAmount = totals(proposal).total;
-    patch.paidAmount = Math.max(Number(proposal.paidAmount || 0), totals(proposal).total);
+    const sum = totals(proposal);
+    patch.billedAmount = sum.total;
+    patch.paidAmount = Math.max(Number(proposal.paidAmount || 0), sum.receivable);
   }
   Object.assign(proposal, patch, { updatedAt: new Date().toISOString() });
   saveState();
@@ -1114,14 +1250,24 @@ function renderPreview() {
 }
 
 function renderDashboard() {
-  const openStatuses = new Set(["Novo pedido", "Em análise", "Orçamento enviado", "Follow-up", "Aceite", "Em desenvolvimento", "A aguardar cliente"]);
+  const openStatuses = new Set(["Novo pedido", "Orçamento enviado", "Follow-up", "Aceite", "Em desenvolvimento"]);
   const proposals = state.proposals;
   const currentMonth = monthKey();
+  const recurringMonthly = recurringProposals().reduce((sum, proposal) => sum + recurringMonthlyValue(proposal), 0);
   const openValue = proposals.filter((p) => openStatuses.has(p.status)).reduce((sum, p) => sum + totals(p).total, 0);
-  const billed = proposals
+  const billedOneOff = proposals
     .filter((p) => monthKey(p.updatedAt || p.createdAt || today()) === currentMonth)
-    .reduce((sum, p) => sum + recognizedRevenue(p), 0);
-  const fiscal = fiscalQuarterStats();
+    .reduce((sum, p) => {
+      const billing = billingTotals(p);
+      return sum + recognizedRevenue(p) - (p.status === "Faturado" ? billing.monthly : 0);
+    }, 0);
+  const billed = Math.max(billedOneOff, 0) + recurringMonthly;
+  const currentQuarter = quarterKey();
+  const fiscal = fiscalQuarterStats(currentQuarter);
+  const fiscalYear = fiscalYearStats();
+  const quarter = quarterMeta(currentQuarter);
+  const manualWithheld = Number(state.fiscal?.yearlyWithheldAdjustment || 0);
+  const annualWithheld = fiscalYear.withholding + manualWithheld;
   const closed = proposals.filter((p) => ["Aceite", "Em desenvolvimento", "Concluído", "Faturado"].includes(p.status)).length;
   const decided = proposals.filter((p) => ["Aceite", "Em desenvolvimento", "Concluído", "Faturado", "Perdido"].includes(p.status)).length;
   const followups = proposals.filter((p) => p.followupDate && !["Faturado", "Perdido"].includes(p.status));
@@ -1134,6 +1280,9 @@ function renderDashboard() {
   qs("#metricVatDue").textContent = eur(fiscal.vat);
   qs("#metricWithheld").textContent = eur(fiscal.withholding);
   qs("#metricReceivable").textContent = eur(fiscal.receivable);
+  qs("#fiscalQuarterLabel").textContent = `${quarter.label} · ${quarter.period}`;
+  qs("#vatDueHint").textContent = `Pagamento previsto até ${quarter.paymentDue}.`;
+  qs("#withheldYearHint").textContent = `Ano: ${eur(annualWithheld)} acumulados`;
 
   const ordered = [...followups].sort((a, b) => {
     return followupAscending
@@ -1233,7 +1382,7 @@ function renderPipeline() {
     return (!term || haystack.includes(term)) && (!filter || proposal.status === filter);
   });
 
-  qs("#kanban").innerHTML = statuses
+  qs("#kanban").innerHTML = pipelineStatuses
     .map((status) => {
       const cards = proposals.filter((proposal) => proposal.status === status);
       return `
@@ -1459,6 +1608,7 @@ function renderClients() {
       const total = proposals.reduce((sum, proposal) => sum + totals(proposal).total, 0);
       const billed = proposals.reduce((sum, proposal) => sum + recognizedRevenue(proposal), 0);
       const open = proposals.filter((proposal) => !["Faturado", "Perdido"].includes(proposal.status)).length;
+      const activeRecurring = proposals.some((proposal) => recurringMonthlyValue(proposal) > 0);
       const first = proposals[0];
       return `
         <article class="client-card">
@@ -1467,7 +1617,10 @@ function renderClients() {
               <strong>${escapeHtml(first.companyName || first.clientName || "Cliente sem nome")}</strong>
               <span>${escapeHtml([first.clientName, first.clientEmail, first.clientPhone, first.clientNif ? `NIF ${first.clientNif}` : ""].filter(Boolean).join(" · "))}</span>
             </div>
-            <button class="button ghost mini" data-open="${first.id}" type="button">Abrir</button>
+            <div class="client-head-actions">
+              ${activeRecurring ? `<span class="status-pill is-active">Avença ativa</span>` : ""}
+              <button class="button ghost mini" data-open="${first.id}" type="button">Abrir</button>
+            </div>
           </header>
           <div class="client-metrics">
             <div class="client-metric"><span>Propostas</span><strong>${proposals.length}</strong></div>
@@ -1512,10 +1665,30 @@ function renderSettings() {
   qs("#brandIban").value = state.brand.iban || "";
   qs("#brandPaymentTerms").value = state.brand.paymentTerms || "";
   qs("#brandColor").value = state.brand.color || "#111111";
+  qs("#yearlyWithheldAdjustment").value = Number(state.fiscal?.yearlyWithheldAdjustment || 0);
 
-  qs("#catalogRows").innerHTML = state.catalog
-    .map(
-      (service, index) => `
+  const catalog = state.catalog || [];
+  const categoryList = [...new Set(catalog.map((service) => service.category || "Serviços personalizados"))].sort();
+  if (catalogCategoryFilter && !categoryList.includes(catalogCategoryFilter)) catalogCategoryFilter = "";
+  qs("#catalogCategoryFilter").innerHTML = `<option value="">Todas as categorias</option>${categoryList.map((category) => `<option value="${escapeAttr(category)}" ${category === catalogCategoryFilter ? "selected" : ""}>${escapeHtml(category)}</option>`).join("")}`;
+
+  const groups = catalog.reduce((acc, service, index) => {
+    const category = service.category || "Serviços personalizados";
+    if (catalogCategoryFilter && category !== catalogCategoryFilter) return acc;
+    acc[category] ||= [];
+    acc[category].push({ service, index });
+    return acc;
+  }, {});
+
+  qs("#catalogRows").innerHTML = Object.entries(groups)
+    .map(([category, entries]) => `
+      <details class="catalog-accordion" open>
+        <summary>
+          <span>${escapeHtml(category)}</span>
+          <strong>${entries.length} serviços</strong>
+        </summary>
+        <div class="catalog-group">
+          ${entries.map(({ service, index }) => `
         <div class="catalog-row" data-index="${index}">
           <div class="catalog-card-head">
             <label class="catalog-name">
@@ -1553,9 +1726,11 @@ function renderSettings() {
             <textarea rows="3" data-catalog-field="includes" placeholder="Itens incluídos no serviço">${escapeHtml(service.includes || "")}</textarea>
           </label>
         </div>
-      `,
-    )
-    .join("");
+          `).join("")}
+        </div>
+      </details>
+    `)
+    .join("") || `<div class="empty">Sem serviços nesta categoria.</div>`;
   renderPricingMatrix();
 }
 
@@ -1899,25 +2074,37 @@ function bindEvents() {
       paymentTerms: qs("#brandPaymentTerms").value.trim(),
       color: qs("#brandColor").value,
     };
+    state.fiscal ||= {};
+    state.fiscal.yearlyWithheldAdjustment = Number(qs("#yearlyWithheldAdjustment").value || 0);
     saveState();
     renderAll();
   });
 
   qs("#catalogForm").addEventListener("submit", (event) => {
     event.preventDefault();
-    state.catalog = qsa(".catalog-row").map((row) => ({
-      ...(state.catalog[Number(row.dataset.index)] || {}),
-      id: state.catalog[Number(row.dataset.index)]?.id || crypto.randomUUID(),
-      name: row.querySelector('[data-catalog-field="name"]').value.trim(),
-      price: Number(row.querySelector('[data-catalog-field="price"]').value || 0),
-      category: row.querySelector('[data-catalog-field="category"]').value.trim(),
-      billing: row.querySelector('[data-catalog-field="billing"]').value,
-      commitment: row.querySelector('[data-catalog-field="commitment"]').value.trim(),
-      pitch: row.querySelector('[data-catalog-field="pitch"]').value.trim(),
-      includes: row.querySelector('[data-catalog-field="includes"]').value.trim(),
-    }));
+    const nextCatalog = [...(state.catalog || [])];
+    qsa(".catalog-row").forEach((row) => {
+      const index = Number(row.dataset.index);
+      nextCatalog[index] = {
+        ...(nextCatalog[index] || {}),
+        id: nextCatalog[index]?.id || crypto.randomUUID(),
+        name: row.querySelector('[data-catalog-field="name"]').value.trim(),
+        price: Number(row.querySelector('[data-catalog-field="price"]').value || 0),
+        category: row.querySelector('[data-catalog-field="category"]').value.trim(),
+        billing: row.querySelector('[data-catalog-field="billing"]').value,
+        commitment: row.querySelector('[data-catalog-field="commitment"]').value.trim(),
+        pitch: row.querySelector('[data-catalog-field="pitch"]').value.trim(),
+        includes: row.querySelector('[data-catalog-field="includes"]').value.trim(),
+      };
+    });
+    state.catalog = nextCatalog.filter(Boolean);
     saveState();
     renderAll();
+  });
+
+  qs("#catalogCategoryFilter").addEventListener("change", () => {
+    catalogCategoryFilter = qs("#catalogCategoryFilter").value;
+    renderSettings();
   });
 
   qs("#syncPricingBtn").addEventListener("click", applyPricingCatalog);

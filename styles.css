@@ -1127,11 +1127,37 @@ textarea {
   margin-bottom: 8px;
 }
 
+.catalog-row {
+  grid-template-columns: minmax(180px, 1.4fr) 120px 36px;
+  align-items: end;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
 .service-row input,
 .catalog-row input,
 .service-row select,
-.catalog-row select {
+.catalog-row select,
+.catalog-row textarea {
   min-width: 0;
+}
+
+.catalog-row label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.catalog-field-wide {
+  grid-column: span 2;
+}
+
+.catalog-field-full {
+  grid-column: 1 / -1;
 }
 
 .catalog-name {
@@ -1721,6 +1747,11 @@ textarea {
   .milestone-track,
   .client-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .catalog-field-wide,
+  .catalog-field-full {
+    grid-column: 1;
   }
 
   .nav-tabs {

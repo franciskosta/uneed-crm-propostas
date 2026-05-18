@@ -529,6 +529,24 @@ function serviceMeta(service) {
   return [service.category, service.billing, service.commitment].filter(Boolean).join(" · ");
 }
 
+function serviceFromCatalogItem(item) {
+  return {
+    name: item.name || "Novo serviço",
+    qty: 1,
+    price: Number(item.price || 0),
+    selected: true,
+    category: item.category || "Serviço personalizado",
+    billing: item.billing || "Pronto pagamento",
+    commitment: item.commitment || "",
+    includes: item.includes || "",
+    pitch: item.pitch || "",
+    objective: item.objective || "",
+    tag: item.tag || "",
+    featured: Boolean(item.featured),
+    cta: item.cta || "",
+  };
+}
+
 function proposalHeadline(proposal) {
   const featured = selectedServices(proposal).find((service) => service.pitch || service.cta);
   if (featured?.pitch) return featured.pitch;
@@ -591,15 +609,15 @@ function fillStatusSelects() {
 function renderQuickProductSelect() {
   const select = qs("#quickProductSelect");
   if (!select) return;
-  select.innerHTML = pricingItems()
-    .map((item) => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.name)} · ${escapeHtml(item.billing)} · ${eur(item.price)}</option>`)
+  select.innerHTML = (state.catalog || [])
+    .map((item, index) => `<option value="${index}">${escapeHtml(item.name)} · ${escapeHtml(item.billing || "Pronto pagamento")} · ${eur(item.price)}</option>`)
     .join("");
 }
 
 function addPricingItemToActiveProposal(item) {
   const proposal = readForm();
   proposal.services ||= [];
-  proposal.services.push(serviceFromPricingItem(item));
+  proposal.services.push(serviceFromCatalogItem(item));
   const index = state.proposals.findIndex((entry) => entry.id === proposal.id);
   if (index >= 0) state.proposals[index] = proposal;
   saveState();
@@ -1419,13 +1437,37 @@ function renderSettings() {
     .map(
       (service, index) => `
         <div class="catalog-row" data-index="${index}">
-          <label class="catalog-name">
+          <label class="catalog-name catalog-field-wide">
+            Nome do serviço
             <input type="text" value="${escapeAttr(service.name)}" data-catalog-field="name" aria-label="Serviço" />
-            ${serviceMeta(service) ? `<span class="service-meta">${escapeHtml(serviceMeta(service))}</span>` : ""}
           </label>
-          <input type="number" min="0" step="1" value="${Number(service.price || 0)}" data-catalog-field="price" aria-label="Preço" />
-          <span></span>
+          <label>
+            Preço
+            <input type="number" min="0" step="1" value="${Number(service.price || 0)}" data-catalog-field="price" aria-label="Preço" />
+          </label>
           <button class="remove-row" type="button" data-remove-catalog="${index}" title="Remover">×</button>
+          <label>
+            Categoria
+            <input type="text" value="${escapeAttr(service.category || "")}" data-catalog-field="category" placeholder="Ex: UNEED LEADS" />
+          </label>
+          <label>
+            Modalidade
+            <select data-catalog-field="billing">
+              ${["Pronto pagamento", "Mensal", "Anual", "Setup"].map((option) => `<option ${option === (service.billing || "Pronto pagamento") ? "selected" : ""}>${option}</option>`).join("")}
+            </select>
+          </label>
+          <label>
+            Compromisso
+            <input type="text" value="${escapeAttr(service.commitment || "")}" data-catalog-field="commitment" placeholder="Ex: mínimo 12 meses" />
+          </label>
+          <label class="catalog-field-wide">
+            Legenda/subtítulo
+            <input type="text" value="${escapeAttr(service.pitch || "")}" data-catalog-field="pitch" placeholder="Frase curta que aparece por baixo do serviço" />
+          </label>
+          <label class="catalog-field-full">
+            O que inclui
+            <textarea rows="3" data-catalog-field="includes" placeholder="Itens incluídos no serviço">${escapeHtml(service.includes || "")}</textarea>
+          </label>
         </div>
       `,
     )
@@ -1437,16 +1479,23 @@ function renderPricingMatrix() {
   const matrix = qs("#pricingMatrix");
   const note = qs("#pricingNote");
   if (!matrix || !note) return;
-  const pricing = window.UNEED_PRICING;
-  if (!pricing?.categories?.length) {
-    note.textContent = "Sem tabela dinâmica carregada.";
+  const catalog = state.catalog || [];
+  if (!catalog.length) {
+    note.textContent = "Sem serviços no catálogo.";
     matrix.innerHTML = "";
     return;
   }
-  note.textContent = `${pricing.categories.length} categorias · atualizado em ${pricing.updatedAt} · sistemas em mensalidade/pronto pagamento, valores sem IVA.`;
-  matrix.innerHTML = pricing.categories.map((category) => `
+  const categories = catalog.reduce((groups, item, index) => {
+    const title = item.category || "Serviços personalizados";
+    groups[title] ||= [];
+    groups[title].push({ ...item, catalogIndex: index });
+    return groups;
+  }, {});
+  const categoryEntries = Object.entries(categories);
+  note.textContent = `${categoryEntries.length} categorias · ${catalog.length} serviços · tabela alimentada pelo catálogo editável, valores sem IVA.`;
+  matrix.innerHTML = categoryEntries.map(([title, items]) => `
     <section class="pricing-category">
-      <h3>${escapeHtml(category.title)}</h3>
+      <h3>${escapeHtml(title)}</h3>
       <div class="pricing-table-wrap">
         <table class="pricing-table">
           <thead>
@@ -1460,7 +1509,7 @@ function renderPricingMatrix() {
             </tr>
           </thead>
           <tbody>
-            ${(category.items || []).map((item) => `
+            ${items.map((item) => `
               <tr class="${item.featured ? "is-featured" : ""}">
                 <td>
                   ${item.featured ? `<span class="pricing-badge">Mais procurado</span>` : ""}
@@ -1471,7 +1520,7 @@ function renderPricingMatrix() {
                 <td>${eur(item.price)}</td>
                 <td>${escapeHtml(item.commitment || "-")}</td>
                 <td>${escapeHtml(item.includes || "")}</td>
-                <td><button class="button ghost mini" type="button" data-add-pricing="${escapeAttr(item.id)}">Adicionar</button></td>
+                <td><button class="button ghost mini" type="button" data-add-pricing="${item.catalogIndex}">Adicionar</button></td>
               </tr>
             `).join("")}
           </tbody>
@@ -1560,7 +1609,7 @@ function bindEvents() {
   });
 
   qs("#quickAddProductBtn").addEventListener("click", () => {
-    const item = pricingItems().find((entry) => entry.id === qs("#quickProductSelect").value);
+    const item = state.catalog[Number(qs("#quickProductSelect").value)];
     if (!item) return;
     addPricingItemToActiveProposal(item);
   });
@@ -1773,8 +1822,14 @@ function bindEvents() {
     event.preventDefault();
     state.catalog = qsa(".catalog-row").map((row) => ({
       ...(state.catalog[Number(row.dataset.index)] || {}),
+      id: state.catalog[Number(row.dataset.index)]?.id || crypto.randomUUID(),
       name: row.querySelector('[data-catalog-field="name"]').value.trim(),
       price: Number(row.querySelector('[data-catalog-field="price"]').value || 0),
+      category: row.querySelector('[data-catalog-field="category"]').value.trim(),
+      billing: row.querySelector('[data-catalog-field="billing"]').value,
+      commitment: row.querySelector('[data-catalog-field="commitment"]').value.trim(),
+      pitch: row.querySelector('[data-catalog-field="pitch"]').value.trim(),
+      includes: row.querySelector('[data-catalog-field="includes"]').value.trim(),
     }));
     saveState();
     renderAll();
@@ -1785,14 +1840,23 @@ function bindEvents() {
   qs("#pricingMatrix").addEventListener("click", (event) => {
     const button = event.target.closest("[data-add-pricing]");
     if (!button) return;
-    const item = pricingItems().find((entry) => entry.id === button.dataset.addPricing);
+    const item = state.catalog[Number(button.dataset.addPricing)];
     if (!item) return;
     switchView("proposal");
     addPricingItemToActiveProposal(item);
   });
 
   qs("#addCatalogServiceBtn").addEventListener("click", () => {
-    state.catalog.push({ name: "Novo serviço", price: 0 });
+    state.catalog.push({
+      id: crypto.randomUUID(),
+      name: "Novo serviço",
+      category: "Serviços personalizados",
+      billing: "Pronto pagamento",
+      commitment: "",
+      pitch: "Legenda curta do serviço.",
+      includes: "",
+      price: 0,
+    });
     renderSettings();
   });
 

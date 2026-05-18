@@ -91,7 +91,13 @@
               <small id="fiscalQuarterLabel">Trimestre atual</small>
             </article>
             <article class="metric-card">
-              <span>IVA a entregar trimestre</span>
+              <div class="metric-label-with-info">
+                <span>IVA a entregar trimestre</span>
+                <span class="tooltip-wrap">
+                  <button class="info-button" type="button" aria-label="Ver datas de entrega do IVA" aria-describedby="vatScheduleTooltip">i</button>
+                  <span class="tooltip-panel" id="vatScheduleTooltip" role="tooltip"></span>
+                </span>
+              </div>
               <strong id="metricVatDue">0 EUR</strong>
               <small id="vatDueHint">Pagamento previsto.</small>
             </article>

@@ -428,13 +428,19 @@ function quarterMeta(quarter = quarterKey()) {
   };
   const dueYear = number === 4 ? year + 1 : year;
   const dueMonth = dueMonths[number] || 4;
+  const declarationDate = new Date(Date.UTC(dueYear, dueMonth, 20));
   const paymentDate = new Date(Date.UTC(dueYear, dueMonth, 25));
   return {
     key: quarter,
     label: `${labels[number] || `${number}.º trimestre`} de ${year}`,
     period: periods[number] || "",
+    declarationDue: declarationDate.toLocaleDateString("pt-PT", { day: "2-digit", month: "long", year: "numeric" }),
     paymentDue: paymentDate.toLocaleDateString("pt-PT", { day: "2-digit", month: "long", year: "numeric" }),
   };
+}
+
+function vatSchedule(year = new Date().getFullYear()) {
+  return [1, 2, 3, 4].map((quarter) => quarterMeta(`${year}-T${quarter}`));
 }
 
 function selectedServices(proposal) {
@@ -1281,8 +1287,14 @@ function renderDashboard() {
   qs("#metricWithheld").textContent = eur(fiscal.withholding);
   qs("#metricReceivable").textContent = eur(fiscal.receivable);
   qs("#fiscalQuarterLabel").textContent = `${quarter.label} · ${quarter.period}`;
-  qs("#vatDueHint").textContent = `Pagamento previsto até ${quarter.paymentDue}.`;
+  qs("#vatDueHint").textContent = `${quarter.label}: ${quarter.period}. Pagamento até ${quarter.paymentDue}.`;
   qs("#withheldYearHint").textContent = `Ano: ${eur(annualWithheld)} acumulados`;
+  qs("#vatScheduleTooltip").innerHTML = vatSchedule().map((item) => `
+    <span>
+      <strong>${escapeHtml(item.label.replace(` de ${new Date().getFullYear()}`, ""))}</strong>
+      ${escapeHtml(item.period)} · declaração até ${escapeHtml(item.declarationDue)} · pagamento até ${escapeHtml(item.paymentDue)}
+    </span>
+  `).join("");
 
   const ordered = [...followups].sort((a, b) => {
     return followupAscending
@@ -1393,22 +1405,26 @@ function renderPipeline() {
               .map((proposal) => {
                 const sum = totals(proposal);
                 return `
-                  <article class="deal-card ${proposal.followupDate && proposal.followupDate < today() && !["Faturado", "Perdido"].includes(proposal.status) ? "is-overdue" : ""}" data-open="${proposal.id}" draggable="true">
-                    <div>
-                      <strong>${escapeHtml(proposal.companyName || proposal.clientName || "Sem nome")}</strong>
-                      <span class="card-meta">${escapeHtml(proposal.clientName || "")}</span>
+                  <details class="deal-card ${proposal.followupDate && proposal.followupDate < today() && !["Faturado", "Perdido"].includes(proposal.status) ? "is-overdue" : ""}" data-open="${proposal.id}" draggable="true">
+                    <summary class="deal-summary">
+                      <span>
+                        <strong>${escapeHtml(proposal.companyName || proposal.clientName || "Sem nome")}</strong>
+                        <span class="card-meta">${escapeHtml(proposalLabel(proposal))}</span>
+                      </span>
+                      <strong>${eur(sum.total)}</strong>
+                    </summary>
+                    <div class="deal-card-body">
+                      <span class="card-meta">Cliente: ${escapeHtml(proposal.clientName || "sem nome")}</span>
+                      <span class="card-meta">Follow-up: ${proposal.followupDate || "sem data"}</span>
+                      <select class="status-select" data-status-id="${proposal.id}">
+                        ${statuses.map((item) => `<option ${item === proposal.status ? "selected" : ""}>${item}</option>`).join("")}
+                      </select>
+                      <div class="deal-actions">
+                        <button class="button ghost mini" data-open="${proposal.id}" type="button">Editar</button>
+                        <button class="button danger mini" data-delete-proposal="${proposal.id}" type="button">Apagar</button>
+                      </div>
                     </div>
-                    <strong>${eur(sum.total)}</strong>
-                    <span class="card-meta">${escapeHtml(proposalLabel(proposal))}</span>
-                    <span class="card-meta">Follow-up: ${proposal.followupDate || "sem data"}</span>
-                    <select class="status-select" data-status-id="${proposal.id}">
-                      ${statuses.map((item) => `<option ${item === proposal.status ? "selected" : ""}>${item}</option>`).join("")}
-                    </select>
-                    <div class="deal-actions">
-                      <button class="button ghost mini" data-open="${proposal.id}" type="button">Editar</button>
-                      <button class="button danger mini" data-delete-proposal="${proposal.id}" type="button">Apagar</button>
-                    </div>
-                  </article>
+                  </details>
                 `;
               })
               .join("") || `<div class="empty">Sem propostas.</div>`
@@ -1689,7 +1705,15 @@ function renderSettings() {
         </summary>
         <div class="catalog-group">
           ${entries.map(({ service, index }) => `
-        <div class="catalog-row" data-index="${index}">
+        <details class="catalog-row" data-index="${index}">
+          <summary class="catalog-service-summary">
+            <span>
+              <strong>${escapeHtml(service.name || "Serviço sem nome")}</strong>
+              <small>${escapeHtml(service.category || "Sem categoria")} · ${escapeHtml(service.billing || "Pronto pagamento")} · ${eur(service.price || 0)}</small>
+            </span>
+            <button class="remove-row" type="button" data-remove-catalog="${index}" title="Remover serviço" aria-label="Remover serviço">×</button>
+          </summary>
+          <div class="catalog-service-body">
           <div class="catalog-card-head">
             <label class="catalog-name">
               Nome do serviço
@@ -1699,7 +1723,6 @@ function renderSettings() {
               Preço
               <input type="number" min="0" step="0.01" value="${Number(service.price || 0)}" data-catalog-field="price" aria-label="Preço" />
             </label>
-            <button class="remove-row" type="button" data-remove-catalog="${index}" title="Remover serviço" aria-label="Remover serviço">×</button>
           </div>
           <div class="catalog-meta-grid">
             <label>
@@ -1725,7 +1748,8 @@ function renderSettings() {
             O que inclui
             <textarea rows="3" data-catalog-field="includes" placeholder="Itens incluídos no serviço">${escapeHtml(service.includes || "")}</textarea>
           </label>
-        </div>
+          </div>
+        </details>
           `).join("")}
         </div>
       </details>
@@ -1934,6 +1958,7 @@ function bindEvents() {
       deleteProposal(deleteButton.dataset.deleteProposal);
       return;
     }
+    if (event.target.closest(".deal-summary")) return;
     const select = event.target.closest("[data-status-id]");
     if (select) return;
     const card = event.target.closest("[data-open]");
@@ -2135,6 +2160,8 @@ function bindEvents() {
   qs("#catalogRows").addEventListener("click", (event) => {
     const removeButton = event.target.closest("[data-remove-catalog]");
     if (!removeButton) return;
+    event.preventDefault();
+    event.stopPropagation();
     state.catalog.splice(Number(removeButton.dataset.removeCatalog), 1);
     renderSettings();
   });

@@ -481,6 +481,13 @@ function totals(proposal) {
   };
 }
 
+function pipelineValueSummary(sum) {
+  const parts = [`Base ${eur(sum.taxable)}`];
+  if (sum.vatRate) parts.push(`+ IVA ${sum.vatRate}% (${eur(sum.vat)})`);
+  if (sum.withholdingRate) parts.push(`- retenção ${sum.withholdingRate}% (${eur(sum.withholding)})`);
+  return parts.join(" · ");
+}
+
 function recognizedRevenue(proposal) {
   if (proposal.status !== "Faturado") return Number(proposal.billedAmount || 0);
   const explicit = Number(proposal.billedAmount || 0);
@@ -1411,9 +1418,13 @@ function renderPipeline() {
                         <strong>${escapeHtml(proposal.companyName || proposal.clientName || "Sem nome")}</strong>
                         <span class="card-meta">${escapeHtml(proposalLabel(proposal))}</span>
                       </span>
-                      <strong>${eur(sum.total)}</strong>
+                      <span class="deal-value">
+                        <strong>${eur(sum.receivable)}</strong>
+                        <small>Líquido</small>
+                      </span>
                     </summary>
                     <div class="deal-card-body">
+                      <span class="card-meta fiscal-breakdown">${escapeHtml(pipelineValueSummary(sum))}</span>
                       <span class="card-meta">Cliente: ${escapeHtml(proposal.clientName || "sem nome")}</span>
                       <span class="card-meta">Follow-up: ${proposal.followupDate || "sem data"}</span>
                       <select class="status-select" data-status-id="${proposal.id}">

@@ -1784,12 +1784,33 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.deal-value {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  text-align: right;
+}
+
+.deal-value small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
 .deal-card-body {
   display: grid;
   gap: 9px;
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
+}
+
+.fiscal-breakdown {
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(21, 27, 75, 0.04);
+  line-height: 1.35;
 }
 
 .deal-card strong,

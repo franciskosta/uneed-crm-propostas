@@ -447,7 +447,7 @@ input[type="color"] {
 
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 14px;
   margin-bottom: 18px;
 }
@@ -1951,11 +1951,9 @@ textarea {
 
 @media (max-width: 1180px) {
   .proposal-layout,
-  .dashboard-grid,
   .settings-grid,
   .recurring-card,
-  .ticket-toolbar,
-  .metric-grid {
+  .ticket-toolbar {
     grid-template-columns: 1fr;
   }
 

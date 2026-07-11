@@ -37,6 +37,40 @@ const pipelineStatuses = [
   "Perdido",
 ];
 
+const leadSources = [
+  "Instagram",
+  "Referência",
+  "Website UNEED",
+  "WhatsApp",
+  "Email",
+  "Cliente atual",
+  "Outro",
+];
+
+const opportunityCategories = [
+  "Landing page",
+  "Website",
+  "Avença",
+  "Sistema de marcações",
+  "Suporte",
+  "Branding/Design",
+  "Outro",
+];
+
+const lostReasons = [
+  "Preço",
+  "Sem urgência",
+  "Escolheu concorrente",
+  "Não respondeu",
+  "Não era fit",
+  "Sem orçamento",
+  "Outro",
+];
+
+const wonStatuses = ["Aceite", "Em desenvolvimento", "Concluído", "Faturado"];
+const sentStatuses = ["Orçamento enviado", "Follow-up", ...wonStatuses, "Perdido"];
+const decidedStatuses = [...wonStatuses, "Perdido"];
+
 const recurringMilestones = [250, 500, 1000, 2500, 5000, 10000];
 
 const ticketStatuses = [
@@ -91,6 +125,12 @@ const seedProposals = [
     clientEmail: "ana@clinica-aurora.pt",
     clientPhone: "+351 910 000 000",
     leadSource: "Instagram",
+    opportunityCategory: "Landing page",
+    leadDate: new Date().toISOString().slice(0, 10),
+    proposalSentDate: new Date().toISOString().slice(0, 10),
+    closedDate: "",
+    lostReason: "",
+    npsScore: "",
     status: "Orçamento enviado",
     followupDate: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
     validUntil: new Date(Date.now() + 1000 * 60 * 60 * 24 * 12).toISOString().slice(0, 10),
@@ -320,6 +360,17 @@ function migrateBrandDefaults() {
   state.proposals.forEach((proposal) => {
     if (proposal.status === "Em análise") proposal.status = "Novo pedido";
     if (proposal.status === "A aguardar cliente") proposal.status = "Follow-up";
+    if (!("leadSource" in proposal)) proposal.leadSource = "Instagram";
+    if (!("opportunityCategory" in proposal)) proposal.opportunityCategory = inferOpportunityCategory(proposal);
+    if (!("leadDate" in proposal)) proposal.leadDate = dateOnly(proposal.createdAt || today());
+    if (!("proposalSentDate" in proposal)) {
+      proposal.proposalSentDate = sentStatuses.includes(proposal.status) ? dateOnly(proposal.updatedAt || proposal.createdAt || today()) : "";
+    }
+    if (!("closedDate" in proposal)) {
+      proposal.closedDate = decidedStatuses.includes(proposal.status) ? dateOnly(proposal.updatedAt || proposal.createdAt || today()) : "";
+    }
+    if (!("lostReason" in proposal)) proposal.lostReason = "";
+    if (!("npsScore" in proposal)) proposal.npsScore = "";
     if (!("withholdingMode" in proposal)) proposal.withholdingMode = "0";
     if (!("paymentTerms" in proposal)) proposal.paymentTerms = state.brand.paymentTerms || "";
   });
@@ -394,8 +445,13 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function dateOnly(value = today()) {
+  if (!value) return today();
+  return String(value).slice(0, 10);
+}
+
 function monthKey(dateString = today()) {
-  return dateString.slice(0, 7);
+  return dateOnly(dateString).slice(0, 7);
 }
 
 function quarterKey(dateString = today()) {
@@ -787,6 +843,12 @@ function emptyProposal() {
     clientEmail: "",
     clientPhone: "",
     leadSource: "Instagram",
+    opportunityCategory: "Outro",
+    leadDate: today(),
+    proposalSentDate: "",
+    closedDate: "",
+    lostReason: "",
+    npsScore: "",
     status: "Novo pedido",
     followupDate: today(),
     validUntil: date.toISOString().slice(0, 10),
@@ -816,6 +878,15 @@ function fillStatusSelects() {
   const statusFilter = qs("#statusFilter");
   proposalStatus.innerHTML = statuses.map((status) => `<option>${status}</option>`).join("");
   statusFilter.innerHTML = `<option value="">Todos os estados</option>${statuses.map((status) => `<option>${status}</option>`).join("")}`;
+
+  const leadSource = qs("#leadSource");
+  const opportunityCategory = qs("#opportunityCategory");
+  const lostReason = qs("#lostReason");
+  if (leadSource) leadSource.innerHTML = leadSources.map((source) => `<option>${source}</option>`).join("");
+  if (opportunityCategory) opportunityCategory.innerHTML = opportunityCategories.map((category) => `<option>${category}</option>`).join("");
+  if (lostReason) {
+    lostReason.innerHTML = `<option value="">Selecionar se a proposta for perdida</option>${lostReasons.map((reason) => `<option>${reason}</option>`).join("")}`;
+  }
 
   const ticketStatusFilter = qs("#ticketStatusFilter");
   const ticketPriorityFilter = qs("#ticketPriorityFilter");
@@ -863,6 +934,12 @@ function closeSuccessModal() {
 function updateProposal(id, patch) {
   const proposal = state.proposals.find((item) => item.id === id);
   if (!proposal) return;
+  if (patch.status && statusIsSent(patch.status) && !proposal.proposalSentDate) {
+    patch.proposalSentDate = today();
+  }
+  if (patch.status && statusIsDecided(patch.status) && !proposal.closedDate) {
+    patch.closedDate = today();
+  }
   if (patch.status === "Faturado" && !Number(proposal.billedAmount || 0)) {
     const sum = totals(proposal);
     patch.billedAmount = sum.total;
@@ -983,6 +1060,111 @@ function hasRecurringServices(proposal) {
   return selectedServices(proposal).some((service) => String(service.billing || "").toLowerCase().includes("mensal"));
 }
 
+function inferOpportunityCategory(proposal) {
+  if (proposal?.opportunityCategory) return proposal.opportunityCategory;
+  const service = selectedServices(proposal || {})[0] || (proposal?.services || [])[0];
+  const category = String(service?.category || service?.billing || service?.name || "").toLowerCase();
+  if (category.includes("lead") || category.includes("landing") || category.includes("lp")) return "Landing page";
+  if (category.includes("book") || category.includes("agenda") || category.includes("marca")) return "Sistema de marcações";
+  if (category.includes("mensal") || category.includes("aven")) return "Avença";
+  if (category.includes("brand") || category.includes("design")) return "Branding/Design";
+  if (category.includes("suporte")) return "Suporte";
+  if (category.includes("site") || category.includes("web")) return "Website";
+  return "Outro";
+}
+
+function daysBetween(start, end) {
+  if (!start || !end) return null;
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null;
+  return Math.max(Math.round((endDate - startDate) / 86400000), 0);
+}
+
+function statusIsWon(status) {
+  return wonStatuses.includes(status);
+}
+
+function statusIsSent(status) {
+  return sentStatuses.includes(status);
+}
+
+function statusIsDecided(status) {
+  return decidedStatuses.includes(status);
+}
+
+function proposalCloseDate(proposal) {
+  return proposal.closedDate || (statusIsDecided(proposal.status) ? dateOnly(proposal.updatedAt || proposal.createdAt || today()) : "");
+}
+
+function performanceStats() {
+  const proposals = state.proposals || [];
+  const currentMonth = monthKey();
+  const leadsMonth = proposals.filter((proposal) => monthKey(proposal.leadDate || proposal.createdAt || today()) === currentMonth);
+  const sentMonth = proposals.filter((proposal) => {
+    const sentDate = proposal.proposalSentDate || (statusIsSent(proposal.status) ? proposal.updatedAt || proposal.createdAt : "");
+    return sentDate && monthKey(sentDate) === currentMonth;
+  });
+  const won = proposals.filter((proposal) => statusIsWon(proposal.status));
+  const lost = proposals.filter((proposal) => proposal.status === "Perdido");
+  const decided = proposals.filter((proposal) => statusIsDecided(proposal.status));
+  const wonWithValue = won.filter((proposal) => totals(proposal).receivable > 0);
+  const closeDurations = decided
+    .map((proposal) => daysBetween(proposal.leadDate || proposal.createdAt, proposalCloseDate(proposal)))
+    .filter((value) => value !== null);
+  const recurring = recurringProposals();
+  const lostRecurringMonth = lost.filter((proposal) => {
+    const closed = proposalCloseDate(proposal);
+    return hasRecurringServices(proposal) && closed && monthKey(closed) === currentMonth;
+  });
+  const npsValues = proposals
+    .map((proposal) => Number(proposal.npsScore))
+    .filter((value) => Number.isFinite(value) && value >= 0 && value <= 10);
+  const average = (items) => (items.length ? items.reduce((sum, value) => sum + value, 0) / items.length : 0);
+  const byCategory = proposals.reduce((map, proposal) => {
+    const category = proposal.opportunityCategory || inferOpportunityCategory(proposal);
+    map[category] ||= { category, leads: 0, sent: 0, won: 0, lost: 0, value: 0 };
+    map[category].leads += 1;
+    if (statusIsSent(proposal.status) || proposal.proposalSentDate) map[category].sent += 1;
+    if (statusIsWon(proposal.status)) {
+      map[category].won += 1;
+      map[category].value += totals(proposal).receivable;
+    }
+    if (proposal.status === "Perdido") map[category].lost += 1;
+    return map;
+  }, {});
+  const lossReasons = lost.reduce((map, proposal) => {
+    const reason = proposal.lostReason || "Sem motivo";
+    map[reason] = (map[reason] || 0) + 1;
+    return map;
+  }, {});
+  const sources = proposals.reduce((map, proposal) => {
+    const source = proposal.leadSource || "Sem origem";
+    map[source] = (map[source] || 0) + 1;
+    return map;
+  }, {});
+  const mrr = recurring.reduce((sum, proposal) => sum + recurringMonthlyValue(proposal), 0);
+  const churnBase = recurring.length + lostRecurringMonth.length;
+  return {
+    proposals,
+    leadsMonth,
+    sentMonth,
+    won,
+    lost,
+    decided,
+    closeRate: decided.length ? (won.length / decided.length) * 100 : 0,
+    avgCloseDays: average(closeDurations),
+    avgTicket: wonWithValue.length ? wonWithValue.reduce((sum, proposal) => sum + totals(proposal).receivable, 0) / wonWithValue.length : 0,
+    mrr,
+    estimatedLtv: recurring.length ? (mrr / recurring.length) * 12 : 0,
+    churnRate: churnBase ? (lostRecurringMonth.length / churnBase) * 100 : 0,
+    nps: npsValues.length ? average(npsValues) : null,
+    byCategory: Object.values(byCategory).sort((a, b) => b.value - a.value || b.leads - a.leads),
+    lossReasons: Object.entries(lossReasons).sort((a, b) => b[1] - a[1]),
+    sources: Object.entries(sources).sort((a, b) => b[1] - a[1]),
+  };
+}
+
 function renderForm() {
   const proposal = getActiveProposal();
   if (!proposal) return;
@@ -995,6 +1177,12 @@ function renderForm() {
   qs("#clientEmail").value = proposal.clientEmail || "";
   qs("#clientPhone").value = proposal.clientPhone || "";
   qs("#leadSource").value = proposal.leadSource || "Instagram";
+  qs("#opportunityCategory").value = proposal.opportunityCategory || inferOpportunityCategory(proposal);
+  qs("#leadDate").value = proposal.leadDate || dateOnly(proposal.createdAt || today());
+  qs("#proposalSentDate").value = proposal.proposalSentDate || "";
+  qs("#closedDate").value = proposal.closedDate || "";
+  qs("#lostReason").value = proposal.lostReason || "";
+  qs("#npsScore").value = proposal.npsScore || "";
   qs("#proposalStatus").value = proposal.status || "Novo pedido";
   qs("#followupDate").value = proposal.followupDate || "";
   qs("#validUntil").value = proposal.validUntil || "";
@@ -1042,7 +1230,16 @@ function readForm() {
   proposal.clientEmail = qs("#clientEmail").value.trim();
   proposal.clientPhone = qs("#clientPhone").value.trim();
   proposal.leadSource = qs("#leadSource").value;
+  proposal.opportunityCategory = qs("#opportunityCategory").value;
+  proposal.leadDate = qs("#leadDate").value || dateOnly(proposal.createdAt || today());
+  proposal.proposalSentDate = qs("#proposalSentDate").value;
+  proposal.closedDate = qs("#closedDate").value;
+  proposal.lostReason = qs("#lostReason").value;
+  proposal.npsScore = qs("#npsScore").value === "" ? "" : Number(qs("#npsScore").value);
   proposal.status = qs("#proposalStatus").value;
+  if (statusIsSent(proposal.status) && !proposal.proposalSentDate) proposal.proposalSentDate = today();
+  if (statusIsDecided(proposal.status) && !proposal.closedDate) proposal.closedDate = today();
+  if (proposal.status !== "Perdido") proposal.lostReason = "";
   proposal.followupDate = qs("#followupDate").value;
   proposal.validUntil = qs("#validUntil").value;
   proposal.sampleUrl = qs("#sampleUrl").value.trim();
@@ -1824,10 +2021,118 @@ function renderPricingMatrix() {
   `).join("");
 }
 
+function renderPerformance() {
+  const stats = performanceStats();
+  const totalOpportunities = stats.proposals.length;
+  const source = stats.sources[0];
+  const focus = stats.leadsMonth.length === 0
+    ? "Criar novas leads este mês"
+    : stats.closeRate < 35
+      ? "Melhorar follow-ups e motivos de perda"
+      : "Escalar o que já está a converter";
+
+  qs("#perfFocus").textContent = focus;
+  qs("#perfLeadsMonth").textContent = stats.leadsMonth.length;
+  qs("#perfTopSource").textContent = source ? `Top origem: ${source[0]} (${source[1]})` : "Sem origem dominante";
+  qs("#perfSentMonth").textContent = stats.sentMonth.length;
+  qs("#perfCloseRate").textContent = `${Math.round(stats.closeRate)}%`;
+  qs("#perfWinLoss").textContent = `${stats.won.length} ganhos · ${stats.lost.length} perdidos`;
+  qs("#perfAvgCloseDays").textContent = `${Math.round(stats.avgCloseDays)} dias`;
+  qs("#perfAvgTicket").textContent = eur(stats.avgTicket);
+  qs("#perfMrr").textContent = `${eur(stats.mrr)}/mês`;
+  qs("#perfLtv").textContent = `LTV estimado 12m: ${eur(stats.estimatedLtv)}`;
+  qs("#perfChurn").textContent = `${Math.round(stats.churnRate)}%`;
+  qs("#perfNps").textContent = stats.nps === null ? "-" : stats.nps.toFixed(1).replace(".", ",");
+
+  qs("#perfCategoryList").innerHTML = stats.byCategory.length
+    ? stats.byCategory.map((item) => {
+        const decisions = item.won + item.lost;
+        const rate = decisions ? Math.round((item.won / decisions) * 100) : 0;
+        return `
+          <div class="performance-row">
+            <div>
+              <strong>${escapeHtml(item.category)}</strong>
+              <span>${item.leads} leads · ${item.sent} propostas · ${item.won} ganhos</span>
+            </div>
+            <div>
+              <strong>${rate}%</strong>
+              <span>${eur(item.value)}</span>
+            </div>
+          </div>
+        `;
+      }).join("")
+    : `<p class="empty-state">Ainda não há dados suficientes.</p>`;
+
+  qs("#perfLossList").innerHTML = stats.lossReasons.length
+    ? stats.lossReasons.map(([reason, count]) => `
+        <div class="performance-row">
+          <div>
+            <strong>${escapeHtml(reason)}</strong>
+            <span>${count} oportunidade${count === 1 ? "" : "s"} perdida${count === 1 ? "" : "s"}</span>
+          </div>
+          <div><strong>${Math.round((count / Math.max(stats.lost.length, 1)) * 100)}%</strong></div>
+        </div>
+      `).join("")
+    : `<p class="empty-state">Quando uma proposta for perdida, o motivo aparece aqui.</p>`;
+
+  const quarter = quarterMeta();
+  const target = Number(state.monthTarget || 0) * 3;
+  const quarterRevenue = fiscalQuarterStats().receivable;
+  const okrs = [
+    {
+      icon: "EUR",
+      title: "Receita trimestral",
+      text: `${eur(quarterRevenue)} de ${eur(target)} no ${quarter.label.toLowerCase()}.`,
+    },
+    {
+      icon: "%",
+      title: "Taxa de fecho",
+      text: `${Math.round(stats.closeRate)}% de conversão em oportunidades decididas.`,
+    },
+    {
+      icon: "MRR",
+      title: "Motor de avenças",
+      text: `${eur(stats.mrr)}/mês em receita recorrente ativa.`,
+    },
+    {
+      icon: "NPS",
+      title: "Experiência do cliente",
+      text: stats.nps === null ? "Ainda sem NPS registado." : `NPS médio ${stats.nps.toFixed(1).replace(".", ",")} em 10.`,
+    },
+  ];
+  qs("#perfOkrList").innerHTML = okrs.map((item) => `
+    <div class="achievement">
+      <span>${item.icon}</span>
+      <div>
+        <strong>${item.title}</strong>
+        <p>${item.text}</p>
+      </div>
+    </div>
+  `).join("");
+
+  const funnel = [
+    ["Leads", totalOpportunities],
+    ["Propostas", stats.proposals.filter((proposal) => statusIsSent(proposal.status) || proposal.proposalSentDate).length],
+    ["Decididas", stats.decided.length],
+    ["Ganhas", stats.won.length],
+  ];
+  const max = Math.max(funnel[0][1], 1);
+  qs("#perfFunnel").innerHTML = funnel.map(([label, count]) => `
+    <div class="funnel-step">
+      <div>
+        <strong>${label}</strong>
+        <span>${count}</span>
+      </div>
+      <div class="funnel-bar"><span style="width:${Math.max((count / max) * 100, count ? 8 : 0)}%"></span></div>
+    </div>
+  `).join("");
+}
+
 function renderAll() {
   fillStatusSelects();
   renderForm();
   renderDashboard();
+  renderPerformance();
   renderPipeline();
   renderTickets();
   renderRecurring();
@@ -1881,6 +2186,15 @@ function bindEvents() {
   });
 
   qs("#proposalForm").addEventListener("input", () => {
+    const proposal = readForm();
+    renderProposalSummary(proposal);
+    renderPreview();
+  });
+
+  qs("#proposalStatus").addEventListener("change", () => {
+    const status = qs("#proposalStatus").value;
+    if (statusIsSent(status) && !qs("#proposalSentDate").value) qs("#proposalSentDate").value = today();
+    if (statusIsDecided(status) && !qs("#closedDate").value) qs("#closedDate").value = today();
     const proposal = readForm();
     renderProposalSummary(proposal);
     renderPreview();

@@ -37,6 +37,7 @@
 
         <nav class="nav-tabs" aria-label="Secções">
           <button class="nav-tab is-active" data-view="dashboard">Dashboard</button>
+          <button class="nav-tab" data-view="performance">Performance</button>
           <button class="nav-tab" data-view="proposal">Proposta</button>
           <button class="nav-tab" data-view="clients">Clientes</button>
           <button class="nav-tab" data-view="pipeline">Pipeline</button>
@@ -131,6 +132,93 @@
           </div>
         </section>
 
+        <section class="view" id="view-performance">
+          <section class="panel performance-hero">
+            <div>
+              <p class="eyebrow">Inteligência comercial</p>
+              <h2>Funil, conversão e saúde do negócio</h2>
+              <p>Uma leitura rápida para perceber de onde vêm as oportunidades, quanto valem e onde se perdem.</p>
+            </div>
+            <div class="performance-highlight">
+              <span>Próximo foco</span>
+              <strong id="perfFocus">A alimentar dados comerciais</strong>
+            </div>
+          </section>
+
+          <div class="metric-grid performance-metrics">
+            <article class="metric-card">
+              <span>Leads este mês</span>
+              <strong id="perfLeadsMonth">0</strong>
+              <small id="perfTopSource">Sem origem dominante</small>
+            </article>
+            <article class="metric-card">
+              <span>Propostas enviadas</span>
+              <strong id="perfSentMonth">0</strong>
+              <small>No mês atual</small>
+            </article>
+            <article class="metric-card">
+              <span>Taxa de fecho</span>
+              <strong id="perfCloseRate">0%</strong>
+              <small id="perfWinLoss">0 ganhos · 0 perdidos</small>
+            </article>
+            <article class="metric-card">
+              <span>Tempo médio de fecho</span>
+              <strong id="perfAvgCloseDays">0 dias</strong>
+              <small>Da entrada à decisão</small>
+            </article>
+            <article class="metric-card">
+              <span>Ticket médio ganho</span>
+              <strong id="perfAvgTicket">0 EUR</strong>
+              <small>Valor líquido médio</small>
+            </article>
+            <article class="metric-card">
+              <span>MRR / Avenças</span>
+              <strong id="perfMrr">0 EUR</strong>
+              <small id="perfLtv">LTV estimado: 0 EUR</small>
+            </article>
+            <article class="metric-card">
+              <span>Churn estimado</span>
+              <strong id="perfChurn">0%</strong>
+              <small>Avenças perdidas no mês</small>
+            </article>
+            <article class="metric-card">
+              <span>NPS médio</span>
+              <strong id="perfNps">-</strong>
+              <small>0 a 10</small>
+            </article>
+          </div>
+
+          <div class="dashboard-grid">
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Conversão por categoria</h2>
+              </div>
+              <div class="performance-list" id="perfCategoryList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Motivos de perda</h2>
+              </div>
+              <div class="performance-list" id="perfLossList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>OKR do trimestre</h2>
+              </div>
+              <div class="achievement-list" id="perfOkrList"></div>
+            </section>
+
+            <section class="panel">
+              <div class="panel-heading">
+                <h2>Funil comercial</h2>
+              </div>
+              <div class="performance-funnel" id="perfFunnel"></div>
+            </section>
+          </div>
+        </section>
+
         <section class="view" id="view-proposal">
           <div class="proposal-layout">
             <form class="editor panel" id="proposalForm">
@@ -180,29 +268,53 @@
                   Telefone
                   <input id="clientPhone" placeholder="+351 900 000 000" />
                 </label>
-                <label class="proposal-management">
-                  Origem
-                  <select id="leadSource">
-                    <option>Instagram</option>
-                    <option>Referência</option>
-                    <option>Website UNEED</option>
-                    <option>WhatsApp</option>
-                    <option>Outro</option>
-                  </select>
-                </label>
-                <label class="proposal-management">
-                  Estado
-                  <select id="proposalStatus"></select>
-                </label>
-                <label class="proposal-management">
-                  Data de follow-up
-                  <input id="followupDate" type="date" />
-                </label>
                 <label>
                   Validade da proposta
                   <input id="validUntil" type="date" />
                 </label>
               </div>
+
+              <details class="commercial-fields" open>
+                <summary>Dados comerciais e métricas</summary>
+                <div class="form-grid">
+                  <label>
+                    Origem da lead
+                    <select id="leadSource"></select>
+                  </label>
+                  <label>
+                    Categoria
+                    <select id="opportunityCategory"></select>
+                  </label>
+                  <label>
+                    Estado
+                    <select id="proposalStatus"></select>
+                  </label>
+                  <label>
+                    Entrada da lead
+                    <input id="leadDate" type="date" />
+                  </label>
+                  <label>
+                    Envio da proposta
+                    <input id="proposalSentDate" type="date" />
+                  </label>
+                  <label>
+                    Fecho/perda
+                    <input id="closedDate" type="date" />
+                  </label>
+                  <label>
+                    Motivo de perda
+                    <select id="lostReason"></select>
+                  </label>
+                  <label>
+                    NPS
+                    <input id="npsScore" type="number" min="0" max="10" step="1" placeholder="0-10" />
+                  </label>
+                  <label>
+                    Data de follow-up
+                    <input id="followupDate" type="date" />
+                  </label>
+                </div>
+              </details>
 
               <label>
                 Link da amostra

@@ -60,6 +60,7 @@
           <button class="nav-tab" data-view="proposal">Proposta</button>
           <button class="nav-tab" data-view="clients">Clientes</button>
           <button class="nav-tab" data-view="pipeline">Pipeline</button>
+          <button class="nav-tab" data-view="instagram">Prospeção IG</button>
           <button class="nav-tab" data-view="tickets">Tickets</button>
           <button class="nav-tab" data-view="recurring">Avenças</button>
           <button class="nav-tab" data-view="history">Histórico</button>
@@ -445,6 +446,85 @@
             </select>
           </div>
           <div class="kanban" id="kanban"></div>
+        </section>
+
+        <section class="view" id="view-instagram">
+          <div class="prospecting-hero panel">
+            <div>
+              <p class="eyebrow">Prospeção Instagram</p>
+              <h2>Kanban de contactos frios e follow-ups</h2>
+              <p>Organiza negócios locais por fase, sinais digitais e próximo contacto.</p>
+            </div>
+            <div class="prospecting-highlight">
+              <span>Taxa demo/cliente</span>
+              <strong id="instagramConversionMetric">0%</strong>
+            </div>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric-card">
+              <span>Total em prospeção</span>
+              <strong id="instagramMetricTotal">0</strong>
+            </article>
+            <article class="metric-card">
+              <span>Mensagens enviadas</span>
+              <strong id="instagramMetricMessaged">0</strong>
+            </article>
+            <article class="metric-card">
+              <span>Demonstrações pedidas</span>
+              <strong id="instagramMetricDemo">0</strong>
+            </article>
+            <article class="metric-card">
+              <span>Clientes ativos</span>
+              <strong id="instagramMetricActive">0</strong>
+            </article>
+          </div>
+
+          <form class="panel prospect-form" id="instagramProspectForm">
+            <div class="panel-heading">
+              <h2>Novo contacto Instagram</h2>
+              <button class="button primary" type="submit">Adicionar ao kanban</button>
+            </div>
+            <input id="instagramProspectId" type="hidden" />
+            <div class="form-grid">
+              <label>
+                Nome / negócio
+                <input id="instagramName" placeholder="Ex: Clínica Aurora" required />
+              </label>
+              <label>
+                Link Instagram
+                <input id="instagramUrl" type="url" placeholder="https://instagram.com/..." />
+              </label>
+              <label>
+                Telefone
+                <input id="instagramPhone" placeholder="+351 900 000 000" />
+              </label>
+              <label>
+                Estado
+                <select id="instagramStatus"></select>
+              </label>
+            </div>
+            <div class="prospect-checks">
+              <label><input id="instagramHasWebsite" type="checkbox" /> Tem site</label>
+              <label><input id="instagramHasBooking" type="checkbox" /> Tem sistema de marcações</label>
+              <label><input id="instagramHasWhatsappTree" type="checkbox" /> Marcações WhatsApp acessíveis por link tree</label>
+            </div>
+            <label>
+              Notas rápidas
+              <textarea id="instagramNotes" rows="2" placeholder="Ex: perfil ativo, sem CTA claro, responde rápido, precisa de agenda..."></textarea>
+            </label>
+            <div class="form-actions">
+              <button class="button ghost" id="clearInstagramProspectBtn" type="button">Limpar</button>
+            </div>
+          </form>
+
+          <div class="pipeline-toolbar">
+            <input id="instagramSearchInput" placeholder="Pesquisar nome, telefone, notas ou link..." />
+            <select id="instagramStatusFilter">
+              <option value="">Todos os estados</option>
+            </select>
+          </div>
+          <div class="kanban instagram-kanban" id="instagramKanban"></div>
         </section>
 
         <section class="view" id="view-tickets">

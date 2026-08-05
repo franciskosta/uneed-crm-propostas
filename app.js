@@ -84,6 +84,16 @@ const ticketStatuses = [
 
 const ticketPriorities = ["Baixa", "Normal", "Alta", "Urgente"];
 
+const instagramProspectStatuses = [
+  "Por fazer",
+  "Mensagem IG enviada",
+  "Follow up WhatsApp",
+  "Break up por telefone ou WhatsApp",
+  "Não deu cliente",
+  "Pediu demonstração",
+  "Cliente ativo",
+];
+
 function pricingItems() {
   return (window.UNEED_PRICING?.categories || []).flatMap((category) => (
     (category.items || []).map((item) => ({ ...item, category: category.title }))
@@ -212,6 +222,7 @@ function loadState() {
     },
     proposals: seedProposals,
     tickets: [],
+    instagramProspects: [],
   };
 }
 
@@ -375,6 +386,16 @@ function migrateBrandDefaults() {
     if (!("paymentTerms" in proposal)) proposal.paymentTerms = state.brand.paymentTerms || "";
   });
   state.tickets ||= [];
+  state.instagramProspects ||= [];
+  state.instagramProspects.forEach((prospect) => {
+    if (!prospect.id) prospect.id = crypto.randomUUID();
+    if (!instagramProspectStatuses.includes(prospect.status)) prospect.status = "Por fazer";
+    if (!("hasWebsite" in prospect)) prospect.hasWebsite = false;
+    if (!("hasBooking" in prospect)) prospect.hasBooking = false;
+    if (!("hasWhatsappTree" in prospect)) prospect.hasWhatsappTree = false;
+    if (!("createdAt" in prospect)) prospect.createdAt = new Date().toISOString();
+    if (!("updatedAt" in prospect)) prospect.updatedAt = prospect.createdAt;
+  });
   saveState();
 }
 
@@ -895,6 +916,15 @@ function fillStatusSelects() {
   }
   if (ticketPriorityFilter) {
     ticketPriorityFilter.innerHTML = `<option value="">Todas as prioridades</option>${ticketPriorities.map((priority) => `<option>${priority}</option>`).join("")}`;
+  }
+
+  const instagramStatus = qs("#instagramStatus");
+  const instagramStatusFilter = qs("#instagramStatusFilter");
+  if (instagramStatus) {
+    instagramStatus.innerHTML = instagramProspectStatuses.map((status) => `<option>${status}</option>`).join("");
+  }
+  if (instagramStatusFilter) {
+    instagramStatusFilter.innerHTML = `<option value="">Todos os estados</option>${instagramProspectStatuses.map((status) => `<option>${status}</option>`).join("")}`;
   }
 }
 
@@ -1643,6 +1673,173 @@ function renderPipeline() {
     .join("");
 }
 
+function emptyInstagramProspect() {
+  return {
+    id: crypto.randomUUID(),
+    name: "",
+    instagramUrl: "",
+    phone: "",
+    status: "Por fazer",
+    hasWebsite: false,
+    hasBooking: false,
+    hasWhatsappTree: false,
+    notes: "",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function prospectSignalLabel(prospect) {
+  const signals = [];
+  signals.push(prospect.hasWebsite ? "Site: sim" : "Site: não");
+  signals.push(prospect.hasBooking ? "Marcações: sim" : "Marcações: não");
+  signals.push(prospect.hasWhatsappTree ? "WhatsApp/link tree: sim" : "WhatsApp/link tree: não");
+  return signals.join(" · ");
+}
+
+function renderInstagramProspecting() {
+  const board = qs("#instagramKanban");
+  if (!board) return;
+  state.instagramProspects ||= [];
+
+  const term = (qs("#instagramSearchInput")?.value || "").trim().toLowerCase();
+  const filter = qs("#instagramStatusFilter")?.value || "";
+  const prospects = state.instagramProspects.filter((prospect) => {
+    const haystack = [
+      prospect.name,
+      prospect.instagramUrl,
+      prospect.phone,
+      prospect.status,
+      prospect.notes,
+      prospectSignalLabel(prospect),
+    ].join(" ").toLowerCase();
+    return (!term || haystack.includes(term)) && (!filter || prospect.status === filter);
+  });
+
+  const total = state.instagramProspects.length;
+  const messaged = state.instagramProspects.filter((item) => item.status !== "Por fazer").length;
+  const demos = state.instagramProspects.filter((item) => item.status === "Pediu demonstração").length;
+  const active = state.instagramProspects.filter((item) => item.status === "Cliente ativo").length;
+  const conversionBase = Math.max(total, 1);
+  qs("#instagramMetricTotal").textContent = total;
+  qs("#instagramMetricMessaged").textContent = messaged;
+  qs("#instagramMetricDemo").textContent = demos;
+  qs("#instagramMetricActive").textContent = active;
+  qs("#instagramConversionMetric").textContent = `${Math.round(((demos + active) / conversionBase) * 100)}%`;
+
+  board.innerHTML = instagramProspectStatuses
+    .map((status) => {
+      const cards = prospects.filter((prospect) => prospect.status === status);
+      return `
+        <section class="kanban-column prospect-column" data-instagram-drop-status="${escapeAttr(status)}">
+          <h2>${escapeHtml(status)}<span>${cards.length}</span></h2>
+          ${
+            cards
+              .map((prospect) => `
+                <article class="deal-card prospect-card" data-instagram-open="${escapeAttr(prospect.id)}" draggable="true">
+                  <div class="deal-summary">
+                    <span>
+                      <strong>${escapeHtml(prospect.name || "Contacto sem nome")}</strong>
+                      <span class="card-meta">${escapeHtml(prospect.phone || "Sem telefone")}</span>
+                    </span>
+                    <span class="prospect-score">${prospect.hasWebsite ? "Site" : "Sem site"}</span>
+                  </div>
+                  <div class="deal-card-body">
+                    ${safeExternalUrl(prospect.instagramUrl) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.instagramUrl))}" target="_blank" rel="noopener">Abrir Instagram</a>` : `<span class="card-meta">Instagram por preencher</span>`}
+                    <span class="card-meta prospect-signals">${escapeHtml(prospectSignalLabel(prospect))}</span>
+                    ${prospect.notes ? `<p class="prospect-notes">${escapeHtml(prospect.notes)}</p>` : ""}
+                    <select class="status-select" data-instagram-status-id="${escapeAttr(prospect.id)}">
+                      ${instagramProspectStatuses.map((item) => `<option ${item === prospect.status ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+                    </select>
+                    <div class="deal-actions">
+                      <button class="button ghost mini" data-instagram-edit="${escapeAttr(prospect.id)}" type="button">Editar</button>
+                      <button class="button danger mini" data-instagram-delete="${escapeAttr(prospect.id)}" type="button">Apagar</button>
+                    </div>
+                  </div>
+                </article>
+              `)
+              .join("") || `<div class="empty">Sem contactos.</div>`
+          }
+        </section>
+      `;
+    })
+    .join("");
+}
+
+function readInstagramProspectForm() {
+  const id = qs("#instagramProspectId").value || crypto.randomUUID();
+  const existing = state.instagramProspects.find((prospect) => prospect.id === id);
+  return {
+    ...(existing || emptyInstagramProspect()),
+    id,
+    name: qs("#instagramName").value.trim(),
+    instagramUrl: qs("#instagramUrl").value.trim(),
+    phone: qs("#instagramPhone").value.trim(),
+    status: qs("#instagramStatus").value || "Por fazer",
+    hasWebsite: qs("#instagramHasWebsite").checked,
+    hasBooking: qs("#instagramHasBooking").checked,
+    hasWhatsappTree: qs("#instagramHasWhatsappTree").checked,
+    notes: qs("#instagramNotes").value.trim(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function clearInstagramProspectForm() {
+  qs("#instagramProspectId").value = "";
+  qs("#instagramName").value = "";
+  qs("#instagramUrl").value = "";
+  qs("#instagramPhone").value = "";
+  qs("#instagramStatus").value = "Por fazer";
+  qs("#instagramHasWebsite").checked = false;
+  qs("#instagramHasBooking").checked = false;
+  qs("#instagramHasWhatsappTree").checked = false;
+  qs("#instagramNotes").value = "";
+}
+
+function editInstagramProspect(id) {
+  const prospect = state.instagramProspects.find((item) => item.id === id);
+  if (!prospect) return;
+  qs("#instagramProspectId").value = prospect.id;
+  qs("#instagramName").value = prospect.name || "";
+  qs("#instagramUrl").value = prospect.instagramUrl || "";
+  qs("#instagramPhone").value = prospect.phone || "";
+  qs("#instagramStatus").value = prospect.status || "Por fazer";
+  qs("#instagramHasWebsite").checked = Boolean(prospect.hasWebsite);
+  qs("#instagramHasBooking").checked = Boolean(prospect.hasBooking);
+  qs("#instagramHasWhatsappTree").checked = Boolean(prospect.hasWhatsappTree);
+  qs("#instagramNotes").value = prospect.notes || "";
+  switchView("instagram");
+  qs("#instagramName").focus();
+}
+
+function upsertInstagramProspect() {
+  const prospect = readInstagramProspectForm();
+  const index = state.instagramProspects.findIndex((item) => item.id === prospect.id);
+  if (index >= 0) {
+    state.instagramProspects[index] = prospect;
+  } else {
+    state.instagramProspects.unshift({ ...prospect, createdAt: new Date().toISOString() });
+  }
+  clearInstagramProspectForm();
+  saveState();
+  renderAll();
+}
+
+function updateInstagramProspect(id, patch) {
+  const prospect = state.instagramProspects.find((item) => item.id === id);
+  if (!prospect) return;
+  Object.assign(prospect, patch, { updatedAt: new Date().toISOString() });
+  saveState();
+  renderInstagramProspecting();
+}
+
+function deleteInstagramProspect(id) {
+  state.instagramProspects = state.instagramProspects.filter((item) => item.id !== id);
+  if (qs("#instagramProspectId")?.value === id) clearInstagramProspectForm();
+  saveState();
+  renderInstagramProspecting();
+}
+
 function renderTickets() {
   const board = qs("#ticketsBoard");
   if (!board) return;
@@ -2134,6 +2331,7 @@ function renderAll() {
   renderDashboard();
   renderPerformance();
   renderPipeline();
+  renderInstagramProspecting();
   renderTickets();
   renderRecurring();
   renderClients();
@@ -2322,6 +2520,63 @@ function bindEvents() {
     if (!column) return;
     event.preventDefault();
     updateProposal(event.dataTransfer.getData("text/plain"), { status: column.dataset.dropStatus });
+  });
+
+  qs("#instagramProspectForm").addEventListener("submit", (event) => {
+    event.preventDefault();
+    upsertInstagramProspect();
+  });
+
+  qs("#clearInstagramProspectBtn").addEventListener("click", clearInstagramProspectForm);
+  qs("#instagramSearchInput").addEventListener("input", renderInstagramProspecting);
+  qs("#instagramStatusFilter").addEventListener("change", renderInstagramProspecting);
+
+  qs("#instagramKanban").addEventListener("click", (event) => {
+    const deleteButton = event.target.closest("[data-instagram-delete]");
+    if (deleteButton) {
+      event.stopPropagation();
+      deleteInstagramProspect(deleteButton.dataset.instagramDelete);
+      return;
+    }
+    const editButton = event.target.closest("[data-instagram-edit]");
+    if (editButton) {
+      event.stopPropagation();
+      editInstagramProspect(editButton.dataset.instagramEdit);
+    }
+  });
+
+  qs("#instagramKanban").addEventListener("change", (event) => {
+    const select = event.target.closest("[data-instagram-status-id]");
+    if (!select) return;
+    updateInstagramProspect(select.dataset.instagramStatusId, { status: select.value });
+  });
+
+  qs("#instagramKanban").addEventListener("dragstart", (event) => {
+    const card = event.target.closest("[data-instagram-open]");
+    if (!card) return;
+    card.classList.add("is-dragging");
+    event.dataTransfer.setData("text/plain", card.dataset.instagramOpen);
+    event.dataTransfer.effectAllowed = "move";
+  });
+
+  qs("#instagramKanban").addEventListener("dragend", (event) => {
+    event.target.closest("[data-instagram-open]")?.classList.remove("is-dragging");
+    qsa("[data-instagram-drop-status]").forEach((column) => column.classList.remove("is-drop-target"));
+  });
+
+  qs("#instagramKanban").addEventListener("dragover", (event) => {
+    const column = event.target.closest("[data-instagram-drop-status]");
+    if (!column) return;
+    event.preventDefault();
+    qsa("[data-instagram-drop-status]").forEach((item) => item.classList.remove("is-drop-target"));
+    column.classList.add("is-drop-target");
+  });
+
+  qs("#instagramKanban").addEventListener("drop", (event) => {
+    const column = event.target.closest("[data-instagram-drop-status]");
+    if (!column) return;
+    event.preventDefault();
+    updateInstagramProspect(event.dataTransfer.getData("text/plain"), { status: column.dataset.instagramDropStatus });
   });
 
   qs("#nextActions").addEventListener("click", (event) => {

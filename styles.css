@@ -358,6 +358,7 @@ h3 {
 .topbar-actions,
 .form-actions,
 .pipeline-toolbar,
+.prospect-checks,
 .panel-heading,
 .quick-actions,
 .product-picker {
@@ -370,6 +371,71 @@ h3 {
 .topbar-actions {
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+.prospecting-hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: center;
+  background: var(--brand);
+  color: #fff;
+}
+
+.prospecting-hero p,
+.prospecting-hero .eyebrow {
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.prospecting-highlight {
+  min-width: 180px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius);
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.prospecting-highlight span,
+.prospecting-highlight strong {
+  display: block;
+}
+
+.prospecting-highlight span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.prospecting-highlight strong {
+  margin-top: 5px;
+  font-size: 28px;
+}
+
+.prospect-form {
+  display: grid;
+  gap: 14px;
+}
+
+.prospect-checks {
+  flex-wrap: wrap;
+  align-items: stretch;
+}
+
+.prospect-checks label {
+  display: flex;
+  flex: 1 1 220px;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  background: #fff;
+  color: var(--ink);
+}
+
+.prospect-checks input {
+  width: auto;
 }
 
 .sync-status {
@@ -1870,6 +1936,10 @@ textarea {
   padding-bottom: 10px;
 }
 
+.instagram-kanban {
+  grid-template-columns: repeat(7, minmax(250px, 1fr));
+}
+
 .kanban-column {
   min-height: 520px;
   border: 1px solid var(--line);
@@ -1968,6 +2038,37 @@ textarea {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
+}
+
+.prospect-card {
+  border-color: rgba(24, 29, 73, 0.14);
+}
+
+.prospect-score {
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: rgba(215, 32, 63, 0.09);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.prospect-link {
+  width: max-content;
+  color: var(--brand);
+  font-weight: 900;
+}
+
+.prospect-signals {
+  line-height: 1.4;
+}
+
+.prospect-notes {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .fiscal-breakdown {
@@ -2280,6 +2381,7 @@ textarea {
   #view-dashboard,
   #view-clients,
   #view-pipeline,
+  #view-instagram,
   #view-tickets,
   #view-recurring,
   #view-history,

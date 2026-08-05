@@ -794,6 +794,17 @@ input[type="color"] {
   align-items: start;
 }
 
+.security-panel {
+  grid-column: 1;
+}
+
+.muted-copy {
+  margin: -4px 0 16px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 .clients-toolbar {
   margin-bottom: 14px;
 }

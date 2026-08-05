@@ -961,6 +961,48 @@ function closeSuccessModal() {
   modal.setAttribute("aria-hidden", "true");
 }
 
+async function updateAccountPassword(event) {
+  event.preventDefault();
+  const passwordInput = qs("#newPassword");
+  const confirmInput = qs("#confirmNewPassword");
+  const nextPassword = passwordInput.value.trim();
+  const confirmation = confirmInput.value.trim();
+
+  if (nextPassword.length < 8) {
+    showSuccessModal("A nova password deve ter pelo menos 8 caracteres.");
+    return;
+  }
+  if (nextPassword !== confirmation) {
+    showSuccessModal("As passwords não coincidem. Confirma e tenta novamente.");
+    return;
+  }
+
+  const client = getSupabaseClient();
+  if (!client) {
+    showSuccessModal("Supabase não está configurado neste ambiente. A password online só pode ser alterada quando o CRM estiver ligado ao Supabase.");
+    return;
+  }
+
+  const { data: sessionData } = await client.auth.getSession();
+  if (!sessionData.session) {
+    showSuccessModal("A tua sessão expirou. Faz login novamente e volta a tentar alterar a password.");
+    window.setTimeout(() => {
+      window.location.href = "/login.html";
+    }, 1600);
+    return;
+  }
+
+  const { error } = await client.auth.updateUser({ password: nextPassword });
+  if (error) {
+    showSuccessModal(error.message || "Não foi possível alterar a password. Tenta novamente.");
+    return;
+  }
+
+  passwordInput.value = "";
+  confirmInput.value = "";
+  showSuccessModal("Password alterada com sucesso. Podes continuar a usar o CRM normalmente.");
+}
+
 function updateProposal(id, patch) {
   const proposal = state.proposals.find((item) => item.id === id);
   if (!proposal) return;
@@ -2684,6 +2726,8 @@ function bindEvents() {
     saveState();
     renderAll();
   });
+
+  qs("#passwordForm")?.addEventListener("submit", updateAccountPassword);
 
   qs("#catalogForm").addEventListener("submit", (event) => {
     event.preventDefault();

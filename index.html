@@ -6,6 +6,25 @@
     <title>UNEED Propostas CRM</title>
     <link rel="icon" href="./assets/favicon.ico" />
     <link rel="stylesheet" href="./styles.css" />
+    <script>
+      (function redirectRecoveryLinks() {
+        const params = new URLSearchParams(window.location.search);
+        const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+        hashParams.forEach((value, key) => params.set(key, value));
+        const isRecoveryLink =
+          params.get("type") === "recovery" ||
+          params.has("access_token") ||
+          params.has("refresh_token") ||
+          params.has("code");
+        const isRecoveryError =
+          params.get("error_code") === "otp_expired" ||
+          params.get("error") === "access_denied";
+
+        if (isRecoveryLink || isRecoveryError) {
+          window.location.replace(`/login.html${window.location.search}${window.location.hash}`);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div class="app-shell">

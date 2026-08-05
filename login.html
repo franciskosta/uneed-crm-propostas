@@ -137,7 +137,13 @@
           { redirectTo },
         );
         if (recoveryError) {
-          error.textContent = "Não foi possível enviar o email. Confirma o email e tenta novamente.";
+          if (recoveryError.code === "over_email_send_rate_limit" || recoveryError.status === 429) {
+            error.textContent = "O Supabase bloqueou temporariamente novos emails de recuperação por excesso de pedidos. Aguarda alguns minutos e tenta novamente.";
+            return;
+          }
+          error.textContent = recoveryError.message
+            ? `Não foi possível enviar o email: ${recoveryError.message}`
+            : "Não foi possível enviar o email. Confirma o email e tenta novamente.";
           return;
         }
         document.querySelector("#loginMode").textContent = "Email enviado. Abre o link recebido e define a nova password.";

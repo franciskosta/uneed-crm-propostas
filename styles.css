@@ -75,6 +75,23 @@ body {
   margin-top: 4px;
 }
 
+.login-link {
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  text-align: center;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.login-link:hover {
+  color: var(--accent);
+}
+
 .login-mode {
   margin: 8px 0 0;
   border: 1px solid var(--line);

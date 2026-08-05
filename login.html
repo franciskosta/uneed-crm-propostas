@@ -22,7 +22,17 @@
             <input id="loginPassword" type="password" autocomplete="current-password" required />
           </label>
           <button class="button accent" type="submit">Entrar</button>
+          <button class="login-link" id="requestRecoveryBtn" type="button">Esqueci-me da password</button>
           <p class="login-error" id="loginError" role="alert"></p>
+        </form>
+        <form id="requestRecoveryForm" class="is-hidden">
+          <label>
+            Email
+            <input id="recoveryEmail" type="email" autocomplete="username" required placeholder="geral@uneed.pt" />
+          </label>
+          <button class="button accent" type="submit">Enviar email de recuperação</button>
+          <button class="login-link" id="backToLoginBtn" type="button">Voltar ao login</button>
+          <p class="login-error" id="recoveryError" role="alert"></p>
         </form>
         <form id="resetForm" class="is-hidden">
           <label>
@@ -68,7 +78,28 @@
       const client = supabaseClient();
       const params = authParams();
       const isRecovery = params.get("type") === "recovery" || params.has("access_token") || params.has("code");
+      const recoveryLinkError = params.get("error_code") || params.get("error_description") || "";
       const authMode = client ? "supabase" : "local";
+      const loginForm = document.querySelector("#loginForm");
+      const requestRecoveryForm = document.querySelector("#requestRecoveryForm");
+      const resetForm = document.querySelector("#resetForm");
+
+      function showLoginForm() {
+        loginForm.classList.remove("is-hidden");
+        requestRecoveryForm.classList.add("is-hidden");
+        resetForm.classList.add("is-hidden");
+        document.querySelector("#loginMode").classList.add("is-hidden");
+      }
+
+      function showRecoveryRequestForm() {
+        loginForm.classList.add("is-hidden");
+        requestRecoveryForm.classList.remove("is-hidden");
+        resetForm.classList.add("is-hidden");
+        document.querySelector("#recoveryEmail").value = document.querySelector("#loginEmail").value || "geral@uneed.pt";
+        document.querySelector("#loginMode").textContent = "Vamos enviar um link para definires uma nova password.";
+        document.querySelector("#loginMode").classList.remove("is-hidden");
+      }
+
       if (authMode === "local") {
         document.querySelector("#loginMode").textContent = "Modo local: usa geral@uneed.pt / uneed-local.";
         document.querySelector("#loginMode").classList.remove("is-hidden");
@@ -76,16 +107,44 @@
 
       let recoverySessionPromise = Promise.resolve();
       if (client && isRecovery) {
-        document.querySelector("#loginForm").classList.add("is-hidden");
-        document.querySelector("#resetForm").classList.remove("is-hidden");
+        loginForm.classList.add("is-hidden");
+        requestRecoveryForm.classList.add("is-hidden");
+        resetForm.classList.remove("is-hidden");
         document.querySelector("#loginMode").textContent = "Recuperação ativa: define uma nova password para continuar.";
         document.querySelector("#loginMode").classList.remove("is-hidden");
         recoverySessionPromise = prepareRecoverySession(client, params).catch(() => {
           document.querySelector("#resetError").textContent = "O link de recuperação expirou. Pede um novo email no Supabase.";
         });
+      } else if (client && recoveryLinkError) {
+        showRecoveryRequestForm();
+        document.querySelector("#recoveryError").textContent = "O link de recuperação expirou ou já foi usado. Envia um novo email.";
       }
 
-      document.querySelector("#loginForm").addEventListener("submit", async (event) => {
+      document.querySelector("#requestRecoveryBtn").addEventListener("click", showRecoveryRequestForm);
+      document.querySelector("#backToLoginBtn").addEventListener("click", showLoginForm);
+
+      requestRecoveryForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const error = document.querySelector("#recoveryError");
+        error.textContent = "";
+        if (!client) {
+          error.textContent = "Supabase não está configurado neste ambiente.";
+          return;
+        }
+        const redirectTo = `${window.location.origin}/login.html`;
+        const { error: recoveryError } = await client.auth.resetPasswordForEmail(
+          document.querySelector("#recoveryEmail").value.trim(),
+          { redirectTo },
+        );
+        if (recoveryError) {
+          error.textContent = "Não foi possível enviar o email. Confirma o email e tenta novamente.";
+          return;
+        }
+        document.querySelector("#loginMode").textContent = "Email enviado. Abre o link recebido e define a nova password.";
+        error.textContent = "";
+      });
+
+      loginForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         const error = document.querySelector("#loginError");
         error.textContent = "";

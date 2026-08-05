@@ -7,8 +7,14 @@ function isPasswordRecoveryUrl() {
   return params.get("type") === "recovery" || params.has("access_token") || params.has("code");
 }
 
+function appOrigin() {
+  const localHosts = ["localhost", "127.0.0.1"];
+  if (localHosts.includes(window.location.hostname)) return window.location.origin;
+  return "https://crm.uneed.pt";
+}
+
 if (isPasswordRecoveryUrl()) {
-  window.location.replace(`/login.html${window.location.search}${window.location.hash}`);
+  window.location.replace(`${appOrigin()}/login.html${window.location.search}${window.location.hash}`);
 }
 
 if (window.location.pathname.replace(/\/$/, "") === "/suporte") {

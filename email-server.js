@@ -321,7 +321,13 @@ async function discoverProspects(payload) {
       if (center) body.locationBias = { circle: { center, radius: Math.max(1000, Math.min(Number(payload.radiusKm) || 10, 50) * 1000) } };
       if (pageToken) body.pageToken = pageToken;
       const response = await fetch("https://places.googleapis.com/v1/places:searchText", { method: "POST", headers: { "Content-Type": "application/json", "X-Goog-Api-Key": process.env.GOOGLE_PLACES_API_KEY, "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.primaryTypeDisplayName,places.websiteUri,places.googleMapsUri,places.nationalPhoneNumber,places.rating,places.userRatingCount,nextPageToken" }, body: JSON.stringify(body) });
-      if (!response.ok) throw new Error(`Google Places respondeu ${response.status}`);
+      if (!response.ok) {
+        let detail = "";
+        try {
+          detail = (await response.json())?.error?.message || "";
+        } catch {}
+        throw new Error(`Google Places respondeu ${response.status}${detail ? `: ${detail}` : ""}`);
+      }
       const data = await response.json();
       for (const place of data.places || []) {
         const business = { placeId: place.id, name: place.displayName?.text || "Sem nome", niche: payload.niche?.label || "", district: payload.district || "", municipality, address: place.formattedAddress || "", phone: place.nationalPhoneNumber || "", website: place.websiteUri || "", mapsUrl: place.googleMapsUri || "", rating: place.rating || null, reviewCount: place.userRatingCount || 0 };

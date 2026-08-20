@@ -300,7 +300,13 @@ async function analyzeProspect(business, website, niche) {
     throw new Error(`OpenAI respondeu ${result.status}${detail ? `: ${detail}` : ""}`);
   }
   const data = await result.json();
-  return JSON.parse(data.output_text);
+  const outputText = data.output_text || data.output
+    ?.flatMap((item) => item.content || [])
+    .find((item) => item.type === "output_text")?.text;
+  if (!outputText) {
+    throw new Error(`A OpenAI não devolveu texto analisável${data.status ? ` (estado: ${data.status})` : ""}`);
+  }
+  return JSON.parse(outputText.replace(/^```json\s*|\s*```$/g, "").trim());
 }
 
 async function discoverProspects(payload) {

@@ -1818,6 +1818,18 @@ function updateMunicipalityFilter() {
   if (select) select.innerHTML = `<option value="">Todos os municípios</option>${names.map((item) => `<option>${escapeHtml(item)}</option>`).join("")}`;
 }
 
+function updateNicheFilter() {
+  const select = qs("#prospectNicheFilter");
+  if (!select) return;
+  const selected = select.value;
+  const niches = [...new Set([
+    ...prospectNiches.map((item) => item.label),
+    ...(state.instagramProspects || []).map((item) => item.niche).filter(Boolean),
+  ])].sort((a, b) => a.localeCompare(b, "pt"));
+  select.innerHTML = `<option value="">Todos os nichos</option>${niches.map((item) => `<option>${escapeHtml(item)}</option>`).join("")}`;
+  if (niches.includes(selected)) select.value = selected;
+}
+
 async function generateProspects() {
   const button = qs("#prospectGenerateBtn");
   const status = qs("#prospectRunStatus");
@@ -1866,9 +1878,11 @@ function renderInstagramProspecting() {
   const board = qs("#instagramKanban");
   if (!board) return;
   state.instagramProspects ||= [];
+  updateNicheFilter();
 
   const term = (qs("#instagramSearchInput")?.value || "").trim().toLowerCase();
   const filter = qs("#instagramStatusFilter")?.value || "";
+  const nicheFilter = qs("#prospectNicheFilter")?.value || "";
   const districtFilter = qs("#prospectDistrictFilter")?.value || "";
   const municipalityFilter = qs("#prospectMunicipalityFilter")?.value || "";
   const prospects = state.instagramProspects.filter((prospect) => {
@@ -1884,7 +1898,7 @@ function renderInstagramProspecting() {
       prospect.opportunity,
       prospectSignalLabel(prospect),
     ].join(" ").toLowerCase();
-    return (!term || haystack.includes(term)) && (!filter || prospect.status === filter) && (!districtFilter || prospect.district === districtFilter) && (!municipalityFilter || prospect.municipality === municipalityFilter);
+    return (!term || haystack.includes(term)) && (!filter || prospect.status === filter) && (!nicheFilter || prospect.niche === nicheFilter) && (!districtFilter || prospect.district === districtFilter) && (!municipalityFilter || prospect.municipality === municipalityFilter);
   });
 
   const total = state.instagramProspects.length;
@@ -2707,6 +2721,7 @@ function bindEvents() {
   qs("#clearInstagramProspectBtn").addEventListener("click", clearInstagramProspectForm);
   qs("#instagramSearchInput").addEventListener("input", renderInstagramProspecting);
   qs("#instagramStatusFilter").addEventListener("change", renderInstagramProspecting);
+  qs("#prospectNicheFilter").addEventListener("change", renderInstagramProspecting);
   qs("#prospectGeneratorForm").addEventListener("submit", (event) => { event.preventDefault(); generateProspects(); });
   qs("#prospectDistrict").addEventListener("change", updateMunicipalityOptions);
   qs("#prospectDistrictFilter").addEventListener("change", () => { updateMunicipalityFilter(); renderInstagramProspecting(); });

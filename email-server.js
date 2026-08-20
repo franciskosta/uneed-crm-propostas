@@ -261,6 +261,86 @@ function sendJson(response, status, payload) {
   response.end(JSON.stringify(payload));
 }
 
+function prospectKeys(lead) {
+  let domain = "";
+  try { domain = new URL(lead.website || "").hostname.replace(/^www\./, "").toLowerCase(); } catch {}
+  const instagram = String(lead.instagramUrl || "").toLowerCase().replace(/^https?:\/\/(www\.)?instagram\.com\//, "").replace(/[/?#].*$/, "");
+  const phone = String(lead.phone || "").replace(/\D/g, "").replace(/^351/, "");
+  const namePlace = `${String(lead.name || "").toLowerCase().replace(/[^a-z0-9à-ÿ]/g, "")}|${String(lead.municipality || "").toLowerCase()}`;
+  return [lead.placeId && `place:${lead.placeId}`, domain && `domain:${domain}`, instagram && `instagram:${instagram}`, phone && `phone:${phone}`, namePlace !== "|" && `name:${namePlace}`].filter(Boolean);
+}
+
+async function inspectProspectWebsite(url) {
+  if (!url) return { exists: false, hasBooking: false, hasWhatsapp: false, hasForm: false, text: "" };
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 7000);
+    const result = await fetch(url, { signal: controller.signal, headers: { "User-Agent": "UNEED-CRM-Prospecting/1.0" } });
+    clearTimeout(timer);
+    const html = (await result.text()).slice(0, 120000);
+    const lower = html.toLowerCase();
+    return { exists: result.ok, hasBooking: /marcar|marcaç|booking|agendar/.test(lower), hasWhatsapp: /wa\.me|whatsapp/.test(lower), hasForm: /<form/.test(lower), text: html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 5000) };
+  } catch {
+    return { exists: false, hasBooking: false, hasWhatsapp: false, hasForm: false, text: "" };
+  }
+}
+
+async function analyzeProspect(business, website, niche) {
+  if (!process.env.OPENAI_API_KEY) {
+    const score = Math.min(95, 55 + (!website.exists ? 25 : 0) + (!website.hasBooking ? 10 : 0) + (business.phone ? 5 : 0));
+    return { score, shouldContact: score >= 60, opportunity: website.exists ? "Melhorar a conversão e centralizar pedidos" : "Criar uma presença digital própria", reason: website.exists ? "A presença atual não evidencia um percurso completo para pedidos." : "Não foi encontrado um website próprio funcional.", message: `Olá! Sou o Francisco da UNEED. Ao analisar ${business.name}, reparei numa oportunidade para facilitar os pedidos online com uma presença própria. Posso mostrar-lhe uma ideia simples, sem compromisso?`, confidence: 65 };
+  }
+  const prompt = `Avalia este negócio para UNEED Presença (website one-page, domínio, email, alojamento, manutenção e uma forma principal de receber pedidos). Responde apenas JSON com score (0-100), shouldContact, opportunity, reason, message em português de Portugal e confidence. Não inventes. Nicho: ${JSON.stringify(niche)} Negócio: ${JSON.stringify(business)} Website: ${JSON.stringify(website)}`;
+  const result = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: process.env.OPENAI_PROSPECT_MODEL || "gpt-5-mini", input: prompt, text: { format: { type: "json_object" } } }) });
+  if (!result.ok) throw new Error(`OpenAI respondeu ${result.status}`);
+  const data = await result.json();
+  return JSON.parse(data.output_text);
+}
+
+async function discoverProspects(payload) {
+  if (!process.env.GOOGLE_PLACES_API_KEY) throw new Error("Falta configurar GOOGLE_PLACES_API_KEY no servidor");
+  const known = new Set((payload.knownKeys || []).slice(0, 20000));
+  const seen = new Set(known);
+  const results = [];
+  let duplicates = 0;
+  let rejected = 0;
+  const rejectedKeys = [];
+  const municipalities = (payload.municipalities || []).slice(0, 308);
+  const target = Math.max(1, Math.min(Number(payload.limit) || 20, 60));
+  for (const municipality of municipalities) {
+    if (results.length >= target) break;
+    let center = null;
+    try {
+      const centerResponse = await fetch("https://places.googleapis.com/v1/places:searchText", { method: "POST", headers: { "Content-Type": "application/json", "X-Goog-Api-Key": process.env.GOOGLE_PLACES_API_KEY, "X-Goog-FieldMask": "places.location" }, body: JSON.stringify({ textQuery: `município de ${municipality}, Portugal`, languageCode: "pt-PT", maxResultCount: 1 }) });
+      const centerData = centerResponse.ok ? await centerResponse.json() : {};
+      center = centerData.places?.[0]?.location || null;
+    } catch {}
+    let pageToken = "";
+    for (let page = 0; page < 3 && results.length < target; page++) {
+      const body = { textQuery: `${payload.niche?.query || payload.niche?.label} em ${municipality}, Portugal`, languageCode: "pt-PT", maxResultCount: 20 };
+      if (center) body.locationBias = { circle: { center, radius: Math.max(1000, Math.min(Number(payload.radiusKm) || 10, 50) * 1000) } };
+      if (pageToken) body.pageToken = pageToken;
+      const response = await fetch("https://places.googleapis.com/v1/places:searchText", { method: "POST", headers: { "Content-Type": "application/json", "X-Goog-Api-Key": process.env.GOOGLE_PLACES_API_KEY, "X-Goog-FieldMask": "places.id,places.displayName,places.formattedAddress,places.primaryTypeDisplayName,places.websiteUri,places.googleMapsUri,places.nationalPhoneNumber,places.rating,places.userRatingCount,nextPageToken" }, body: JSON.stringify(body) });
+      if (!response.ok) throw new Error(`Google Places respondeu ${response.status}`);
+      const data = await response.json();
+      for (const place of data.places || []) {
+        const business = { placeId: place.id, name: place.displayName?.text || "Sem nome", niche: payload.niche?.label || "", district: payload.district || "", municipality, address: place.formattedAddress || "", phone: place.nationalPhoneNumber || "", website: place.websiteUri || "", mapsUrl: place.googleMapsUri || "", rating: place.rating || null, reviewCount: place.userRatingCount || 0 };
+        const keys = prospectKeys(business);
+        if (keys.some((key) => seen.has(key))) { duplicates += 1; continue; }
+        keys.forEach((key) => seen.add(key));
+        const website = await inspectProspectWebsite(business.website);
+        const analysis = await analyzeProspect(business, website, payload.niche);
+        if (!analysis.shouldContact || Number(analysis.score || 0) < Number(payload.minScore || 0)) { rejected += 1; rejectedKeys.push(...keys); continue; }
+        results.push({ ...business, score: Number(analysis.score || 0), opportunity: analysis.opportunity || "", notes: analysis.reason || "", message: analysis.message || "", confidence: Number(analysis.confidence || 0), hasWebsite: website.exists, hasBooking: website.hasBooking, hasWhatsappTree: website.hasWhatsapp });
+        if (results.length >= target) break;
+      }
+      pageToken = data.nextPageToken || "";
+      if (!pageToken) break;
+    }
+  }
+  return { results, duplicates, rejected, rejectedKeys: [...new Set(rejectedKeys)] };
+}
+
 async function sendViaResend(email) {
   if (!process.env.RESEND_API_KEY) return { sent: false, reason: "missing_email_config" };
   const apiResponse = await fetch("https://api.resend.com/emails", {
@@ -323,6 +403,16 @@ async function handleApi(request, response) {
     const payload = JSON.parse(await readBody(request));
     await saveAppState(user.id, payload.state || null);
     sendJson(response, 200, { ok: true });
+    return;
+  }
+
+  if (url.pathname === "/api/prospect/search" && request.method === "POST") {
+    const payload = JSON.parse(await readBody(request));
+    if (!payload.niche || !payload.district || !Array.isArray(payload.municipalities) || !payload.municipalities.length) {
+      sendJson(response, 400, { ok: false, error: "Seleciona nicho, distrito e pelo menos um município" });
+      return;
+    }
+    sendJson(response, 200, { ok: true, ...(await discoverProspects(payload)) });
     return;
   }
 

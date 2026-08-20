@@ -62,6 +62,20 @@ RESEND_API_KEY="a_tua_chave" EMAIL_FROM="UNEED <hello@uneed.pt>" npm start
 
 O backend guarda lembretes em `.local/email-reminders.json`. Para produção, esta parte deve passar para uma base de dados e um provider de email configurado.
 
+## Prospeção automática
+
+O separador **Prospeção IG** inclui agora descoberta automática de negócios, qualificação, deduplicação global e entrada direta no Kanban. Para ativar pesquisas reais no servidor, configura:
+
+```bash
+GOOGLE_PLACES_API_KEY="a_tua_chave_google_places"
+OPENAI_API_KEY="a_tua_chave_openai"
+OPENAI_PROSPECT_MODEL="gpt-5-mini"
+```
+
+`GOOGLE_PLACES_API_KEY` é obrigatória. `OPENAI_API_KEY` é recomendada para análise e mensagens personalizadas; sem ela, o CRM aplica uma avaliação determinística baseada nos sinais públicos encontrados. As chaves ficam apenas no backend e nunca são enviadas para o navegador.
+
+A deduplicação usa, por ordem, Google Place ID, domínio, Instagram, telefone e nome + município. Leads que permanecem no Kanban e rejeições automáticas não voltam a aparecer. Um lead apagado do Kanban volta a ficar elegível.
+
 ## Colocar online com Supabase + Vercel
 
 Este é o caminho recomendado para começar online com baixo custo:

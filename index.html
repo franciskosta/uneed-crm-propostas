@@ -451,9 +451,9 @@
         <section class="view" id="view-instagram">
           <div class="prospecting-hero panel">
             <div>
-              <p class="eyebrow">Prospeção Instagram</p>
-              <h2>Kanban de contactos frios e follow-ups</h2>
-              <p>Organiza negócios locais por fase, sinais digitais e próximo contacto.</p>
+              <p class="eyebrow">Prospeção inteligente</p>
+              <h2>Descoberta automática e Kanban comercial</h2>
+              <p>Encontra, qualifica e adiciona negócios locais ao pipeline sem repetições.</p>
             </div>
             <div class="prospecting-highlight">
               <span>Taxa demo/cliente</span>
@@ -478,7 +478,34 @@
               <span>Clientes ativos</span>
               <strong id="instagramMetricActive">0</strong>
             </article>
+            <article class="metric-card">
+              <span>Score médio</span>
+              <strong id="prospectMetricScore">0</strong>
+            </article>
+            <article class="metric-card">
+              <span>Repetidos evitados</span>
+              <strong id="prospectMetricDuplicates">0</strong>
+            </article>
           </div>
+
+          <form class="panel prospect-generator" id="prospectGeneratorForm">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Motor automático</p>
+                <h2>Gerar leads qualificados</h2>
+              </div>
+              <button class="button accent" id="prospectGenerateBtn" type="submit">Procurar e adicionar</button>
+            </div>
+            <div class="prospect-generator-grid">
+              <label>Nicho<select id="prospectNiche"></select></label>
+              <label>Distrito / Região<select id="prospectDistrict"></select></label>
+              <label>Município<select id="prospectMunicipality"></select></label>
+              <label>Raio<select id="prospectRadius"><option value="5">5 km</option><option value="10" selected>10 km</option><option value="20">20 km</option></select></label>
+              <label>Máximo<input id="prospectLimit" type="number" min="1" max="60" value="20" /></label>
+              <label>Score mínimo<select id="prospectMinScore"><option>60</option><option selected>70</option><option>80</option><option>90</option></select></label>
+            </div>
+            <div class="prospect-run-status" id="prospectRunStatus" hidden></div>
+          </form>
 
           <form class="panel prospect-form" id="instagramProspectForm">
             <div class="panel-heading">
@@ -523,6 +550,8 @@
             <select id="instagramStatusFilter">
               <option value="">Todos os estados</option>
             </select>
+            <select id="prospectDistrictFilter"><option value="">Todos os distritos</option></select>
+            <select id="prospectMunicipalityFilter"><option value="">Todos os municípios</option></select>
           </div>
           <div class="kanban instagram-kanban" id="instagramKanban"></div>
         </section>

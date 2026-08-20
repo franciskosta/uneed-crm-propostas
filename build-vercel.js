@@ -11,6 +11,7 @@ const files = [
   "app.js",
   "pricing.js",
   "suporte.js",
+  "portugal-municipalities.json",
 ];
 
 fs.rmSync(outDir, { recursive: true, force: true });

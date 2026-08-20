@@ -100,6 +100,30 @@ const instagramProspectStatuses = [
   "Cliente ativo",
 ];
 
+const prospectNiches = [
+  ["cabeleireiros", "Cabeleireiros, salões e barbearias", "cabeleireiro salão barbearia"],
+  ["estetica", "Estética, unhas e maquilhagem", "centro estética unhas maquilhagem"],
+  ["bem_estar", "Massagem, spa e terapias", "massagem spa terapias bem estar"],
+  ["saude", "Clínicas, dentistas e fisioterapia", "clínica dentista fisioterapia"],
+  ["veterinaria", "Clínicas veterinárias", "clínica veterinária"],
+  ["fitness", "Personal trainers, pilates e yoga", "personal trainer estúdio pilates yoga"],
+  ["fotografia", "Fotógrafos e espaços de eventos", "fotógrafo espaço eventos"],
+  ["oficinas", "Oficinas, pneus e detalhe automóvel", "oficina pneus detalhe automóvel"],
+  ["obras", "Construção, remodelações e manutenção", "remodelações construção manutenção"],
+  ["servicos_casa", "Eletricistas, canalizadores e climatização", "eletricista canalizador climatização"],
+  ["limpeza", "Limpeza e jardinagem", "empresa limpeza jardinagem"],
+  ["grafica", "Gráficas, brindes e personalizados", "gráfica brindes impressão personalizada"],
+  ["distribuidores", "Distribuidores e fornecedores B2B", "distribuidor fornecedor profissional"],
+  ["mobiliario", "Mobiliário e soluções por medida", "mobiliário por medida cozinhas roupeiros"],
+  ["profissionais", "Contabilidade, seguros e consultoria", "contabilidade seguros consultoria"],
+  ["imobiliario", "Mediadores e consultores imobiliários", "consultor agência imobiliária"],
+  ["formacao", "Formadores e centros de formação", "centro formação cursos"],
+  ["instituicoes", "Creches, lares e associações", "creche lar associação"],
+  ["restauracao", "Restaurantes e catering", "restaurante catering"],
+].map(([id, label, query]) => ({ id, label, query }));
+
+let portugalMunicipalities = [];
+
 function pricingItems() {
   return (window.UNEED_PRICING?.categories || []).flatMap((category) => (
     (category.items || []).map((item) => ({ ...item, category: category.title }))
@@ -393,6 +417,8 @@ function migrateBrandDefaults() {
   });
   state.tickets ||= [];
   state.instagramProspects ||= [];
+  state.prospectStats ||= { duplicatesSkipped: 0, rejected: 0, searches: 0 };
+  state.prospectRejectedKeys ||= [];
   state.instagramProspects.forEach((prospect) => {
     if (!prospect.id) prospect.id = crypto.randomUUID();
     if (!instagramProspectStatuses.includes(prospect.status)) prospect.status = "Por fazer";
@@ -1745,6 +1771,97 @@ function prospectSignalLabel(prospect) {
   return signals.join(" · ");
 }
 
+function normalizedProspectKeys(prospect) {
+  const domain = (() => { try { return new URL(prospect.website || "").hostname.replace(/^www\./, "").toLowerCase(); } catch { return ""; } })();
+  const instagram = String(prospect.instagramUrl || "").toLowerCase().replace(/^https?:\/\/(www\.)?instagram\.com\//, "").replace(/[/?#].*$/, "");
+  const phone = String(prospect.phone || "").replace(/\D/g, "").replace(/^351/, "");
+  const namePlace = `${String(prospect.name || "").toLowerCase().replace(/[^a-z0-9à-ÿ]/g, "")}|${String(prospect.municipality || "").toLowerCase()}`;
+  return [prospect.placeId && `place:${prospect.placeId}`, domain && `domain:${domain}`, instagram && `instagram:${instagram}`, phone && `phone:${phone}`, namePlace !== "|" && `name:${namePlace}`].filter(Boolean);
+}
+
+function knownProspectKeys() {
+  return [...new Set([...(state.instagramProspects || []).flatMap(normalizedProspectKeys), ...(state.prospectRejectedKeys || [])])];
+}
+
+async function loadPortugalMunicipalities() {
+  try {
+    const response = await fetch("./portugal-municipalities.json");
+    portugalMunicipalities = (await response.json()).filter((item) => item.name && item.district);
+    const islands = {
+      "Região Autónoma dos Açores": ["Angra do Heroísmo", "Calheta", "Corvo", "Horta", "Lagoa", "Lajes das Flores", "Lajes do Pico", "Madalena", "Nordeste", "Ponta Delgada", "Povoação", "Praia da Vitória", "Ribeira Grande", "Santa Cruz da Graciosa", "Santa Cruz das Flores", "São Roque do Pico", "Velas", "Vila do Porto", "Vila Franca do Campo"],
+      "Região Autónoma da Madeira": ["Calheta", "Câmara de Lobos", "Funchal", "Machico", "Ponta do Sol", "Porto Moniz", "Porto Santo", "Ribeira Brava", "Santa Cruz", "Santana", "São Vicente"],
+    };
+    Object.entries(islands).forEach(([district, names]) => names.forEach((name) => portugalMunicipalities.push({ name, district })));
+  } catch {
+    portugalMunicipalities = [];
+  }
+  const district = qs("#prospectDistrict");
+  const filter = qs("#prospectDistrictFilter");
+  const districts = [...new Set(portugalMunicipalities.map((item) => item.district))].sort((a, b) => a.localeCompare(b, "pt"));
+  if (district) district.innerHTML = districts.map((item) => `<option>${escapeHtml(item)}</option>`).join("");
+  if (filter) filter.innerHTML = `<option value="">Todos os distritos</option>${districts.map((item) => `<option>${escapeHtml(item)}</option>`).join("")}`;
+  updateMunicipalityOptions();
+  updateMunicipalityFilter();
+}
+
+function updateMunicipalityOptions() {
+  const district = qs("#prospectDistrict")?.value || "";
+  const items = portugalMunicipalities.filter((item) => item.district === district).sort((a, b) => a.name.localeCompare(b.name, "pt"));
+  const select = qs("#prospectMunicipality");
+  if (select) select.innerHTML = `<option value="">Todos os municípios</option>${items.map((item) => `<option>${escapeHtml(item.name)}</option>`).join("")}`;
+}
+
+function updateMunicipalityFilter() {
+  const district = qs("#prospectDistrictFilter")?.value || "";
+  const names = [...new Set((state.instagramProspects || []).filter((item) => !district || item.district === district).map((item) => item.municipality).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt"));
+  const select = qs("#prospectMunicipalityFilter");
+  if (select) select.innerHTML = `<option value="">Todos os municípios</option>${names.map((item) => `<option>${escapeHtml(item)}</option>`).join("")}`;
+}
+
+async function generateProspects() {
+  const button = qs("#prospectGenerateBtn");
+  const status = qs("#prospectRunStatus");
+  const district = qs("#prospectDistrict").value;
+  const selectedMunicipality = qs("#prospectMunicipality").value;
+  const municipalities = selectedMunicipality ? [selectedMunicipality] : portugalMunicipalities.filter((item) => item.district === district).map((item) => item.name);
+  const niche = prospectNiches.find((item) => item.id === qs("#prospectNiche").value) || prospectNiches[0];
+  button.disabled = true;
+  status.hidden = false;
+  status.dataset.tone = "progress";
+  status.textContent = `A pesquisar ${municipalities.length} município(s)…`;
+  try {
+    const headers = { "Content-Type": "application/json" };
+    const client = getSupabaseClient();
+    if (client) {
+      const { data } = await client.auth.getSession();
+      if (data.session?.access_token) headers.Authorization = `Bearer ${data.session.access_token}`;
+    }
+    const response = await fetch("/api/prospect/search", { method: "POST", headers, body: JSON.stringify({ niche, district, municipalities, radiusKm: Number(qs("#prospectRadius").value), limit: Number(qs("#prospectLimit").value), minScore: Number(qs("#prospectMinScore").value), knownKeys: knownProspectKeys() }) });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || "Não foi possível concluir a pesquisa");
+    const added = [];
+    for (const lead of payload.results || []) {
+      if (normalizedProspectKeys(lead).some((key) => knownProspectKeys().includes(key))) continue;
+      added.push({ ...emptyInstagramProspect(), ...lead, id: crypto.randomUUID(), status: "Por fazer", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+    }
+    state.instagramProspects.unshift(...added);
+    state.prospectStats.searches += 1;
+    state.prospectStats.duplicatesSkipped += Number(payload.duplicates || 0);
+    state.prospectStats.rejected += Number(payload.rejected || 0);
+    state.prospectRejectedKeys = [...new Set([...(state.prospectRejectedKeys || []), ...(payload.rejectedKeys || [])])].slice(-20000);
+    saveState();
+    updateMunicipalityFilter();
+    renderInstagramProspecting();
+    status.dataset.tone = "success";
+    status.textContent = `${added.length} adicionados ao Kanban · ${payload.duplicates || 0} repetidos evitados · ${payload.rejected || 0} rejeitados pelo score.`;
+  } catch (error) {
+    status.dataset.tone = "error";
+    status.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function renderInstagramProspecting() {
   const board = qs("#instagramKanban");
   if (!board) return;
@@ -1752,6 +1869,8 @@ function renderInstagramProspecting() {
 
   const term = (qs("#instagramSearchInput")?.value || "").trim().toLowerCase();
   const filter = qs("#instagramStatusFilter")?.value || "";
+  const districtFilter = qs("#prospectDistrictFilter")?.value || "";
+  const municipalityFilter = qs("#prospectMunicipalityFilter")?.value || "";
   const prospects = state.instagramProspects.filter((prospect) => {
     const haystack = [
       prospect.name,
@@ -1759,9 +1878,13 @@ function renderInstagramProspecting() {
       prospect.phone,
       prospect.status,
       prospect.notes,
+      prospect.district,
+      prospect.municipality,
+      prospect.niche,
+      prospect.opportunity,
       prospectSignalLabel(prospect),
     ].join(" ").toLowerCase();
-    return (!term || haystack.includes(term)) && (!filter || prospect.status === filter);
+    return (!term || haystack.includes(term)) && (!filter || prospect.status === filter) && (!districtFilter || prospect.district === districtFilter) && (!municipalityFilter || prospect.municipality === municipalityFilter);
   });
 
   const total = state.instagramProspects.length;
@@ -1773,6 +1896,8 @@ function renderInstagramProspecting() {
   qs("#instagramMetricMessaged").textContent = messaged;
   qs("#instagramMetricDemo").textContent = demos;
   qs("#instagramMetricActive").textContent = active;
+  qs("#prospectMetricScore").textContent = total ? Math.round(state.instagramProspects.reduce((sum, item) => sum + Number(item.score || 0), 0) / total) : 0;
+  qs("#prospectMetricDuplicates").textContent = state.prospectStats?.duplicatesSkipped || 0;
   qs("#instagramConversionMetric").textContent = `${Math.round(((demos + active) / conversionBase) * 100)}%`;
 
   board.innerHTML = instagramProspectStatuses
@@ -1795,6 +1920,10 @@ function renderInstagramProspecting() {
                   <div class="deal-card-body">
                     ${safeExternalUrl(prospect.instagramUrl) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.instagramUrl))}" target="_blank" rel="noopener">Abrir Instagram</a>` : `<span class="card-meta">Instagram por preencher</span>`}
                     <span class="card-meta prospect-signals">${escapeHtml(prospectSignalLabel(prospect))}</span>
+                    ${prospect.score ? `<span class="prospect-score-line">Score ${escapeHtml(prospect.score)} · ${escapeHtml(prospect.district || "")} / ${escapeHtml(prospect.municipality || "")}</span>` : ""}
+                    ${safeExternalUrl(prospect.website) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.website))}" target="_blank" rel="noopener">Abrir website</a>` : ""}
+                    ${safeExternalUrl(prospect.mapsUrl) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.mapsUrl))}" target="_blank" rel="noopener">Google Maps</a>` : ""}
+                    ${prospect.message ? `<details class="prospect-message"><summary>Mensagem preparada</summary><p>${escapeHtml(prospect.message)}</p></details>` : ""}
                     ${prospect.notes ? `<p class="prospect-notes">${escapeHtml(prospect.notes)}</p>` : ""}
                     <select class="status-select" data-instagram-status-id="${escapeAttr(prospect.id)}">
                       ${instagramProspectStatuses.map((item) => `<option ${item === prospect.status ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
@@ -2578,6 +2707,10 @@ function bindEvents() {
   qs("#clearInstagramProspectBtn").addEventListener("click", clearInstagramProspectForm);
   qs("#instagramSearchInput").addEventListener("input", renderInstagramProspecting);
   qs("#instagramStatusFilter").addEventListener("change", renderInstagramProspecting);
+  qs("#prospectGeneratorForm").addEventListener("submit", (event) => { event.preventDefault(); generateProspects(); });
+  qs("#prospectDistrict").addEventListener("change", updateMunicipalityOptions);
+  qs("#prospectDistrictFilter").addEventListener("change", () => { updateMunicipalityFilter(); renderInstagramProspecting(); });
+  qs("#prospectMunicipalityFilter").addEventListener("change", renderInstagramProspecting);
 
   qs("#instagramKanban").addEventListener("click", (event) => {
     const deleteButton = event.target.closest("[data-instagram-delete]");
@@ -3040,5 +3173,7 @@ function formatBits(mask) {
 }
 
 bindEvents();
+qs("#prospectNiche").innerHTML = prospectNiches.map((item) => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.label)}</option>`).join("");
+loadPortugalMunicipalities();
 renderAll();
 loadServerState();

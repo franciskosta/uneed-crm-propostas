@@ -7,7 +7,7 @@
       "destination": "/suporte.html"
     },
     {
-      "source": "/((?!assets/|styles.css|app.js|pricing.js|suporte.js|supabase-config.js|login.html|suporte.html|favicon.ico).*)",
+      "source": "/((?!api/|assets/|styles.css|app.js|pricing.js|suporte.js|supabase-config.js|portugal-municipalities.json|login.html|suporte.html|favicon.ico).*)",
       "destination": "/index.html"
     }
   ]

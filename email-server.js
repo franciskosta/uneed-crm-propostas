@@ -292,7 +292,13 @@ async function analyzeProspect(business, website, niche) {
   }
   const prompt = `Avalia este negócio para UNEED Presença (website one-page, domínio, email, alojamento, manutenção e uma forma principal de receber pedidos). Responde apenas JSON com score (0-100), shouldContact, opportunity, reason, message em português de Portugal e confidence. Não inventes. Nicho: ${JSON.stringify(niche)} Negócio: ${JSON.stringify(business)} Website: ${JSON.stringify(website)}`;
   const result = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: process.env.OPENAI_PROSPECT_MODEL || "gpt-5-mini", input: prompt, text: { format: { type: "json_object" } } }) });
-  if (!result.ok) throw new Error(`OpenAI respondeu ${result.status}`);
+  if (!result.ok) {
+    let detail = "";
+    try {
+      detail = (await result.json())?.error?.message || "";
+    } catch {}
+    throw new Error(`OpenAI respondeu ${result.status}${detail ? `: ${detail}` : ""}`);
+  }
   const data = await result.json();
   return JSON.parse(data.output_text);
 }

@@ -1993,7 +1993,7 @@ textarea {
 .prospect-score-line { color: var(--brand); font-size: 12px; font-weight: 850; }
 .prospect-message { border-top: 1px solid var(--line); padding-top: 8px; }
 .prospect-message summary { color: var(--brand); cursor: pointer; font-size: 12px; font-weight: 800; }
-.prospect-message p { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.prospect-message p { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; white-space: pre-line; }
 
 @media (max-width: 1180px) {
   .prospect-generator-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }

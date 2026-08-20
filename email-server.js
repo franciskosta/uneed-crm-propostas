@@ -270,8 +270,14 @@ function prospectKeys(lead) {
   return [lead.placeId && `place:${lead.placeId}`, domain && `domain:${domain}`, instagram && `instagram:${instagram}`, phone && `phone:${phone}`, namePlace !== "|" && `name:${namePlace}`].filter(Boolean);
 }
 
+function extractInstagramUrl(...sources) {
+  const content = sources.filter(Boolean).join(" ").replace(/\\\//g, "/").replace(/&amp;/g, "&");
+  const candidates = content.match(/https?:\/\/(?:www\.)?instagram\.com\/[A-Za-z0-9._-]+/gi) || [];
+  return candidates.find((url) => !/instagram\.com\/(?:p|reel|reels|stories|explore|accounts)\/?$/i.test(url))?.replace(/\/$/, "") || "";
+}
+
 async function inspectProspectWebsite(url) {
-  if (!url) return { exists: false, hasBooking: false, hasWhatsapp: false, hasForm: false, text: "" };
+  if (!url) return { exists: false, hasBooking: false, hasWhatsapp: false, hasForm: false, instagramUrl: "", text: "" };
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 7000);
@@ -279,9 +285,9 @@ async function inspectProspectWebsite(url) {
     clearTimeout(timer);
     const html = (await result.text()).slice(0, 120000);
     const lower = html.toLowerCase();
-    return { exists: result.ok, hasBooking: /marcar|marcaç|booking|agendar/.test(lower), hasWhatsapp: /wa\.me|whatsapp/.test(lower), hasForm: /<form/.test(lower), text: html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 5000) };
+    return { exists: result.ok, hasBooking: /marcar|marcaç|booking|agendar/.test(lower), hasWhatsapp: /wa\.me|whatsapp/.test(lower), hasForm: /<form/.test(lower), instagramUrl: extractInstagramUrl(url, html), text: html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").slice(0, 5000) };
   } catch {
-    return { exists: false, hasBooking: false, hasWhatsapp: false, hasForm: false, text: "" };
+    return { exists: false, hasBooking: false, hasWhatsapp: false, hasForm: false, instagramUrl: extractInstagramUrl(url), text: "" };
   }
 }
 
@@ -290,7 +296,7 @@ async function analyzeProspect(business, website, niche) {
     const score = Math.min(95, 55 + (!website.exists ? 25 : 0) + (!website.hasBooking ? 10 : 0) + (business.phone ? 5 : 0));
     return { score, shouldContact: score >= 60, opportunity: website.exists ? "Melhorar a conversão e centralizar pedidos" : "Criar uma presença digital própria", reason: website.exists ? "A presença atual não evidencia um percurso completo para pedidos." : "Não foi encontrado um website próprio funcional.", message: `Olá! Sou o Francisco da UNEED. Ao analisar ${business.name}, reparei numa oportunidade para facilitar os pedidos online com uma presença própria. Posso mostrar-lhe uma ideia simples, sem compromisso?`, confidence: 65 };
   }
-  const prompt = `Avalia este negócio para UNEED Presença (website one-page, domínio, email, alojamento, manutenção e uma forma principal de receber pedidos). Responde apenas JSON com score (0-100), shouldContact, opportunity, reason, message em português de Portugal e confidence. Não inventes. Nicho: ${JSON.stringify(niche)} Negócio: ${JSON.stringify(business)} Website: ${JSON.stringify(website)}`;
+  const prompt = `Avalia este negócio para UNEED Presença. Responde apenas JSON com score (0-100), shouldContact, opportunity, reason, message em português de Portugal e confidence. Mantém reason em uma ou duas frases curtas. Não inventes factos nem digas que visitaste fisicamente o espaço. A message deve ser humana, calorosa e pronta a enviar preferencialmente por Instagram, com 5 parágrafos curtos: 1) "Olá [nome]! Sou o Francisco, da Uneed Soluções Digitais."; 2) uma observação positiva concreta baseada apenas nos dados; 3) uma oportunidade simples e relevante; 4) "Na Uneed criamos presenças digitais chave na mão, com página profissional, domínio, email, alojamento, suporte e pedidos de marcação integrados. Começa nos 39€ + IVA/mês, sem fidelização."; 5) pergunta natural a oferecer uma simulação personalizada sem compromisso. Usa no máximo um emoji e evita linguagem técnica, listas, frases como "recomendado contacto" e textos robotizados. Nicho: ${JSON.stringify(niche)} Negócio: ${JSON.stringify(business)} Website: ${JSON.stringify(website)}`;
   const result = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: process.env.OPENAI_PROSPECT_MODEL || "gpt-5-mini", input: prompt, text: { format: { type: "json_object" } } }) });
   if (!result.ok) {
     let detail = "";
@@ -342,11 +348,13 @@ async function discoverProspects(payload) {
       }
       const data = await response.json();
       for (const place of data.places || []) {
-        const business = { placeId: place.id, name: place.displayName?.text || "Sem nome", niche: payload.niche?.label || "", district: payload.district || "", municipality, address: place.formattedAddress || "", phone: place.nationalPhoneNumber || "", website: place.websiteUri || "", mapsUrl: place.googleMapsUri || "", rating: place.rating || null, reviewCount: place.userRatingCount || 0 };
+        const listedInstagram = extractInstagramUrl(place.websiteUri || "");
+        const business = { placeId: place.id, name: place.displayName?.text || "Sem nome", niche: payload.niche?.label || "", district: payload.district || "", municipality, address: place.formattedAddress || "", phone: place.nationalPhoneNumber || "", website: listedInstagram ? "" : (place.websiteUri || ""), instagramUrl: listedInstagram, mapsUrl: place.googleMapsUri || "", rating: place.rating || null, reviewCount: place.userRatingCount || 0 };
         const keys = prospectKeys(business);
         if (keys.some((key) => seen.has(key))) { duplicates += 1; continue; }
         keys.forEach((key) => seen.add(key));
         const website = await inspectProspectWebsite(business.website);
+        if (!business.instagramUrl && website.instagramUrl) business.instagramUrl = website.instagramUrl;
         const analysis = await analyzeProspect(business, website, payload.niche);
         if (!analysis.shouldContact || Number(analysis.score || 0) < Number(payload.minScore || 0)) { rejected += 1; rejectedKeys.push(...keys); continue; }
         results.push({ ...business, score: Number(analysis.score || 0), opportunity: analysis.opportunity || "", notes: analysis.reason || "", message: analysis.message || "", confidence: Number(analysis.confidence || 0), hasWebsite: website.exists, hasBooking: website.hasBooking, hasWhatsappTree: website.hasWhatsapp });

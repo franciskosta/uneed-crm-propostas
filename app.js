@@ -958,6 +958,10 @@ function fillStatusSelects() {
   if (instagramStatusFilter) {
     instagramStatusFilter.innerHTML = `<option value="">Todos os estados</option>${instagramProspectStatuses.map((status) => `<option>${status}</option>`).join("")}`;
   }
+  const instagramNiche = qs("#instagramNiche");
+  if (instagramNiche) {
+    instagramNiche.innerHTML = `<option value="">Sem nicho</option>${prospectNiches.map((item) => `<option>${escapeHtml(item.label)}</option>`).join("")}`;
+  }
 }
 
 function renderQuickProductSelect() {
@@ -1753,6 +1757,7 @@ function emptyInstagramProspect() {
     name: "",
     instagramUrl: "",
     phone: "",
+    niche: "",
     status: "Por fazer",
     hasWebsite: false,
     hasBooking: false,
@@ -1826,8 +1831,8 @@ function updateNicheFilter() {
     ...prospectNiches.map((item) => item.label),
     ...(state.instagramProspects || []).map((item) => item.niche).filter(Boolean),
   ])].sort((a, b) => a.localeCompare(b, "pt"));
-  select.innerHTML = `<option value="">Todos os nichos</option>${niches.map((item) => `<option>${escapeHtml(item)}</option>`).join("")}`;
-  if (niches.includes(selected)) select.value = selected;
+  select.innerHTML = `<option value="">Todos os nichos</option><option value="__none__">Sem nicho (contactos antigos)</option>${niches.map((item) => `<option>${escapeHtml(item)}</option>`).join("")}`;
+  if (selected === "__none__" || niches.includes(selected)) select.value = selected;
 }
 
 async function generateProspects() {
@@ -1898,7 +1903,8 @@ function renderInstagramProspecting() {
       prospect.opportunity,
       prospectSignalLabel(prospect),
     ].join(" ").toLowerCase();
-    return (!term || haystack.includes(term)) && (!filter || prospect.status === filter) && (!nicheFilter || prospect.niche === nicheFilter) && (!districtFilter || prospect.district === districtFilter) && (!municipalityFilter || prospect.municipality === municipalityFilter);
+    const matchesNiche = !nicheFilter || (nicheFilter === "__none__" ? !prospect.niche : prospect.niche === nicheFilter);
+    return (!term || haystack.includes(term)) && (!filter || prospect.status === filter) && matchesNiche && (!districtFilter || prospect.district === districtFilter) && (!municipalityFilter || prospect.municipality === municipalityFilter);
   });
 
   const total = state.instagramProspects.length;
@@ -1932,13 +1938,14 @@ function renderInstagramProspecting() {
                     <span class="prospect-score">${prospect.hasWebsite ? "Site" : "Sem site"}</span>
                   </div>
                   <div class="deal-card-body">
-                    ${safeExternalUrl(prospect.instagramUrl) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.instagramUrl))}" target="_blank" rel="noopener">Abrir Instagram</a>` : `<span class="card-meta">Instagram por preencher</span>`}
+                    ${safeExternalUrl(prospect.instagramUrl) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.instagramUrl))}" target="_blank" rel="noopener">Contactar pelo Instagram</a>` : `<span class="card-meta">Instagram não encontrado · usar telefone</span>`}
+                    ${prospect.niche ? `<span class="card-meta">Nicho: ${escapeHtml(prospect.niche)}</span>` : `<span class="card-meta">Nicho por classificar</span>`}
                     <span class="card-meta prospect-signals">${escapeHtml(prospectSignalLabel(prospect))}</span>
                     ${prospect.score ? `<span class="prospect-score-line">Score ${escapeHtml(prospect.score)} · ${escapeHtml(prospect.district || "")} / ${escapeHtml(prospect.municipality || "")}</span>` : ""}
                     ${safeExternalUrl(prospect.website) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.website))}" target="_blank" rel="noopener">Abrir website</a>` : ""}
                     ${safeExternalUrl(prospect.mapsUrl) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.mapsUrl))}" target="_blank" rel="noopener">Google Maps</a>` : ""}
                     ${prospect.message ? `<details class="prospect-message"><summary>Mensagem preparada</summary><p>${escapeHtml(prospect.message)}</p></details>` : ""}
-                    ${prospect.notes ? `<p class="prospect-notes">${escapeHtml(prospect.notes)}</p>` : ""}
+                    ${prospect.notes ? `<details class="prospect-message"><summary>Análise do lead</summary><p>${escapeHtml(prospect.notes)}</p></details>` : ""}
                     <select class="status-select" data-instagram-status-id="${escapeAttr(prospect.id)}">
                       ${instagramProspectStatuses.map((item) => `<option ${item === prospect.status ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
                     </select>
@@ -1967,6 +1974,7 @@ function readInstagramProspectForm() {
     instagramUrl: qs("#instagramUrl").value.trim(),
     phone: qs("#instagramPhone").value.trim(),
     status: qs("#instagramStatus").value || "Por fazer",
+    niche: qs("#instagramNiche").value,
     hasWebsite: qs("#instagramHasWebsite").checked,
     hasBooking: qs("#instagramHasBooking").checked,
     hasWhatsappTree: qs("#instagramHasWhatsappTree").checked,
@@ -1981,6 +1989,7 @@ function clearInstagramProspectForm() {
   qs("#instagramUrl").value = "";
   qs("#instagramPhone").value = "";
   qs("#instagramStatus").value = "Por fazer";
+  qs("#instagramNiche").value = "";
   qs("#instagramHasWebsite").checked = false;
   qs("#instagramHasBooking").checked = false;
   qs("#instagramHasWhatsappTree").checked = false;
@@ -1995,6 +2004,7 @@ function editInstagramProspect(id) {
   qs("#instagramUrl").value = prospect.instagramUrl || "";
   qs("#instagramPhone").value = prospect.phone || "";
   qs("#instagramStatus").value = prospect.status || "Por fazer";
+  qs("#instagramNiche").value = prospect.niche || "";
   qs("#instagramHasWebsite").checked = Boolean(prospect.hasWebsite);
   qs("#instagramHasBooking").checked = Boolean(prospect.hasBooking);
   qs("#instagramHasWhatsappTree").checked = Boolean(prospect.hasWhatsappTree);

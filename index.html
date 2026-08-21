@@ -58,6 +58,7 @@
           <button class="nav-tab is-active" data-view="dashboard">Dashboard</button>
           <button class="nav-tab" data-view="performance">Performance</button>
           <button class="nav-tab" data-view="proposal">Proposta</button>
+          <button class="nav-tab" data-view="contracts">Contratos</button>
           <button class="nav-tab" data-view="clients">Clientes</button>
           <button class="nav-tab" data-view="pipeline">Pipeline</button>
           <button class="nav-tab" data-view="instagram">Prospeção IG</button>
@@ -237,6 +238,197 @@
               <div class="performance-funnel" id="perfFunnel"></div>
             </section>
           </div>
+        </section>
+
+        <section class="view" id="view-contracts">
+          <section class="panel contracts-hero">
+            <div>
+              <p class="eyebrow">Gerador de contratos</p>
+              <h2>Contratos digitais UNEED</h2>
+              <p>Cria contratos mensais ou pontuais com cláusulas dinâmicas, preview e PDF em poucos segundos.</p>
+            </div>
+            <div class="contract-hero-actions">
+              <button class="button ghost" id="newContractBtn" type="button">Novo contrato</button>
+              <button class="button accent" id="printContractBtn" type="button">Gerar PDF</button>
+              <button class="button primary" id="saveContractBtn" type="button">Guardar contrato</button>
+            </div>
+          </section>
+
+          <div class="contracts-layout">
+            <form class="panel contract-editor" id="contractForm">
+              <input id="contractId" type="hidden" />
+              <div class="panel-heading">
+                <h2>Novo contrato</h2>
+              </div>
+
+              <div class="form-grid">
+                <label>
+                  Nome comercial
+                  <input id="contractCommercialName" placeholder="Ex: Clínica Aurora" />
+                </label>
+                <label>
+                  Nome fiscal
+                  <input id="contractFiscalName" placeholder="Nome fiscal do cliente" />
+                </label>
+                <label>
+                  NIF
+                  <input id="contractNif" inputmode="numeric" placeholder="500000000" />
+                </label>
+                <label>
+                  Tipo de cliente
+                  <select id="contractClientType">
+                    <option>Empresa</option>
+                    <option>ENI</option>
+                    <option>Associação</option>
+                    <option>Particular</option>
+                    <option>Outro</option>
+                  </select>
+                </label>
+                <label class="wide-field">
+                  Morada
+                  <input id="contractAddress" placeholder="Morada fiscal completa" />
+                </label>
+                <label>
+                  Email
+                  <input id="contractEmail" type="email" placeholder="cliente@email.pt" />
+                </label>
+                <label>
+                  Telefone
+                  <input id="contractPhone" placeholder="+351 ..." />
+                </label>
+                <label>
+                  Pessoa de contacto
+                  <input id="contractContactPerson" placeholder="Nome do representante" />
+                </label>
+                <label>
+                  Cargo do representante
+                  <input id="contractRepresentativeRole" placeholder="Ex: Gerente" />
+                </label>
+              </div>
+
+              <div class="form-grid">
+                <label>
+                  Nº contrato
+                  <input id="contractNumber" readonly />
+                </label>
+                <label>
+                  Data
+                  <input id="contractDate" type="date" />
+                </label>
+                <label>
+                  Serviço principal
+                  <input id="contractMainService" placeholder="Ex: Website mensal + marcações" />
+                </label>
+                <label>
+                  Início previsto
+                  <input id="contractStartDate" type="date" />
+                </label>
+                <label>
+                  Prazo de implementação
+                  <input id="contractImplementation" placeholder="Ex: 10 a 15 dias úteis" />
+                </label>
+                <label>
+                  Ativação/setup
+                  <input id="contractActivation" type="number" min="0" step="0.01" />
+                </label>
+                <label>
+                  Mensalidade
+                  <input id="contractMonthly" type="number" min="0" step="0.01" />
+                </label>
+                <label>
+                  Periodicidade
+                  <select id="contractPeriodicity">
+                    <option>Mensal</option>
+                    <option>Trimestral</option>
+                    <option>Anual</option>
+                  </select>
+                </label>
+                <label>
+                  IVA aplicável
+                  <select id="contractVat">
+                    <option value="23">IVA 23%</option>
+                    <option value="0">Sem IVA</option>
+                  </select>
+                </label>
+                <label>
+                  Método de pagamento
+                  <select id="contractPaymentMethod">
+                    <option>Débito direto SEPA</option>
+                    <option>Transferência bancária</option>
+                    <option>MB WAY</option>
+                    <option>Outro</option>
+                  </select>
+                </label>
+                <label>
+                  Estado
+                  <select id="contractStatus">
+                    <option>Rascunho</option>
+                    <option>Enviado</option>
+                    <option>Aceite</option>
+                    <option>Recusado</option>
+                    <option>Cancelado</option>
+                  </select>
+                </label>
+                <label>
+                  Aviso cancelamento
+                  <input id="contractCancelNotice" type="number" min="0" step="1" />
+                </label>
+              </div>
+
+              <div class="contract-switches">
+                <label><input id="contractDirectDebit" type="checkbox" /> Débito direto obrigatório</label>
+                <label><input id="contractLoyalty" type="checkbox" /> Tem fidelização</label>
+              </div>
+
+              <div class="form-grid">
+                <label>
+                  Fidelização em meses
+                  <input id="contractLoyaltyMonths" type="number" min="0" step="1" />
+                </label>
+                <label class="wide-field">
+                  Exceção de pagamento / justificação
+                  <input id="contractPaymentException" placeholder="Ex: cliente paga por transferência por acordo comercial" />
+                </label>
+              </div>
+
+              <div class="contract-options">
+                <section>
+                  <h3>Serviços incluídos</h3>
+                  <div class="check-grid" id="contractServiceChecks"></div>
+                </section>
+                <section>
+                  <h3>Add-ons</h3>
+                  <div class="check-grid" id="contractAddonChecks"></div>
+                </section>
+              </div>
+
+              <label>
+                Observações finais
+                <textarea id="contractNotes" rows="4" placeholder="Notas específicas deste contrato"></textarea>
+              </label>
+            </form>
+
+            <section class="contract-preview-wrap">
+              <div class="panel contract-toolbar">
+                <div>
+                  <p class="eyebrow">Preview</p>
+                  <h2 id="contractPreviewTitle">Contrato</h2>
+                </div>
+                <div class="panel-actions">
+                  <button class="button ghost" id="duplicateContractBtn" type="button">Duplicar</button>
+                  <button class="button ghost" id="shareContractBtn" type="button">Link</button>
+                </div>
+              </div>
+              <div class="contract-sheet" id="contractPreview"></div>
+            </section>
+          </div>
+
+          <section class="panel contracts-list-panel">
+            <div class="panel-heading">
+              <h2>Contratos gerados</h2>
+            </div>
+            <div class="contracts-list" id="contractsList"></div>
+          </section>
         </section>
 
         <section class="view" id="view-proposal">
@@ -421,6 +613,7 @@
               <div class="form-actions">
                 <button class="button primary" type="submit">Guardar proposta</button>
                 <button class="button accent" id="printProposalBtn" type="button">Gerar PDF</button>
+                <button class="button ghost proposal-management" id="createContractFromProposalBtn" type="button">Gerar contrato</button>
                 <button class="button ghost proposal-management" id="emailFollowupBtn" type="button">Email follow-up</button>
               </div>
             </form>
@@ -782,6 +975,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./supabase-config.js"></script>
     <script src="./pricing.js"></script>
-    <script src="./app.js?v=20260821-3"></script>
+    <script src="./app.js?v=20260821-4"></script>
   </body>
 </html>

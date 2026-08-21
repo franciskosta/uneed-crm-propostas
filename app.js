@@ -100,6 +100,40 @@ const instagramProspectStatuses = [
   "Cliente ativo",
 ];
 
+const contractStatuses = ["Rascunho", "Enviado", "Aceite", "Recusado", "Cancelado"];
+
+const contractServiceOptions = [
+  ["uneed_presenca", "UNEED Presença"],
+  ["website_mensal", "Website mensal"],
+  ["website_catalogo", "Website catálogo"],
+  ["loja_online", "Loja online"],
+  ["landing_page", "Landing page"],
+  ["manutencao_wordpress", "Manutenção WordPress"],
+  ["alojamento", "Alojamento"],
+  ["dominio", "Domínio"],
+  ["email_profissional", "Email profissional"],
+  ["sistema_marcacoes", "Sistema de marcações"],
+  ["gestao_google_ads", "Gestão Google Ads"],
+  ["gestao_meta_ads", "Gestão Meta Ads"],
+  ["conteudos_redes_sociais", "Conteúdos redes sociais"],
+  ["projeto_personalizado", "Projeto personalizado"],
+];
+
+const contractAddonOptions = [
+  ["email_extra", "Email extra"],
+  ["backoffice_catalogo", "Backoffice catálogo"],
+  ["assistente_guiado_24h", "Assistente guiado 24h"],
+  ["assistente_inteligente_24h", "Assistente inteligente 24h"],
+  ["sms_lembretes", "SMS/lembretes"],
+  ["pagamento_online", "Pagamento online"],
+  ["loja_online_extra", "Extras loja online"],
+  ["integracoes_personalizadas", "Integrações personalizadas"],
+  ["alteracoes_adicionais", "Alterações adicionais"],
+  ["relatorios", "Relatórios"],
+  ["remocao_credito_uneed", "Remoção crédito Uneed"],
+  ["outros_addons", "Outros add-ons"],
+];
+
 const prospectNiches = [
   ["cabeleireiros", "Cabeleireiros, salões e barbearias", "cabeleireiro salão barbearia"],
   ["estetica", "Estética, unhas e maquilhagem", "centro estética unhas maquilhagem"],
@@ -221,6 +255,7 @@ migrateBrandDefaults();
 hydratePricingDefaults();
 isHydratingFromServer = false;
 let activeId = state.proposals[0]?.id || null;
+let activeContractId = state.contracts?.[0]?.id || null;
 let followupAscending = true;
 let catalogCategoryFilter = "";
 
@@ -253,6 +288,7 @@ function loadState() {
     proposals: seedProposals,
     tickets: [],
     instagramProspects: [],
+    contracts: [],
   };
 }
 
@@ -349,6 +385,7 @@ async function loadSupabaseState() {
   migrateBrandDefaults();
   hydratePricingDefaults();
   activeId = state.proposals[0]?.id || activeId;
+  activeContractId = state.contracts?.[0]?.id || activeContractId;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   await loadSupportTickets();
   renderAll();
@@ -376,6 +413,7 @@ async function loadServerState() {
     migrateBrandDefaults();
     hydratePricingDefaults();
     activeId = state.proposals[0]?.id || activeId;
+    activeContractId = state.contracts?.[0]?.id || activeContractId;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     renderAll();
   } catch {
@@ -416,6 +454,22 @@ function migrateBrandDefaults() {
     if (!("paymentTerms" in proposal)) proposal.paymentTerms = state.brand.paymentTerms || "";
   });
   state.tickets ||= [];
+  state.contracts ||= [];
+  state.contracts.forEach((contract) => {
+    if (!contract.id) contract.id = crypto.randomUUID();
+    if (!contract.contractNumber) contract.contractNumber = nextContractNumber();
+    if (!contractStatuses.includes(contract.status)) contract.status = "Rascunho";
+    contract.services ||= [];
+    contract.addons ||= [];
+    if (!("directDebitRequired" in contract)) contract.directDebitRequired = true;
+    if (!("loyalty" in contract)) contract.loyalty = false;
+    if (!("loyaltyMonths" in contract)) contract.loyaltyMonths = 0;
+    if (!("cancelNoticeDays" in contract)) contract.cancelNoticeDays = 30;
+    if (!("version" in contract)) contract.version = 1;
+    if (!("versions" in contract)) contract.versions = [];
+    if (!("createdAt" in contract)) contract.createdAt = new Date().toISOString();
+    if (!("updatedAt" in contract)) contract.updatedAt = contract.createdAt;
+  });
   state.instagramProspects ||= [];
   state.prospectStats ||= { duplicatesSkipped: 0, rejected: 0, searches: 0 };
   state.prospectRejectedKeys ||= [];
@@ -2541,11 +2595,324 @@ function renderPerformance() {
   `).join("");
 }
 
+function nextContractNumber() {
+  const year = new Date().getFullYear();
+  const currentYearContracts = (state.contracts || []).filter((contract) => String(contract.contractNumber || "").includes(`-${year}-`));
+  return `UNEED-${year}-${String(currentYearContracts.length + 1).padStart(3, "0")}`;
+}
+
+function emptyContract(seed = {}) {
+  const now = new Date().toISOString();
+  const services = selectedServices(seed);
+  const recurring = hasRecurringServices(seed);
+  const sum = seed.id ? totals(seed) : { taxable: 0 };
+  return {
+    id: crypto.randomUUID(),
+    contractNumber: nextContractNumber(),
+    status: "Rascunho",
+    commercialName: seed.companyName || seed.clientName || "",
+    fiscalName: seed.companyName || seed.clientName || "",
+    nif: seed.clientNif || "",
+    address: "",
+    email: seed.clientEmail || "",
+    phone: seed.clientPhone || "",
+    contactPerson: seed.clientName || "",
+    representativeRole: "Gerente",
+    clientType: "Empresa",
+    contractDate: today(),
+    mainService: services[0]?.name || seed.opportunityCategory || "",
+    startDate: today(),
+    implementation: services[0]?.commitment || "10 a 15 dias úteis",
+    activationValue: recurring ? 0 : Number(sum.taxable || 0),
+    monthlyValue: recurring ? recurringMonthlyValue(seed) : 0,
+    periodicity: recurring ? "Mensal" : "Anual",
+    vatRate: seed.vatMode === "23" ? "23" : "0",
+    paymentMethod: recurring ? "Débito direto SEPA" : "Transferência bancária",
+    directDebitRequired: recurring,
+    paymentException: "",
+    loyalty: recurring,
+    loyaltyMonths: recurring ? 12 : 0,
+    cancelNoticeDays: 30,
+    services: services.length ? ["projeto_personalizado"] : [],
+    addons: [],
+    notes: seed.proposalNotes || "Contrato sem fidelização, salvo acordo escrito em contrário.",
+    version: 1,
+    versions: [],
+    createdAt: now,
+    updatedAt: now,
+    sentAt: "",
+    acceptedAt: "",
+  };
+}
+
+function getActiveContract() {
+  state.contracts ||= [];
+  if (!activeContractId && state.contracts[0]) activeContractId = state.contracts[0].id;
+  if (!activeContractId) {
+    const contract = emptyContract();
+    state.contracts.unshift(contract);
+    activeContractId = contract.id;
+  }
+  return state.contracts.find((contract) => contract.id === activeContractId) || state.contracts[0];
+}
+
+function createContractFromProposal(proposal = getActiveProposal()) {
+  const contract = emptyContract(proposal || {});
+  const names = selectedServices(proposal || {}).map((service) => service.name).filter(Boolean);
+  contract.mainService = names[0] || contract.mainService || "Serviços digitais UNEED";
+  state.contracts ||= [];
+  state.contracts.unshift(contract);
+  activeContractId = contract.id;
+  saveState();
+  switchView("contracts");
+  renderAll();
+  showSuccessModal(`Contrato ${contract.contractNumber} preparado a partir da proposta.`);
+}
+
+function duplicateActiveContract() {
+  const current = getActiveContract();
+  if (!current) return;
+  const contract = {
+    ...JSON.parse(JSON.stringify(current)),
+    id: crypto.randomUUID(),
+    contractNumber: nextContractNumber(),
+    status: "Rascunho",
+    version: 1,
+    versions: [],
+    sentAt: "",
+    acceptedAt: "",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+  state.contracts.unshift(contract);
+  activeContractId = contract.id;
+  saveState();
+  renderContractForm();
+  showSuccessModal(`Cópia criada: ${contract.contractNumber}.`);
+}
+
+function checkedContractKeys(selector) {
+  return qsa(selector).filter((input) => input.checked).map((input) => input.value);
+}
+
+function contractOptionLabels(options, keys) {
+  return options.filter(([key]) => keys.includes(key)).map(([, label]) => label);
+}
+
+function renderContractChecks(containerId, options, selectedKeys, type) {
+  const container = qs(containerId);
+  if (!container) return;
+  container.innerHTML = options.map(([key, label]) => `
+    <label class="check-card">
+      <input type="checkbox" value="${escapeAttr(key)}" data-contract-${type} ${selectedKeys.includes(key) ? "checked" : ""} />
+      <span>${escapeHtml(label)}</span>
+    </label>
+  `).join("");
+}
+
+function readContractForm() {
+  const contract = getActiveContract() || emptyContract();
+  contract.commercialName = qs("#contractCommercialName").value.trim();
+  contract.fiscalName = qs("#contractFiscalName").value.trim();
+  contract.nif = qs("#contractNif").value.trim();
+  contract.address = qs("#contractAddress").value.trim();
+  contract.email = qs("#contractEmail").value.trim();
+  contract.phone = qs("#contractPhone").value.trim();
+  contract.contactPerson = qs("#contractContactPerson").value.trim();
+  contract.representativeRole = qs("#contractRepresentativeRole").value.trim();
+  contract.clientType = qs("#contractClientType").value;
+  contract.contractNumber = qs("#contractNumber").value.trim() || contract.contractNumber || nextContractNumber();
+  contract.contractDate = qs("#contractDate").value || today();
+  contract.mainService = qs("#contractMainService").value.trim();
+  contract.startDate = qs("#contractStartDate").value || "";
+  contract.implementation = qs("#contractImplementation").value.trim();
+  contract.activationValue = Number(qs("#contractActivation").value || 0);
+  contract.monthlyValue = Number(qs("#contractMonthly").value || 0);
+  contract.periodicity = qs("#contractPeriodicity").value;
+  contract.vatRate = qs("#contractVat").value;
+  contract.paymentMethod = qs("#contractPaymentMethod").value;
+  contract.status = qs("#contractStatus").value;
+  contract.cancelNoticeDays = Number(qs("#contractCancelNotice").value || 30);
+  contract.directDebitRequired = qs("#contractDirectDebit").checked;
+  contract.loyalty = qs("#contractLoyalty").checked;
+  contract.loyaltyMonths = Number(qs("#contractLoyaltyMonths").value || 0);
+  contract.paymentException = qs("#contractPaymentException").value.trim();
+  contract.services = checkedContractKeys("[data-contract-service]");
+  contract.addons = checkedContractKeys("[data-contract-addon]");
+  contract.notes = qs("#contractNotes").value.trim();
+  contract.updatedAt = new Date().toISOString();
+  if (contract.status === "Enviado" && !contract.sentAt) contract.sentAt = today();
+  if (contract.status === "Aceite" && !contract.acceptedAt) contract.acceptedAt = today();
+  return contract;
+}
+
+function renderContractForm() {
+  const contract = getActiveContract();
+  if (!contract || !qs("#contractPreview")) return;
+  qs("#contractId").value = contract.id;
+  qs("#contractCommercialName").value = contract.commercialName || "";
+  qs("#contractFiscalName").value = contract.fiscalName || "";
+  qs("#contractNif").value = contract.nif || "";
+  qs("#contractAddress").value = contract.address || "";
+  qs("#contractEmail").value = contract.email || "";
+  qs("#contractPhone").value = contract.phone || "";
+  qs("#contractContactPerson").value = contract.contactPerson || "";
+  qs("#contractRepresentativeRole").value = contract.representativeRole || "";
+  qs("#contractClientType").value = contract.clientType || "Empresa";
+  qs("#contractNumber").value = contract.contractNumber || nextContractNumber();
+  qs("#contractDate").value = contract.contractDate || today();
+  qs("#contractMainService").value = contract.mainService || "";
+  qs("#contractStartDate").value = contract.startDate || "";
+  qs("#contractImplementation").value = contract.implementation || "";
+  qs("#contractActivation").value = Number(contract.activationValue || 0);
+  qs("#contractMonthly").value = Number(contract.monthlyValue || 0);
+  qs("#contractPeriodicity").value = contract.periodicity || "Mensal";
+  qs("#contractVat").value = contract.vatRate || "23";
+  qs("#contractPaymentMethod").value = contract.paymentMethod || "Débito direto SEPA";
+  qs("#contractStatus").value = contract.status || "Rascunho";
+  qs("#contractCancelNotice").value = Number(contract.cancelNoticeDays || 30);
+  qs("#contractDirectDebit").checked = contract.directDebitRequired !== false;
+  qs("#contractLoyalty").checked = Boolean(contract.loyalty);
+  qs("#contractLoyaltyMonths").value = Number(contract.loyaltyMonths || 0);
+  qs("#contractPaymentException").value = contract.paymentException || "";
+  qs("#contractNotes").value = contract.notes || "";
+  renderContractChecks("#contractServiceChecks", contractServiceOptions, contract.services || [], "service");
+  renderContractChecks("#contractAddonChecks", contractAddonOptions, contract.addons || [], "addon");
+  renderContractPreview(contract);
+  renderContractsList();
+}
+
+function contractClauseBlocks(contract) {
+  const services = contract.services || [];
+  const addons = contract.addons || [];
+  const has = (key) => services.includes(key) || addons.includes(key);
+  const exclusions = [
+    !has("loja_online") && "loja online e pagamentos automáticos integrados",
+    !has("pagamento_online") && "pagamento online automático",
+    !has("gestao_google_ads") && !has("gestao_meta_ads") && "gestão de campanhas de publicidade",
+    !has("assistente_guiado_24h") && !has("assistente_inteligente_24h") && "chatbot, assistentes de IA e automações avançadas",
+    !has("projeto_personalizado") && "desenvolvimento personalizado, integrações complexas, callbacks e funcionalidades à medida",
+  ].filter(Boolean);
+
+  const blocks = [
+    ["Objeto", "A Uneed presta ao Cliente os serviços digitais identificados no Anexo I, incluindo criação, disponibilização, alojamento, manutenção, suporte e demais componentes selecionadas. Qualquer serviço não indicado expressamente será considerado adicional e poderá ser orçamentado à parte."],
+    ["Natureza do serviço", "Salvo acordo escrito em contrário, nos planos mensais o Cliente não compra o website, página, plataforma, sistema de marcações, templates, código, estrutura técnica ou infraestrutura. Estes elementos permanecem propriedade, metodologia ou infraestrutura da Uneed. O Cliente recebe apenas o direito de utilização enquanto o contrato estiver ativo e pago."],
+    ["Serviços incluídos e exclusões", `Estão incluídos os serviços e add-ons listados no Anexo I. Não estão incluídos, salvo contratação específica: ${exclusions.join(", ")}.`],
+    ["Implementação", `A implementação inicia-se após aceitação do contrato, validação do meio de pagamento e entrega dos conteúdos, acessos e informações necessários. O prazo previsto é ${contract.implementation || "a definir"} e pode ser ajustado por atrasos imputáveis ao Cliente.`],
+    ["Conteúdos e responsabilidade do Cliente", "O Cliente é responsável pela veracidade, legalidade e atualização dos conteúdos, imagens, marcas, textos, contactos, preços e demais elementos fornecidos à Uneed."],
+  ];
+
+  if (has("sistema_marcacoes")) blocks.push(["Marcações, pedidos e contactos", "O sistema de marcações organiza e facilita pedidos de contacto ou reserva. Salvo configuração expressa em contrário, os pedidos não constituem confirmação automática, cabendo ao Cliente confirmar, reagendar, aceitar ou recusar marcações junto dos seus clientes finais."]);
+  if (has("assistente_guiado_24h") || has("assistente_inteligente_24h")) blocks.push(["Assistentes virtuais e IA", "Os assistentes virtuais destinam-se a prestar informação geral, responder a perguntas frequentes e encaminhar pedidos. Não substituem atendimento humano, diagnóstico, aconselhamento profissional, decisão clínica, jurídica, financeira ou outra decisão especializada."]);
+  if (has("assistente_inteligente_24h")) blocks.push(["Uso justo de IA", "O assistente inteligente funciona com base em informação aprovada pelo Cliente e poderá estar sujeito a limites mensais de respostas, mensagens, créditos ou pedidos. Utilização adicional, chamadas por IA e automações avançadas serão orçamentadas à parte."]);
+  if (has("dominio") || has("email_profissional") || has("alojamento")) blocks.push(["Domínio, email e alojamento", "Quando incluídos, domínio, email e alojamento são disponibilizados enquanto o contrato estiver ativo e pago. A transferência de domínio pode ser solicitada no fim do contrato desde que não existam valores em dívida e seja tecnicamente possível."]);
+  if (has("gestao_google_ads") || has("gestao_meta_ads")) blocks.push(["Publicidade digital", "A gestão de anúncios não garante resultados comerciais, vendas, leads, ROAS, posicionamento ou desempenho específico, salvo objetivo escrito e expressamente contratado. Orçamentos de media spend são suportados pelo Cliente."]);
+
+  blocks.push(
+    ["Propriedade intelectual e utilização", "Textos, layouts, componentes, templates, sistemas, código, fluxos, funcionalidades, metodologias e infraestrutura técnica desenvolvidos ou disponibilizados pela Uneed podem integrar propriedade intelectual, metodologia própria ou ativos reutilizáveis da Uneed. Salvo acordo escrito em contrário, o Cliente adquire apenas o direito de utilização enquanto o serviço estiver ativo e pago, não adquirindo automaticamente a propriedade integral do código, plataforma, sistema, templates ou infraestrutura técnica."],
+    ["Preço e pagamento", `O Cliente pagará ${eur(contract.activationValue || 0)} de ativação/setup e ${eur(contract.monthlyValue || 0)} por ${String(contract.periodicity || "mensal").toLowerCase()}. Salvo indicação em contrário, os valores acrescem de IVA à taxa legal aplicável.`],
+    ["Débito direto", "Nos serviços mensais, o pagamento recorrente poderá ser processado por débito direto SEPA através da GoCardless ou de outra entidade de pagamentos utilizada pela Uneed. A revogação do débito direto não cancela automaticamente o contrato, devendo o Cliente comunicar a intenção de cancelamento nos termos previstos."],
+    ["Duração e cancelamento", contract.loyalty ? `O contrato tem fidelização de ${contract.loyaltyMonths || 0} meses. Após esse período, o Cliente pode cancelar mediante comunicação escrita com aviso prévio mínimo de ${contract.cancelNoticeDays || 30} dias.` : `Salvo indicação escrita em contrário, o contrato não tem fidelização. O Cliente pode cancelar mediante comunicação escrita com aviso prévio mínimo de ${contract.cancelNoticeDays || 30} dias.`],
+    ["Proteção de dados", "As partes comprometem-se a cumprir o RGPD e legislação nacional aplicável. Quando tratar dados por conta do Cliente, a Uneed atua como subcontratante e processa os dados apenas na medida necessária à prestação dos serviços."],
+    ["Limitação de responsabilidade", "A Uneed não garante resultados comerciais específicos. Na medida permitida por lei, a responsabilidade da Uneed fica limitada ao valor pago pelo Cliente nos três meses anteriores ao facto que originou a responsabilidade, salvo dolo ou responsabilidade legalmente não limitável."],
+    ["Lei aplicável e aceitação", "O contrato rege-se pela lei portuguesa e considera-se aceite por assinatura, confirmação escrita, aceitação eletrónica, início da prestação dos serviços ou pagamento de qualquer valor previsto, desde que previamente disponibilizado ao Cliente."],
+  );
+
+  return blocks;
+}
+
+function renderContractPreview(contract) {
+  const preview = qs("#contractPreview");
+  if (!preview) return;
+  const serviceLabels = contractOptionLabels(contractServiceOptions, contract.services || []);
+  const addonLabels = contractOptionLabels(contractAddonOptions, contract.addons || []);
+  const clauses = contractClauseBlocks(contract);
+  qs("#contractPreviewTitle").textContent = contract.contractNumber || "Contrato";
+  preview.innerHTML = `
+    <article class="contract-page">
+      <header class="contract-cover">
+        <div>
+          <img src="./assets/uneed-logo-branco.png" alt="UNEED" />
+          <h1>Contrato de prestação de serviços digitais</h1>
+          <p>${escapeHtml(contract.mainService || "Serviços digitais UNEED")}</p>
+        </div>
+        <aside>
+          <span>Nº contrato</span><strong>${escapeHtml(contract.contractNumber || "")}</strong>
+          <span>Data</span><strong>${escapeHtml(contract.contractDate || today())}</strong>
+          <span>Versão</span><strong>v${Number(contract.version || 1)}</strong>
+        </aside>
+      </header>
+      <section class="contract-parties">
+        <div><span>Prestadora</span><strong>UNEED Soluções Digitais</strong><p>Representada por Francisco Costa</p></div>
+        <div><span>Cliente</span><strong>${escapeHtml(contract.fiscalName || contract.commercialName || "Cliente")}</strong><p>NIF ${escapeHtml(contract.nif || "por preencher")} · ${escapeHtml(contract.address || "morada por preencher")}</p><p>Representante: ${escapeHtml(contract.contactPerson || "por preencher")} ${contract.representativeRole ? `(${escapeHtml(contract.representativeRole)})` : ""}</p></div>
+      </section>
+      <section class="contract-summary-box">
+        <div><span>Ativação/setup</span><strong>${eur(contract.activationValue || 0)}</strong></div>
+        <div><span>Mensalidade</span><strong>${eur(contract.monthlyValue || 0)}</strong></div>
+        <div><span>IVA</span><strong>${contract.vatRate === "23" ? "23%" : "Não aplicável"}</strong></div>
+        <div><span>Cancelamento</span><strong>${contract.cancelNoticeDays || 30} dias</strong></div>
+      </section>
+      <section class="contract-clauses">
+        ${clauses.map(([title, body], index) => `<article><h2>${index + 1}. ${escapeHtml(title)}</h2><p>${escapeHtml(body)}</p></article>`).join("")}
+      </section>
+      <section class="contract-annex">
+        <h2>Anexo I - Serviços contratados</h2>
+        <div class="contract-annex-grid">
+          <div><h3>Serviços</h3>${serviceLabels.length ? `<ul>${serviceLabels.map((label) => `<li>${escapeHtml(label)}</li>`).join("")}</ul>` : "<p>Sem serviços selecionados.</p>"}</div>
+          <div><h3>Add-ons</h3>${addonLabels.length ? `<ul>${addonLabels.map((label) => `<li>${escapeHtml(label)}</li>`).join("")}</ul>` : "<p>Sem add-ons selecionados.</p>"}</div>
+        </div>
+        <p><strong>Observações:</strong> ${escapeHtml(contract.notes || "Sem observações adicionais.")}</p>
+        ${contract.paymentException ? `<p><strong>Exceção de pagamento:</strong> ${escapeHtml(contract.paymentException)}</p>` : ""}
+      </section>
+      <footer class="contract-signatures">
+        <div><span>UNEED</span><strong>Francisco Costa</strong></div>
+        <div><span>Cliente</span><strong>${escapeHtml(contract.contactPerson || contract.fiscalName || "")}</strong></div>
+      </footer>
+      <p class="contract-footer">${escapeHtml(contract.contractNumber || "")} · ${escapeHtml(contract.contractDate || today())}</p>
+    </article>
+  `;
+}
+
+function renderContractsList() {
+  const list = qs("#contractsList");
+  if (!list) return;
+  state.contracts ||= [];
+  list.innerHTML = state.contracts.length ? state.contracts.map((contract) => `
+    <article class="contract-list-item ${contract.id === activeContractId ? "is-active" : ""}">
+      <div>
+        <strong>${escapeHtml(contract.fiscalName || contract.commercialName || "Cliente sem nome")}</strong>
+        <span>${escapeHtml(contract.contractNumber || "")} · v${Number(contract.version || 1)} · ${escapeHtml(contract.status || "Rascunho")}</span>
+      </div>
+      <div>
+        <span>${eur(contract.monthlyValue || 0)}/mês</span>
+        <button class="button ghost" type="button" data-open-contract="${escapeAttr(contract.id)}">Abrir</button>
+      </div>
+    </article>
+  `).join("") : `<p class="empty-state">Ainda não existem contratos gerados.</p>`;
+}
+
+function saveActiveContract({ version = false } = {}) {
+  const contract = readContractForm();
+  if (version) {
+    contract.versions ||= [];
+    contract.versions.push({ version: contract.version || 1, savedAt: new Date().toISOString(), data: JSON.parse(JSON.stringify(contract)) });
+    contract.version = Number(contract.version || 1) + 1;
+  }
+  const index = state.contracts.findIndex((item) => item.id === contract.id);
+  if (index >= 0) state.contracts[index] = contract;
+  else state.contracts.unshift(contract);
+  activeContractId = contract.id;
+  saveState();
+  renderContractForm();
+  return contract;
+}
+
 function renderAll() {
   fillStatusSelects();
   renderForm();
   renderDashboard();
   renderPerformance();
+  renderContractForm();
   renderPipeline();
   renderInstagramProspecting();
   renderTickets();
@@ -2576,6 +2943,57 @@ function bindEvents() {
     saveState();
     switchView("proposal");
     renderAll();
+  });
+
+  qs("#newContractBtn")?.addEventListener("click", () => {
+    const contract = emptyContract();
+    state.contracts.unshift(contract);
+    activeContractId = contract.id;
+    saveState();
+    switchView("contracts");
+    renderAll();
+  });
+
+  qs("#createContractFromProposalBtn")?.addEventListener("click", () => createContractFromProposal(readForm()));
+
+  qs("#contractForm")?.addEventListener("input", () => {
+    const contract = readContractForm();
+    renderContractPreview(contract);
+    renderContractsList();
+  });
+
+  qs("#contractForm")?.addEventListener("change", () => {
+    const contract = readContractForm();
+    renderContractPreview(contract);
+    renderContractsList();
+  });
+
+  qs("#saveContractBtn")?.addEventListener("click", () => {
+    const contract = saveActiveContract({ version: true });
+    showSuccessModal(`Contrato ${contract.contractNumber} guardado e sincronizado.`);
+  });
+
+  qs("#printContractBtn")?.addEventListener("click", () => {
+    saveActiveContract();
+    document.body.classList.add("printing-contract");
+    window.print();
+    setTimeout(() => document.body.classList.remove("printing-contract"), 500);
+  });
+
+  qs("#duplicateContractBtn")?.addEventListener("click", duplicateActiveContract);
+
+  qs("#shareContractBtn")?.addEventListener("click", () => {
+    const contract = getActiveContract();
+    const url = `${appOrigin()}/#contract=${encodeURIComponent(contract?.id || "")}`;
+    navigator.clipboard?.writeText(url).catch(() => {});
+    showSuccessModal(`Link interno do contrato copiado: ${url}`);
+  });
+
+  qs("#contractsList")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-open-contract]");
+    if (!button) return;
+    activeContractId = button.dataset.openContract;
+    renderContractForm();
   });
 
   qs("#logoutBtn").addEventListener("click", async () => {
@@ -2986,6 +3404,7 @@ function bindEvents() {
     migrateBrandDefaults();
     hydratePricingDefaults();
     activeId = state.proposals[0]?.id || null;
+    activeContractId = state.contracts?.[0]?.id || null;
     saveState();
     renderAll();
   });

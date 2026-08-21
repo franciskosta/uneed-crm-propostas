@@ -3028,6 +3028,11 @@ textarea {
     padding: 3.5mm;
   }
 
+  body.printing-contract .contract-annex {
+    break-before: page;
+    page-break-before: always;
+  }
+
   .proposal-sheet {
     width: 194mm;
     min-height: 281mm;

@@ -427,6 +427,7 @@ function migrateBrandDefaults() {
     if (!("hasWhatsappTree" in prospect)) prospect.hasWhatsappTree = false;
     if (!("createdAt" in prospect)) prospect.createdAt = new Date().toISOString();
     if (!("updatedAt" in prospect)) prospect.updatedAt = prospect.createdAt;
+    if (prospect.message) prospect.message = formalizeProspectMessage(prospect.message);
   });
   saveState();
 }
@@ -1768,6 +1769,20 @@ function emptyInstagramProspect() {
   };
 }
 
+function formalizeProspectMessage(message) {
+  return String(message || "")
+    .replace(/\bQueres que eu prepare\b/gi, "Faria sentido preparar")
+    .replace(/\bQueres\b/gi, "Gostaria")
+    .replace(/\bTens\b/gi, "Tem")
+    .replace(/\bPodes\b/gi, "Pode")
+    .replace(/\bteus\b/gi, "seus")
+    .replace(/\btuas\b/gi, "suas")
+    .replace(/\bteu\b/gi, "seu")
+    .replace(/\btua\b/gi, "sua")
+    .replace(/\bcontigo\b/gi, "consigo")
+    .replace(/\bpara ti\b/gi, "para si");
+}
+
 function prospectSignalLabel(prospect) {
   const signals = [];
   signals.push(prospect.hasWebsite ? "Site: sim" : "Site: não");
@@ -1859,7 +1874,7 @@ async function generateProspects() {
     const added = [];
     for (const lead of payload.results || []) {
       if (normalizedProspectKeys(lead).some((key) => knownProspectKeys().includes(key))) continue;
-      added.push({ ...emptyInstagramProspect(), ...lead, id: crypto.randomUUID(), status: "Por fazer", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      added.push({ ...emptyInstagramProspect(), ...lead, message: formalizeProspectMessage(lead.message), id: crypto.randomUUID(), status: "Por fazer", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
     }
     state.instagramProspects.unshift(...added);
     state.prospectStats.searches += 1;

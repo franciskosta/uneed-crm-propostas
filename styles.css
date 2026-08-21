@@ -1955,6 +1955,7 @@ textarea {
 .contract-parties,
 .contract-summary-box,
 .contract-annex-grid,
+.contract-annex-values,
 .contract-signatures {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1967,6 +1968,7 @@ textarea {
 
 .contract-parties > div,
 .contract-summary-box > div,
+.contract-annex-values > div,
 .contract-annex,
 .contract-signatures > div {
   border: 1px solid var(--line);
@@ -1977,6 +1979,7 @@ textarea {
 
 .contract-parties span,
 .contract-summary-box span,
+.contract-annex-values span,
 .contract-signatures span {
   display: block;
   color: var(--muted);
@@ -1986,7 +1989,8 @@ textarea {
 }
 
 .contract-parties strong,
-.contract-summary-box strong {
+.contract-summary-box strong,
+.contract-annex-values strong {
   display: block;
   margin-top: 5px;
   font-size: 18px;
@@ -2031,6 +2035,15 @@ textarea {
   gap: 5px;
   margin: 0;
   padding-left: 18px;
+}
+
+.contract-annex-values {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 14px;
+}
+
+.contract-annex-values > div {
+  padding: 12px;
 }
 
 .contract-signatures {
@@ -2734,6 +2747,7 @@ textarea {
   .contract-parties,
   .contract-summary-box,
   .contract-annex-grid,
+  .contract-annex-values,
   .contract-signatures,
   .check-grid {
     grid-template-columns: 1fr;
@@ -2792,7 +2806,8 @@ textarea {
   .catalog-meta-grid,
   .contract-option-settings,
   .contract-option-row,
-  .contract-summary-box {
+  .contract-summary-box,
+  .contract-annex-values {
     grid-template-columns: 1fr;
   }
 
@@ -3013,16 +3028,19 @@ textarea {
   body.printing-contract .contract-parties,
   body.printing-contract .contract-summary-box,
   body.printing-contract .contract-annex-grid,
+  body.printing-contract .contract-annex-values,
   body.printing-contract .contract-signatures {
     gap: 4mm;
   }
 
-  body.printing-contract .contract-summary-box {
+  body.printing-contract .contract-summary-box,
+  body.printing-contract .contract-annex-values {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   body.printing-contract .contract-parties > div,
   body.printing-contract .contract-summary-box > div,
+  body.printing-contract .contract-annex-values > div,
   body.printing-contract .contract-annex,
   body.printing-contract .contract-signatures > div {
     padding: 3.5mm;

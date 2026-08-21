@@ -2734,12 +2734,12 @@ function emptyContract(seed = {}) {
     paymentMethod: recurring ? "Débito direto SEPA" : "Transferência bancária",
     directDebitRequired: recurring,
     paymentException: "",
-    loyalty: recurring,
-    loyaltyMonths: recurring ? 12 : 0,
+    loyalty: false,
+    loyaltyMonths: 0,
     cancelNoticeDays: 30,
     services: services.length ? ["projeto_personalizado"] : [],
     addons: [],
-    notes: seed.proposalNotes || "Contrato sem fidelização, salvo acordo escrito em contrário.",
+    notes: seed.proposalNotes || "",
     version: 1,
     versions: [],
     createdAt: now,
@@ -2886,40 +2886,81 @@ function renderContractForm() {
   renderContractsList();
 }
 
+function contractPeriodSuffix(periodicity = "Mensal") {
+  const value = String(periodicity || "Mensal").toLowerCase();
+  if (value.includes("anual")) return "por ano";
+  if (value.includes("trimestral")) return "por trimestre";
+  if (value.includes("mensal")) return "por mês";
+  return `por ${value}`;
+}
+
+function contractRecurringLabel(periodicity = "Mensal") {
+  const value = String(periodicity || "Mensal").toLowerCase();
+  if (value.includes("anual")) return "Anualidade";
+  if (value.includes("trimestral")) return "Trimestralidade";
+  return "Mensalidade";
+}
+
+function contractVatLabel(contract) {
+  return contract.vatRate === "23" ? "IVA 23%" : "Sem IVA";
+}
+
+function contractVatSummary(contract) {
+  return contract.vatRate === "23" ? "+ IVA 23%" : "Sem IVA";
+}
+
+function contractVatSentence(contract) {
+  if (contract.vatRate === "23") return "Aos valores indicados acresce IVA à taxa legal em vigor.";
+  return "Os valores indicados seguem o enquadramento de IVA assinalado no Anexo I.";
+}
+
+function contractPriceText(contract) {
+  const activationValue = Number(contract.activationValue || 0);
+  const recurringValue = Number(contract.monthlyValue || 0);
+  const parts = ["O Cliente pagará os valores indicados no Anexo I, de acordo com a periodicidade aí definida."];
+  if (activationValue > 0) parts.push(`O valor de ativação/setup é de ${eur(activationValue)}.`);
+  if (recurringValue > 0) parts.push(`O valor recorrente é de ${eur(recurringValue)} ${contractPeriodSuffix(contract.periodicity)}.`);
+  if (!activationValue && !recurringValue) parts.push("Não existem valores definidos no contrato além dos que venham a constar do Anexo I.");
+  parts.push(contractVatSentence(contract));
+  return parts.join(" ");
+}
+
+function contractBodyHtml(body) {
+  return String(body || "")
+    .split(/\n{2,}/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean)
+    .map((paragraph) => `<p>${escapeHtml(paragraph)}</p>`)
+    .join("");
+}
+
 function contractClauseBlocks(contract) {
   const services = contract.services || [];
   const addons = contract.addons || [];
   const has = (key) => services.includes(key) || addons.includes(key);
-  const exclusions = [
-    !has("loja_online") && "loja online e pagamentos automáticos integrados",
-    !has("pagamento_online") && "pagamento online automático",
-    !has("gestao_google_ads") && !has("gestao_meta_ads") && "gestão de campanhas de publicidade",
-    !has("assistente_guiado_24h") && !has("assistente_inteligente_24h") && "chatbot, assistentes de IA e automações avançadas",
-    !has("projeto_personalizado") && "desenvolvimento personalizado, integrações complexas, callbacks e funcionalidades à medida",
-  ].filter(Boolean);
 
   const blocks = [
-    ["Objeto", "A Uneed presta ao Cliente os serviços digitais identificados no Anexo I, incluindo criação, disponibilização, alojamento, manutenção, suporte e demais componentes selecionadas. Qualquer serviço não indicado expressamente será considerado adicional e poderá ser orçamentado à parte."],
-    ["Natureza do serviço", "Salvo acordo escrito em contrário, nos planos mensais o Cliente não compra o website, página, plataforma, sistema de marcações, templates, código, estrutura técnica ou infraestrutura. Estes elementos permanecem propriedade, metodologia ou infraestrutura da Uneed. O Cliente recebe apenas o direito de utilização enquanto o contrato estiver ativo e pago."],
-    ["Serviços incluídos e exclusões", `Estão incluídos os serviços e add-ons listados no Anexo I. Não estão incluídos, salvo contratação específica: ${exclusions.join(", ")}.`],
-    ["Implementação", `A implementação inicia-se após aceitação do contrato, validação do meio de pagamento e entrega dos conteúdos, acessos e informações necessários. O prazo previsto é ${contract.implementation || "a definir"} e pode ser ajustado por atrasos imputáveis ao Cliente.`],
-    ["Conteúdos e responsabilidade do Cliente", "O Cliente é responsável pela veracidade, legalidade e atualização dos conteúdos, imagens, marcas, textos, contactos, preços e demais elementos fornecidos à Uneed."],
+    ["Objeto", "A Uneed presta ao Cliente os serviços digitais identificados no Anexo I deste contrato. O Anexo I define o âmbito comercial contratado, incluindo os serviços, add-ons, valores e condições principais aplicáveis. Qualquer serviço, funcionalidade ou trabalho não indicado no Anexo I poderá ser contratado separadamente e orçamentado à parte."],
+    ["Natureza do serviço", "Nos planos mensais, o Cliente contrata um serviço digital continuado prestado pela Uneed. O valor mensal corresponde à disponibilização, utilização, manutenção operacional e acompanhamento do serviço contratado, e não à compra do website, página, plataforma, sistema de marcações, templates, código, estrutura técnica ou infraestrutura. Enquanto o contrato estiver ativo e os pagamentos estiverem regularizados, o Cliente tem o direito de utilizar o serviço nos termos contratados."],
+    ["Serviços incluídos e exclusões", "Estão incluídos os serviços e add-ons indicados no Anexo I. Funcionalidades, integrações, campanhas, automações, conteúdos, alterações ou trabalhos adicionais que não estejam identificados no Anexo I não fazem parte do contrato base e poderão ser analisados e orçamentados separadamente."],
+    ["Implementação", `A implementação inicia-se após a aceitação do contrato, validação do meio de pagamento quando aplicável, e entrega pelo Cliente dos conteúdos, acessos e informações necessários. O prazo previsto de implementação é ${contract.implementation || "a definir"}. Caso existam atrasos na entrega de informação, conteúdos, aprovações ou acessos por parte do Cliente, o prazo poderá ser ajustado proporcionalmente.`],
+    ["Conteúdos e responsabilidade do Cliente", "O Cliente é responsável pela veracidade, legalidade, atualização e autorização de utilização dos conteúdos que fornece à Uneed, incluindo textos, imagens, logótipos, marcas, contactos, preços, descrições de serviços e demais materiais. A Uneed pode apoiar na organização e apresentação desses conteúdos, mas não é responsável por informação incorreta, desatualizada ou não autorizada fornecida pelo Cliente."],
   ];
 
-  if (has("sistema_marcacoes")) blocks.push(["Marcações, pedidos e contactos", "O sistema de marcações organiza e facilita pedidos de contacto ou reserva. Salvo configuração expressa em contrário, os pedidos não constituem confirmação automática, cabendo ao Cliente confirmar, reagendar, aceitar ou recusar marcações junto dos seus clientes finais."]);
-  if (has("assistente_guiado_24h") || has("assistente_inteligente_24h")) blocks.push(["Assistentes virtuais e IA", "Os assistentes virtuais destinam-se a prestar informação geral, responder a perguntas frequentes e encaminhar pedidos. Não substituem atendimento humano, diagnóstico, aconselhamento profissional, decisão clínica, jurídica, financeira ou outra decisão especializada."]);
-  if (has("assistente_inteligente_24h")) blocks.push(["Uso justo de IA", "O assistente inteligente funciona com base em informação aprovada pelo Cliente e poderá estar sujeito a limites mensais de respostas, mensagens, créditos ou pedidos. Utilização adicional, chamadas por IA e automações avançadas serão orçamentadas à parte."]);
-  if (has("dominio") || has("email_profissional") || has("alojamento")) blocks.push(["Domínio, email e alojamento", "Quando incluídos, domínio, email e alojamento são disponibilizados enquanto o contrato estiver ativo e pago. A transferência de domínio pode ser solicitada no fim do contrato desde que não existam valores em dívida e seja tecnicamente possível."]);
-  if (has("gestao_google_ads") || has("gestao_meta_ads")) blocks.push(["Publicidade digital", "A gestão de anúncios não garante resultados comerciais, vendas, leads, ROAS, posicionamento ou desempenho específico, salvo objetivo escrito e expressamente contratado. Orçamentos de media spend são suportados pelo Cliente."]);
+  if (has("sistema_marcacoes")) blocks.push(["Marcações, pedidos e contactos", "Quando o serviço contratado incluir sistema de marcações, pedidos ou contactos, esse sistema serve para facilitar a receção e organização de pedidos dos clientes finais. Salvo configuração expressa em contrário, uma marcação ou pedido recebido pelo sistema não significa confirmação automática. Cabe ao Cliente acompanhar, confirmar, reagendar, aceitar ou recusar pedidos junto dos seus clientes finais."]);
+  if (has("assistente_guiado_24h") || has("assistente_inteligente_24h")) blocks.push(["Assistentes virtuais e IA", "Quando o serviço contratado incluir assistentes virtuais ou funcionalidades de inteligência artificial, estes destinam-se a prestar informação geral, responder a perguntas frequentes e encaminhar pedidos. Não substituem atendimento humano, aconselhamento profissional, diagnóstico, decisão clínica, jurídica, financeira ou qualquer outra decisão especializada."]);
+  if (has("assistente_inteligente_24h")) blocks.push(["Uso justo de IA", "Quando aplicável, o assistente inteligente funciona com base na informação disponibilizada ou aprovada pelo Cliente. A utilização poderá estar sujeita a limites técnicos ou comerciais, como mensagens, respostas, créditos, pedidos ou chamadas. Utilizações adicionais, automações avançadas ou funcionalidades não previstas no Anexo I poderão ser orçamentadas à parte."]);
+  blocks.push(["Domínio, email e alojamento", "Nos planos que incluam domínio, alojamento ou email profissional, estes serviços são assegurados enquanto o contrato estiver ativo e os pagamentos estiverem regularizados. O alojamento e o email não continuam automaticamente após o cancelamento do contrato. No final do serviço, o Cliente poderá solicitar a transferência do domínio, desde que os pagamentos estejam regularizados, a transferência seja tecnicamente possível e sejam cumpridos os procedimentos e prazos do respetivo fornecedor ou registrar. Sempre que necessário, a Uneed poderá conceder um período razoável para migração ou exportação de dados antes da desativação dos serviços."]);
+  if (has("gestao_google_ads") || has("gestao_meta_ads")) blocks.push(["Publicidade digital", "Quando o serviço contratado incluir gestão de publicidade digital, a Uneed compromete-se a configurar, acompanhar e otimizar as campanhas de acordo com o âmbito contratado. No entanto, os resultados dependem de fatores externos, como orçamento, mercado, concorrência, comportamento dos utilizadores, plataforma utilizada e qualidade da oferta. Por esse motivo, a Uneed não garante vendas, contactos, seguidores, posicionamento, ROAS ou outros resultados comerciais específicos. O investimento em anúncios é suportado pelo Cliente, salvo indicação expressa em contrário."]);
 
   blocks.push(
-    ["Propriedade intelectual e utilização", "Textos, layouts, componentes, templates, sistemas, código, fluxos, funcionalidades, metodologias e infraestrutura técnica desenvolvidos ou disponibilizados pela Uneed podem integrar propriedade intelectual, metodologia própria ou ativos reutilizáveis da Uneed. Salvo acordo escrito em contrário, o Cliente adquire apenas o direito de utilização enquanto o serviço estiver ativo e pago, não adquirindo automaticamente a propriedade integral do código, plataforma, sistema, templates ou infraestrutura técnica."],
-    ["Preço e pagamento", `O Cliente pagará ${eur(contract.activationValue || 0)} de ativação/setup e ${eur(contract.monthlyValue || 0)} por ${String(contract.periodicity || "mensal").toLowerCase()}. Salvo indicação em contrário, os valores acrescem de IVA à taxa legal aplicável.`],
-    ["Débito direto", "Nos serviços mensais, o pagamento recorrente poderá ser processado por débito direto SEPA através da GoCardless ou de outra entidade de pagamentos utilizada pela Uneed. A revogação do débito direto não cancela automaticamente o contrato, devendo o Cliente comunicar a intenção de cancelamento nos termos previstos."],
-    ["Duração e cancelamento", contract.loyalty ? `O contrato tem fidelização de ${contract.loyaltyMonths || 0} meses. Após esse período, o Cliente pode cancelar mediante comunicação escrita com aviso prévio mínimo de ${contract.cancelNoticeDays || 30} dias.` : `Salvo indicação escrita em contrário, o contrato não tem fidelização. O Cliente pode cancelar mediante comunicação escrita com aviso prévio mínimo de ${contract.cancelNoticeDays || 30} dias.`],
-    ["Proteção de dados", "As partes comprometem-se a cumprir o RGPD e legislação nacional aplicável. Quando tratar dados por conta do Cliente, a Uneed atua como subcontratante e processa os dados apenas na medida necessária à prestação dos serviços."],
-    ["Limitação de responsabilidade", "A Uneed não garante resultados comerciais específicos. Na medida permitida por lei, a responsabilidade da Uneed fica limitada ao valor pago pelo Cliente nos três meses anteriores ao facto que originou a responsabilidade, salvo dolo ou responsabilidade legalmente não limitável."],
-    ["Lei aplicável e aceitação", "O contrato rege-se pela lei portuguesa e considera-se aceite por assinatura, confirmação escrita, aceitação eletrónica, início da prestação dos serviços ou pagamento de qualquer valor previsto, desde que previamente disponibilizado ao Cliente."],
+    ["Propriedade intelectual e utilização", "Os conteúdos fornecidos pelo Cliente, como textos, imagens, logótipos, marcas e materiais próprios, continuam a pertencer ao Cliente. Os elementos técnicos, criativos e operacionais desenvolvidos, configurados ou disponibilizados pela Uneed, incluindo código, templates, componentes, sistemas, automações, estruturas técnicas, metodologias, fluxos, ferramentas e infraestrutura, pertencem à Uneed ou aos respetivos fornecedores/licenciadores. Salvo acordo escrito específico, o Cliente não adquire a propriedade desses elementos, recebendo apenas o direito de utilização enquanto o contrato estiver ativo e pago."],
+    ["Preço e pagamento", contractPriceText(contract)],
+    ["Débito direto", "Nos serviços recorrentes, o pagamento poderá ser processado por débito direto SEPA através da GoCardless ou de outra entidade de pagamentos utilizada pela Uneed. A alteração, rejeição ou revogação do débito direto não cancela automaticamente o contrato. Para cancelar o serviço, o Cliente deve comunicar essa intenção à Uneed nos termos definidos neste contrato."],
+    ["Duração e cancelamento", contract.loyalty ? `O contrato tem um período inicial de ${contract.loyaltyMonths || 0} meses, conforme indicado no Anexo I. Após esse período, o Cliente pode cancelar o serviço mediante comunicação escrita à Uneed com aviso prévio mínimo de ${contract.cancelNoticeDays || 30} dias. Os valores vencidos, em atraso ou correspondentes ao período de aviso prévio continuam a ser devidos.` : `O contrato não tem período de fidelização, exceto quando o Anexo I indicar expressamente uma condição diferente. O Cliente pode cancelar o serviço mediante comunicação escrita à Uneed com aviso prévio mínimo de ${contract.cancelNoticeDays || 30} dias. Os valores vencidos, em atraso ou correspondentes ao período de aviso prévio continuam a ser devidos.`],
+    ["Proteção de dados", "As partes comprometem-se a cumprir o RGPD e a legislação nacional aplicável em matéria de proteção de dados. Quando a Uneed tratar dados pessoais por conta do Cliente, fá-lo apenas na medida necessária à prestação dos serviços contratados e de acordo com as instruções aplicáveis do Cliente."],
+    ["Resultados, terceiros e responsabilidade", "A Uneed compromete-se a prestar os serviços contratados com cuidado, profissionalismo e de acordo com o âmbito definido no Anexo I. No entanto, não pode garantir resultados comerciais concretos que dependam de fatores externos, como vendas, contactos recebidos, marcações, faturação, posicionamento em motores de pesquisa, desempenho de campanhas ou comportamento dos utilizadores.\n\nA Uneed também não é responsável por falhas diretamente provocadas por serviços externos que não controla, incluindo fornecedores de alojamento, registrars, plataformas de anúncios, gateways de pagamento, APIs, serviços de email, plugins ou outras plataformas de terceiros. Sempre que o problema esteja relacionado com serviços que a Uneed gere ou acompanha, a Uneed fará o razoavelmente possível para ajudar na identificação e resolução da situação.\n\nQuando exista responsabilidade diretamente imputável à Uneed, e nos casos em que a lei permita limitar essa responsabilidade, o valor máximo de indemnização fica limitado ao total pago pelo Cliente à Uneed nos três meses anteriores ao incidente. Esta limitação não se aplica em situações em que a lei não permita excluir ou limitar responsabilidade."],
+    ["Lei aplicável e aceitação", "O contrato rege-se pela lei portuguesa. Considera-se aceite quando, após ter sido disponibilizado ao Cliente, exista uma ação inequívoca de aceitação, incluindo assinatura, aceitação eletrónica, confirmação escrita, pagamento de valor previsto ou autorização para início da prestação dos serviços."],
   );
 
   return blocks;
@@ -2931,6 +2972,7 @@ function renderContractPreview(contract) {
   const serviceLabels = contractOptionLabels(contractOptionPairs("service"), contract.services || []);
   const addonLabels = contractOptionLabels(contractOptionPairs("addon"), contract.addons || []);
   const clauses = contractClauseBlocks(contract);
+  const recurringLabel = contractRecurringLabel(contract.periodicity);
   qs("#contractPreviewTitle").textContent = contract.contractNumber || "Contrato";
   preview.innerHTML = `
     <article class="contract-page">
@@ -2951,20 +2993,27 @@ function renderContractPreview(contract) {
         <div><span>Cliente</span><strong>${escapeHtml(contract.fiscalName || contract.commercialName || "Cliente")}</strong><p>NIF ${escapeHtml(contract.nif || "por preencher")} · ${escapeHtml(contract.address || "morada por preencher")}</p><p>Representante: ${escapeHtml(contract.contactPerson || "por preencher")} ${contract.representativeRole ? `(${escapeHtml(contract.representativeRole)})` : ""}</p></div>
       </section>
       <section class="contract-summary-box">
-        <div><span>Ativação/setup</span><strong>${eur(contract.activationValue || 0)}</strong><small>${contract.vatRate === "23" ? "+ IVA 23%" : "IVA não aplicável"}</small></div>
-        <div><span>Mensalidade</span><strong>${eur(contract.monthlyValue || 0)}</strong><small>${contract.vatRate === "23" ? "+ IVA 23%" : "IVA não aplicável"}</small></div>
+        <div><span>Ativação/setup</span><strong>${eur(contract.activationValue || 0)}</strong><small>${contractVatSummary(contract)}</small></div>
+        <div><span>${escapeHtml(recurringLabel)}</span><strong>${eur(contract.monthlyValue || 0)}</strong><small>${contractVatSummary(contract)}</small></div>
         <div><span>Prazo implementação</span><strong>${escapeHtml(contract.implementation || "A definir")}</strong></div>
       </section>
       <section class="contract-clauses">
-        ${clauses.map(([title, body], index) => `<article><h2>${index + 1}. ${escapeHtml(title)}</h2><p>${escapeHtml(body)}</p></article>`).join("")}
+        ${clauses.map(([title, body], index) => `<article><h2>${index + 1}. ${escapeHtml(title)}</h2>${contractBodyHtml(body)}</article>`).join("")}
       </section>
       <section class="contract-annex">
         <h2>Anexo I - Serviços contratados</h2>
         <div class="contract-annex-grid">
           <div><h3>Serviços</h3>${serviceLabels.length ? `<ul>${serviceLabels.map((label) => `<li>${escapeHtml(label)}</li>`).join("")}</ul>` : "<p>Sem serviços selecionados.</p>"}</div>
-          <div><h3>Add-ons</h3>${addonLabels.length ? `<ul>${addonLabels.map((label) => `<li>${escapeHtml(label)}</li>`).join("")}</ul>` : "<p>Sem add-ons selecionados.</p>"}</div>
+          <div><h3>Add-ons</h3>${addonLabels.length ? `<ul>${addonLabels.map((label) => `<li>${escapeHtml(label)}</li>`).join("")}</ul>` : "<p>Sem add-ons contratados.</p>"}</div>
         </div>
-        <p><strong>Observações:</strong> ${escapeHtml(contract.notes || "Sem observações adicionais.")}</p>
+        <div class="contract-annex-values">
+          <div><span>Ativação/setup</span><strong>${eur(contract.activationValue || 0)}</strong></div>
+          <div><span>Valor recorrente</span><strong>${eur(contract.monthlyValue || 0)} ${contract.monthlyValue ? escapeHtml(contractPeriodSuffix(contract.periodicity)) : ""}</strong></div>
+          <div><span>Periodicidade</span><strong>${escapeHtml(contract.periodicity || "Mensal")}</strong></div>
+          <div><span>IVA</span><strong>${contractVatLabel(contract)}</strong></div>
+          <div><span>Prazo</span><strong>${escapeHtml(contract.implementation || "A definir")}</strong></div>
+          <div><span>Fidelização</span><strong>${contract.loyalty ? `${Number(contract.loyaltyMonths || 0)} meses` : "Sem fidelização"}</strong></div>
+        </div>
         ${contract.paymentException ? `<p><strong>Exceção de pagamento:</strong> ${escapeHtml(contract.paymentException)}</p>` : ""}
       </section>
       <footer class="contract-signatures">

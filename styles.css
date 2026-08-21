@@ -1283,6 +1283,60 @@ input[type="color"] {
   grid-column: 1 / -1;
 }
 
+.contract-options-panel {
+  grid-column: 1 / -1;
+}
+
+.contract-option-settings {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.contract-option-settings section {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+}
+
+.contract-option-settings h3 {
+  font-size: 16px;
+}
+
+.contract-option-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 92px 40px;
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbfcff;
+}
+
+.contract-option-row label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.contract-option-toggle {
+  display: flex !important;
+  gap: 8px !important;
+  align-items: center;
+  color: var(--ink) !important;
+}
+
+.contract-option-toggle input {
+  width: 18px;
+  height: 18px;
+}
+
 .pricing-note {
   margin-top: -4px;
   color: var(--muted);
@@ -1889,6 +1943,10 @@ textarea {
   gap: 14px;
 }
 
+.contract-summary-box {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .contract-parties > div,
 .contract-summary-box > div,
 .contract-annex,
@@ -1914,6 +1972,14 @@ textarea {
   display: block;
   margin-top: 5px;
   font-size: 18px;
+}
+
+.contract-summary-box small {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
 }
 
 .contract-clauses {
@@ -2705,7 +2771,10 @@ textarea {
   }
 
   .catalog-card-head,
-  .catalog-meta-grid {
+  .catalog-meta-grid,
+  .contract-option-settings,
+  .contract-option-row,
+  .contract-summary-box {
     grid-template-columns: 1fr;
   }
 
@@ -2927,6 +2996,10 @@ textarea {
   body.printing-contract .contract-annex-grid,
   body.printing-contract .contract-signatures {
     gap: 4mm;
+  }
+
+  body.printing-contract .contract-summary-box {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   body.printing-contract .contract-parties > div,

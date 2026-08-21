@@ -959,6 +959,30 @@
               <p class="pricing-note" id="pricingNote"></p>
               <div id="pricingMatrix"></div>
             </section>
+
+            <section class="panel contract-options-panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>Serviços dos contratos</h2>
+                  <p class="muted-copy">Edita as opções que aparecem no Gerador de Contratos.</p>
+                </div>
+                <div class="panel-actions">
+                  <button class="button ghost" id="addContractServiceOptionBtn" type="button">Novo serviço</button>
+                  <button class="button ghost" id="addContractAddonOptionBtn" type="button">Novo add-on</button>
+                </div>
+              </div>
+              <div class="contract-option-settings">
+                <section>
+                  <h3>Serviços</h3>
+                  <div id="contractServiceOptionRows"></div>
+                </section>
+                <section>
+                  <h3>Add-ons</h3>
+                  <div id="contractAddonOptionRows"></div>
+                </section>
+              </div>
+              <button class="button primary" id="saveContractOptionsBtn" type="button">Guardar opções dos contratos</button>
+            </section>
           </div>
         </section>
       </main>
@@ -975,6 +999,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./supabase-config.js"></script>
     <script src="./pricing.js"></script>
-    <script src="./app.js?v=20260821-5"></script>
+    <script src="./app.js?v=20260821-6"></script>
   </body>
 </html>

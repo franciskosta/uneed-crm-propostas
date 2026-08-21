@@ -102,7 +102,7 @@ const instagramProspectStatuses = [
 
 const contractStatuses = ["Rascunho", "Enviado", "Aceite", "Recusado", "Cancelado"];
 
-const contractServiceOptions = [
+const defaultContractServiceOptions = [
   ["uneed_presenca", "UNEED Presença"],
   ["website_mensal", "Website mensal"],
   ["website_catalogo", "Website catálogo"],
@@ -119,7 +119,7 @@ const contractServiceOptions = [
   ["projeto_personalizado", "Projeto personalizado"],
 ];
 
-const contractAddonOptions = [
+const defaultContractAddonOptions = [
   ["email_extra", "Email extra"],
   ["backoffice_catalogo", "Backoffice catálogo"],
   ["assistente_guiado_24h", "Assistente guiado 24h"],
@@ -454,6 +454,8 @@ function migrateBrandDefaults() {
     if (!("paymentTerms" in proposal)) proposal.paymentTerms = state.brand.paymentTerms || "";
   });
   state.tickets ||= [];
+  state.contractServiceOptions = normalizeContractOptions(state.contractServiceOptions, defaultContractServiceOptions, "service");
+  state.contractAddonOptions = normalizeContractOptions(state.contractAddonOptions, defaultContractAddonOptions, "addon");
   state.contracts ||= [];
   state.contracts.forEach((contract) => {
     if (!contract.id) contract.id = crypto.randomUUID();
@@ -484,6 +486,56 @@ function migrateBrandDefaults() {
     if (prospect.message) prospect.message = formalizeProspectMessage(prospect.message);
   });
   saveState();
+}
+
+function slugOptionId(label, type = "option") {
+  const slug = String(label || type)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+  return `${type}_${slug || crypto.randomUUID()}`;
+}
+
+function normalizeContractOption(option, type = "option") {
+  if (Array.isArray(option)) {
+    return { id: option[0], label: option[1], active: true };
+  }
+  const label = option?.label || option?.name || "Opção sem nome";
+  return {
+    id: option?.id || slugOptionId(label, type),
+    label,
+    active: option?.active !== false,
+  };
+}
+
+function normalizeContractOptions(currentOptions, defaultOptions, type) {
+  const usedIds = new Set();
+  const normalized = (currentOptions || []).map((option) => normalizeContractOption(option, type)).filter((option) => {
+    if (!option.id || usedIds.has(option.id)) return false;
+    usedIds.add(option.id);
+    return true;
+  });
+
+  defaultOptions.forEach(([id, label]) => {
+    if (!usedIds.has(id)) normalized.push({ id, label, active: true });
+  });
+
+  return normalized;
+}
+
+function editableContractOptions(type) {
+  const key = type === "addon" ? "contractAddonOptions" : "contractServiceOptions";
+  const defaults = type === "addon" ? defaultContractAddonOptions : defaultContractServiceOptions;
+  state[key] = normalizeContractOptions(state[key], defaults, type);
+  return state[key];
+}
+
+function contractOptionPairs(type, activeOnly = false) {
+  return editableContractOptions(type)
+    .filter((option) => !activeOnly || option.active !== false)
+    .map((option) => [option.id, option.label]);
 }
 
 function hydratePricingDefaults() {
@@ -2443,7 +2495,46 @@ function renderSettings() {
       </details>
     `)
     .join("") || `<div class="empty">Sem serviços nesta categoria.</div>`;
+  renderContractOptionSettings("service");
+  renderContractOptionSettings("addon");
   renderPricingMatrix();
+}
+
+function renderContractOptionSettings(type) {
+  const container = qs(type === "addon" ? "#contractAddonOptionRows" : "#contractServiceOptionRows");
+  if (!container) return;
+  const options = editableContractOptions(type);
+  container.innerHTML = options.map((option, index) => `
+    <div class="contract-option-row" data-contract-option-type="${type}" data-contract-option-index="${index}">
+      <label class="contract-option-name">
+        Nome
+        <input type="text" value="${escapeAttr(option.label)}" data-contract-option-field="label" />
+      </label>
+      <label class="contract-option-toggle">
+        <input type="checkbox" ${option.active !== false ? "checked" : ""} data-contract-option-field="active" />
+        <span>Ativo</span>
+      </label>
+      <button class="remove-row" type="button" data-remove-contract-option title="Remover opção" aria-label="Remover opção">×</button>
+    </div>
+  `).join("") || `<div class="empty">Sem opções.</div>`;
+}
+
+function saveContractOptionSettings() {
+  ["service", "addon"].forEach((type) => {
+    const key = type === "addon" ? "contractAddonOptions" : "contractServiceOptions";
+    const rows = qsa(`[data-contract-option-type="${type}"]`);
+    state[key] = rows.map((row) => {
+      const current = editableContractOptions(type)[Number(row.dataset.contractOptionIndex)] || {};
+      const label = row.querySelector('[data-contract-option-field="label"]').value.trim() || "Opção sem nome";
+      return {
+        id: current.id || slugOptionId(label, type),
+        label,
+        active: row.querySelector('[data-contract-option-field="active"]').checked,
+      };
+    });
+  });
+  saveState();
+  if (activeContractId) renderContractForm();
 }
 
 function renderPricingMatrix() {
@@ -2789,8 +2880,8 @@ function renderContractForm() {
   qs("#contractLoyaltyMonths").value = Number(contract.loyaltyMonths || 0);
   qs("#contractPaymentException").value = contract.paymentException || "";
   qs("#contractNotes").value = contract.notes || "";
-  renderContractChecks("#contractServiceChecks", contractServiceOptions, contract.services || [], "service");
-  renderContractChecks("#contractAddonChecks", contractAddonOptions, contract.addons || [], "addon");
+  renderContractChecks("#contractServiceChecks", contractOptionPairs("service", true), contract.services || [], "service");
+  renderContractChecks("#contractAddonChecks", contractOptionPairs("addon", true), contract.addons || [], "addon");
   renderContractPreview(contract);
   renderContractsList();
 }
@@ -2837,8 +2928,8 @@ function contractClauseBlocks(contract) {
 function renderContractPreview(contract) {
   const preview = qs("#contractPreview");
   if (!preview) return;
-  const serviceLabels = contractOptionLabels(contractServiceOptions, contract.services || []);
-  const addonLabels = contractOptionLabels(contractAddonOptions, contract.addons || []);
+  const serviceLabels = contractOptionLabels(contractOptionPairs("service"), contract.services || []);
+  const addonLabels = contractOptionLabels(contractOptionPairs("addon"), contract.addons || []);
   const clauses = contractClauseBlocks(contract);
   qs("#contractPreviewTitle").textContent = contract.contractNumber || "Contrato";
   preview.innerHTML = `
@@ -2860,10 +2951,9 @@ function renderContractPreview(contract) {
         <div><span>Cliente</span><strong>${escapeHtml(contract.fiscalName || contract.commercialName || "Cliente")}</strong><p>NIF ${escapeHtml(contract.nif || "por preencher")} · ${escapeHtml(contract.address || "morada por preencher")}</p><p>Representante: ${escapeHtml(contract.contactPerson || "por preencher")} ${contract.representativeRole ? `(${escapeHtml(contract.representativeRole)})` : ""}</p></div>
       </section>
       <section class="contract-summary-box">
-        <div><span>Ativação/setup</span><strong>${eur(contract.activationValue || 0)}</strong></div>
-        <div><span>Mensalidade</span><strong>${eur(contract.monthlyValue || 0)}</strong></div>
-        <div><span>IVA</span><strong>${contract.vatRate === "23" ? "23%" : "Não aplicável"}</strong></div>
-        <div><span>Cancelamento</span><strong>${contract.cancelNoticeDays || 30} dias</strong></div>
+        <div><span>Ativação/setup</span><strong>${eur(contract.activationValue || 0)}</strong><small>${contract.vatRate === "23" ? "+ IVA 23% se aplicável" : "IVA não aplicável"}</small></div>
+        <div><span>Mensalidade</span><strong>${eur(contract.monthlyValue || 0)}</strong><small>${contract.vatRate === "23" ? "+ IVA 23% se aplicável" : "IVA não aplicável"}</small></div>
+        <div><span>Prazo implementação</span><strong>${escapeHtml(contract.implementation || "A definir")}</strong></div>
       </section>
       <section class="contract-clauses">
         ${clauses.map(([title, body], index) => `<article><h2>${index + 1}. ${escapeHtml(title)}</h2><p>${escapeHtml(body)}</p></article>`).join("")}
@@ -3412,6 +3502,43 @@ function bindEvents() {
     event.stopPropagation();
     state.catalog.splice(Number(removeButton.dataset.removeCatalog), 1);
     renderSettings();
+  });
+
+  qs("#addContractServiceOptionBtn").addEventListener("click", () => {
+    editableContractOptions("service").push({
+      id: `custom_service_${crypto.randomUUID()}`,
+      label: "Novo serviço de contrato",
+      active: true,
+    });
+    renderSettings();
+  });
+
+  qs("#addContractAddonOptionBtn").addEventListener("click", () => {
+    editableContractOptions("addon").push({
+      id: `custom_addon_${crypto.randomUUID()}`,
+      label: "Novo add-on de contrato",
+      active: true,
+    });
+    renderSettings();
+  });
+
+  qs("#saveContractOptionsBtn").addEventListener("click", () => {
+    saveContractOptionSettings();
+    showSuccessModal("Opções dos contratos guardadas.");
+  });
+
+  document.addEventListener("click", (event) => {
+    const removeButton = event.target.closest("[data-remove-contract-option]");
+    if (!removeButton) return;
+    const row = removeButton.closest("[data-contract-option-type]");
+    if (!row) return;
+    saveContractOptionSettings();
+    const type = row.dataset.contractOptionType;
+    const list = editableContractOptions(type);
+    list.splice(Number(row.dataset.contractOptionIndex), 1);
+    saveState();
+    renderSettings();
+    if (activeContractId) renderContractForm();
   });
 
   qs("#exportDataBtn").addEventListener("click", () => {

@@ -1904,7 +1904,7 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 22px;
-  background: linear-gradient(180deg, #fff 0%, #f7f8fc 100%);
+  background: #fff;
   color: var(--ink);
 }
 
@@ -2982,6 +2982,7 @@ textarea {
     min-height: auto;
     padding: 12mm;
     gap: 5mm;
+    background: #fff;
     box-shadow: none;
   }
 

@@ -2951,8 +2951,8 @@ function renderContractPreview(contract) {
         <div><span>Cliente</span><strong>${escapeHtml(contract.fiscalName || contract.commercialName || "Cliente")}</strong><p>NIF ${escapeHtml(contract.nif || "por preencher")} · ${escapeHtml(contract.address || "morada por preencher")}</p><p>Representante: ${escapeHtml(contract.contactPerson || "por preencher")} ${contract.representativeRole ? `(${escapeHtml(contract.representativeRole)})` : ""}</p></div>
       </section>
       <section class="contract-summary-box">
-        <div><span>Ativação/setup</span><strong>${eur(contract.activationValue || 0)}</strong><small>${contract.vatRate === "23" ? "+ IVA 23% se aplicável" : "IVA não aplicável"}</small></div>
-        <div><span>Mensalidade</span><strong>${eur(contract.monthlyValue || 0)}</strong><small>${contract.vatRate === "23" ? "+ IVA 23% se aplicável" : "IVA não aplicável"}</small></div>
+        <div><span>Ativação/setup</span><strong>${eur(contract.activationValue || 0)}</strong><small>${contract.vatRate === "23" ? "+ IVA 23%" : "IVA não aplicável"}</small></div>
+        <div><span>Mensalidade</span><strong>${eur(contract.monthlyValue || 0)}</strong><small>${contract.vatRate === "23" ? "+ IVA 23%" : "IVA não aplicável"}</small></div>
         <div><span>Prazo implementação</span><strong>${escapeHtml(contract.implementation || "A definir")}</strong></div>
       </section>
       <section class="contract-clauses">

@@ -2298,7 +2298,11 @@ textarea {
 .prospect-score-line { color: var(--brand); font-size: 12px; font-weight: 850; }
 .prospect-message { border-top: 1px solid var(--line); padding-top: 8px; }
 .prospect-message summary { color: var(--brand); cursor: pointer; font-size: 12px; font-weight: 800; }
-.prospect-message p { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; white-space: pre-line; }
+.prospect-message p { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.prospect-message-paragraphs { display: grid; gap: 8px; margin-top: 9px; }
+.prospect-message-paragraph { position: relative; padding: 10px 46px 10px 10px; border: 1px solid var(--line); border-radius: 9px; background: rgba(255, 255, 255, 0.72); }
+.prospect-copy-button { position: absolute; top: 7px; right: 7px; border: 0; border-radius: 7px; padding: 5px 7px; background: rgba(24, 29, 73, 0.08); color: var(--brand); cursor: pointer; font: inherit; font-size: 9px; font-weight: 850; }
+.prospect-copy-button:hover { background: rgba(24, 29, 73, 0.15); }
 
 @media (max-width: 1180px) {
   .prospect-generator-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }

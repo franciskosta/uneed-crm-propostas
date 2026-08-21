@@ -1837,6 +1837,19 @@ function formalizeProspectMessage(message) {
     .replace(/\bpara ti\b/gi, "para si");
 }
 
+function prospectMessageParagraphs(message) {
+  const text = formalizeProspectMessage(message).trim();
+  if (!text) return [];
+  const explicitParagraphs = text.split(/\n\s*\n|\n+/).map((part) => part.trim()).filter(Boolean);
+  if (explicitParagraphs.length > 1) return explicitParagraphs;
+  return text.split(/(?<=[.!?])\s+(?=[A-ZÁÀÂÃÉÊÍÓÔÕÚÇ])/u).map((part) => part.trim()).filter(Boolean);
+}
+
+function renderProspectMessage(prospect) {
+  const paragraphs = prospectMessageParagraphs(prospect.message);
+  return `<details class="prospect-message"><summary>Mensagem preparada</summary><div class="prospect-message-paragraphs">${paragraphs.map((paragraph, index) => `<div class="prospect-message-paragraph"><p>${escapeHtml(paragraph)}</p><button class="prospect-copy-button" data-copy-prospect="${escapeAttr(prospect.id)}" data-copy-paragraph="${index}" type="button" aria-label="Copiar parágrafo ${index + 1}">Copiar</button></div>`).join("")}</div></details>`;
+}
+
 function prospectSignalLabel(prospect) {
   const signals = [];
   signals.push(prospect.hasWebsite ? "Site: sim" : "Site: não");
@@ -2013,7 +2026,7 @@ function renderInstagramProspecting() {
                     ${prospect.score ? `<span class="prospect-score-line">Score ${escapeHtml(prospect.score)} · ${escapeHtml(prospect.district || "")} / ${escapeHtml(prospect.municipality || "")}</span>` : ""}
                     ${safeExternalUrl(prospect.website) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.website))}" target="_blank" rel="noopener">Abrir website</a>` : ""}
                     ${safeExternalUrl(prospect.mapsUrl) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.mapsUrl))}" target="_blank" rel="noopener">Google Maps</a>` : ""}
-                    ${prospect.message ? `<details class="prospect-message"><summary>Mensagem preparada</summary><p>${escapeHtml(prospect.message)}</p></details>` : ""}
+                    ${prospect.message ? renderProspectMessage(prospect) : ""}
                     ${prospect.notes ? `<details class="prospect-message"><summary>Análise do lead</summary><p>${escapeHtml(prospect.notes)}</p></details>` : ""}
                     <select class="status-select" data-instagram-status-id="${escapeAttr(prospect.id)}">
                       ${instagramProspectStatuses.map((item) => `<option ${item === prospect.status ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
@@ -3171,6 +3184,20 @@ function bindEvents() {
   qs("#prospectMunicipalityFilter").addEventListener("change", renderInstagramProspecting);
 
   qs("#instagramKanban").addEventListener("click", (event) => {
+    const copyButton = event.target.closest("[data-copy-prospect]");
+    if (copyButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      const prospect = state.instagramProspects.find((item) => item.id === copyButton.dataset.copyProspect);
+      const paragraph = prospectMessageParagraphs(prospect?.message)[Number(copyButton.dataset.copyParagraph)];
+      if (paragraph) {
+        navigator.clipboard?.writeText(paragraph).then(() => {
+          copyButton.textContent = "Copiado";
+          setTimeout(() => { copyButton.textContent = "Copiar"; }, 1400);
+        }).catch(() => {});
+      }
+      return;
+    }
     const deleteButton = event.target.closest("[data-instagram-delete]");
     if (deleteButton) {
       event.stopPropagation();

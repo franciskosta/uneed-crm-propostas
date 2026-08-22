@@ -3006,14 +3006,6 @@ function renderContractPreview(contract) {
           <div><h3>Serviços</h3>${serviceLabels.length ? `<ul>${serviceLabels.map((label) => `<li>${escapeHtml(label)}</li>`).join("")}</ul>` : "<p>Sem serviços selecionados.</p>"}</div>
           <div><h3>Add-ons</h3>${addonLabels.length ? `<ul>${addonLabels.map((label) => `<li>${escapeHtml(label)}</li>`).join("")}</ul>` : "<p>Sem add-ons contratados.</p>"}</div>
         </div>
-        <div class="contract-annex-values">
-          <div><span>Ativação/setup</span><strong>${eur(contract.activationValue || 0)}</strong></div>
-          <div><span>Valor recorrente</span><strong>${eur(contract.monthlyValue || 0)} ${contract.monthlyValue ? escapeHtml(contractPeriodSuffix(contract.periodicity)) : ""}</strong></div>
-          <div><span>Periodicidade</span><strong>${escapeHtml(contract.periodicity || "Mensal")}</strong></div>
-          <div><span>IVA</span><strong>${contractVatLabel(contract)}</strong></div>
-          <div><span>Prazo</span><strong>${escapeHtml(contract.implementation || "A definir")}</strong></div>
-          <div><span>Fidelização</span><strong>${contract.loyalty ? `${Number(contract.loyaltyMonths || 0)} meses` : "Sem fidelização"}</strong></div>
-        </div>
         ${contract.paymentException ? `<p><strong>Exceção de pagamento:</strong> ${escapeHtml(contract.paymentException)}</p>` : ""}
       </section>
       <footer class="contract-signatures">

@@ -2033,6 +2033,11 @@ textarea {
   padding-left: 18px;
 }
 
+.contract-annex {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
 .contract-signatures {
   margin-top: auto;
   padding-top: 12px;
@@ -3026,11 +3031,6 @@ textarea {
   body.printing-contract .contract-annex,
   body.printing-contract .contract-signatures > div {
     padding: 3.5mm;
-  }
-
-  body.printing-contract .contract-annex {
-    break-before: page;
-    page-break-before: always;
   }
 
   .proposal-sheet {

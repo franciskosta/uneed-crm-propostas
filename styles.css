@@ -2523,6 +2523,16 @@ textarea {
   font-weight: 900;
 }
 
+.whatsapp-link {
+  color: #128c7e;
+}
+
+.followup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .prospect-signals {
   line-height: 1.4;
 }

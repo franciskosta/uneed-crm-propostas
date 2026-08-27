@@ -949,6 +949,26 @@ function safeExternalUrl(url) {
   }
 }
 
+function whatsappNumber(phone) {
+  const digits = String(phone || "").replace(/\D/g, "");
+  const withoutCountry = digits.startsWith("351") ? digits.slice(3) : digits;
+  if (!/^9\d{8}$/.test(withoutCountry)) return "";
+  return `351${withoutCountry}`;
+}
+
+function whatsappHref(phone, message = "") {
+  const number = whatsappNumber(phone);
+  if (!number) return "";
+  const text = message ? `?text=${encodeURIComponent(message)}` : "";
+  return `https://wa.me/${number}${text}`;
+}
+
+function followupWhatsappMessage(proposal) {
+  const name = proposal.clientName || proposal.companyName || "";
+  const service = proposalLabel(proposal);
+  return `Olá ${name}. Estou a fazer follow-up em relação à proposta UNEED${service ? ` (${service})` : ""}. Conseguiu ver com calma?`;
+}
+
 function recurringMilestoneStatus(monthly) {
   const reached = recurringMilestones.filter((value) => monthly >= value);
   const next = recurringMilestones.find((value) => monthly < value) || null;
@@ -1726,13 +1746,17 @@ function renderDashboard() {
       .slice(0, 7)
       .map((p) => {
         const overdue = p.followupDate < today();
+        const whatsapp = whatsappHref(p.clientPhone, followupWhatsappMessage(p));
         return `
           <article class="action-item ${overdue ? "is-overdue" : ""}">
             <button data-open="${p.id}" type="button">
               <strong>${escapeHtml(p.companyName || p.clientName || "Cliente sem nome")}</strong>
               <span>${overdue ? "Atrasado desde" : "Follow-up"} ${p.followupDate} · ${eur(totals(p).total)}</span>
             </button>
-            <button class="button ghost mini" data-email-reminder="${p.id}" type="button">Email lembrete</button>
+            <div class="followup-actions">
+              ${whatsapp ? `<a class="button ghost mini whatsapp-link" href="${escapeAttr(whatsapp)}" target="_blank" rel="noopener">WhatsApp</a>` : ""}
+              <button class="button ghost mini" data-email-reminder="${p.id}" type="button">Email lembrete</button>
+            </div>
           </article>
         `;
       })
@@ -1823,6 +1847,7 @@ function renderPipeline() {
             cards
               .map((proposal) => {
                 const sum = totals(proposal);
+                const whatsapp = whatsappHref(proposal.clientPhone, followupWhatsappMessage(proposal));
                 return `
                   <details class="deal-card ${proposal.followupDate && proposal.followupDate < today() && !["Faturado", "Perdido"].includes(proposal.status) ? "is-overdue" : ""}" data-open="${proposal.id}" draggable="true">
                     <summary class="deal-summary">
@@ -1838,6 +1863,7 @@ function renderPipeline() {
                     <div class="deal-card-body">
                       <span class="card-meta fiscal-breakdown">${escapeHtml(pipelineValueSummary(sum))}</span>
                       <span class="card-meta">Cliente: ${escapeHtml(proposal.clientName || "sem nome")}</span>
+                      ${whatsapp ? `<a class="prospect-link whatsapp-link" href="${escapeAttr(whatsapp)}" target="_blank" rel="noopener">Enviar WhatsApp</a>` : ""}
                       <span class="card-meta">Follow-up: ${proposal.followupDate || "sem data"}</span>
                       <select class="status-select" data-status-id="${proposal.id}">
                         ${statuses.map((item) => `<option ${item === proposal.status ? "selected" : ""}>${item}</option>`).join("")}
@@ -2062,17 +2088,20 @@ function renderInstagramProspecting() {
           <h2>${escapeHtml(status)}<span>${cards.length}</span></h2>
           ${
             cards
-              .map((prospect) => `
-                <article class="deal-card prospect-card" data-instagram-open="${escapeAttr(prospect.id)}" draggable="true">
-                  <div class="deal-summary">
-                    <span>
-                      <strong>${escapeHtml(prospect.name || "Contacto sem nome")}</strong>
-                      <span class="card-meta">${escapeHtml(prospect.phone || "Sem telefone")}</span>
-                    </span>
-                    <span class="prospect-score">${prospect.hasWebsite ? "Site" : "Sem site"}</span>
-                  </div>
-                  <div class="deal-card-body">
+              .map((prospect) => {
+                const whatsapp = whatsappHref(prospect.phone);
+                return `
+                  <article class="deal-card prospect-card" data-instagram-open="${escapeAttr(prospect.id)}" draggable="true">
+                    <div class="deal-summary">
+                      <span>
+                        <strong>${escapeHtml(prospect.name || "Contacto sem nome")}</strong>
+                        <span class="card-meta">${escapeHtml(prospect.phone || "Sem telefone")}</span>
+                      </span>
+                      <span class="prospect-score">${prospect.hasWebsite ? "Site" : "Sem site"}</span>
+                    </div>
+                    <div class="deal-card-body">
                     ${safeExternalUrl(prospect.instagramUrl) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.instagramUrl))}" target="_blank" rel="noopener">Contactar pelo Instagram</a>` : `<span class="card-meta">Instagram não encontrado · usar telefone</span>`}
+                    ${whatsapp ? `<a class="prospect-link whatsapp-link" href="${escapeAttr(whatsapp)}" target="_blank" rel="noopener">Enviar WhatsApp</a>` : ""}
                     ${prospect.niche ? `<span class="card-meta">Nicho: ${escapeHtml(prospect.niche)}</span>` : `<span class="card-meta">Nicho por classificar</span>`}
                     <span class="card-meta prospect-signals">${escapeHtml(prospectSignalLabel(prospect))}</span>
                     ${prospect.score ? `<span class="prospect-score-line">Score ${escapeHtml(prospect.score)} · ${escapeHtml(prospect.district || "")} / ${escapeHtml(prospect.municipality || "")}</span>` : ""}
@@ -2089,7 +2118,8 @@ function renderInstagramProspecting() {
                     </div>
                   </div>
                 </article>
-              `)
+              `;
+              })
               .join("") || `<div class="empty">Sem contactos.</div>`
           }
         </section>

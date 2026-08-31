@@ -258,6 +258,8 @@ let activeId = state.proposals[0]?.id || null;
 let activeContractId = state.contracts?.[0]?.id || null;
 let followupAscending = true;
 let catalogCategoryFilter = "";
+let activeMockupProspectId = null;
+let mockupLogoDataUrl = "";
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -481,6 +483,10 @@ function migrateBrandDefaults() {
     if (!("hasWebsite" in prospect)) prospect.hasWebsite = false;
     if (!("hasBooking" in prospect)) prospect.hasBooking = false;
     if (!("hasWhatsappTree" in prospect)) prospect.hasWhatsappTree = false;
+    if (!("mockupImage" in prospect)) prospect.mockupImage = "";
+    if (!("mockupBrief" in prospect)) prospect.mockupBrief = "";
+    if (!("mockupOffer" in prospect)) prospect.mockupOffer = "";
+    if (!("mockupGeneratedAt" in prospect)) prospect.mockupGeneratedAt = "";
     if (!("createdAt" in prospect)) prospect.createdAt = new Date().toISOString();
     if (!("updatedAt" in prospect)) prospect.updatedAt = prospect.createdAt;
     if (prospect.message) prospect.message = formalizeProspectMessage(prospect.message);
@@ -1895,6 +1901,10 @@ function emptyInstagramProspect() {
     hasWebsite: false,
     hasBooking: false,
     hasWhatsappTree: false,
+    mockupImage: "",
+    mockupBrief: "",
+    mockupOffer: "",
+    mockupGeneratedAt: "",
     notes: "",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -1934,6 +1944,320 @@ function prospectSignalLabel(prospect) {
   signals.push(prospect.hasBooking ? "Marcações: sim" : "Marcações: não");
   signals.push(prospect.hasWhatsappTree ? "WhatsApp/link tree: sim" : "WhatsApp/link tree: não");
   return signals.join(" · ");
+}
+
+function defaultMockupOffer(prospect) {
+  const niche = String(prospect.niche || "").toLowerCase();
+  if (niche.includes("restaurante") || niche.includes("catering")) return "Reservar mesa online";
+  if (niche.includes("clínica") || niche.includes("dentista") || niche.includes("fisioterapia") || niche.includes("saúde")) return "Marcar consulta online";
+  if (niche.includes("estética") || niche.includes("unhas") || niche.includes("cabeleireiro") || niche.includes("barbearia")) return "Marcar horário pelo telemóvel";
+  if (niche.includes("imobili")) return "Pedir avaliação do imóvel";
+  if (niche.includes("oficina") || niche.includes("automóvel")) return "Pedir orçamento rápido";
+  return "Pedir diagnóstico gratuito";
+}
+
+function defaultMockupBrief(prospect) {
+  const details = [];
+  details.push(prospect.hasWebsite ? "O objetivo é tornar o website mais claro e orientado à conversão." : "Criar uma presença online profissional e imediata.");
+  if (!prospect.hasBooking) details.push("Dar destaque a marcações online simples.");
+  if (!prospect.hasWhatsappTree) details.push("Adicionar CTA de WhatsApp visível e fácil de usar.");
+  if (prospect.notes) details.push(prospect.notes);
+  return details.join("\n");
+}
+
+function openMockupModal(id) {
+  const prospect = state.instagramProspects.find((item) => item.id === id);
+  if (!prospect) return;
+  activeMockupProspectId = id;
+  mockupLogoDataUrl = "";
+  qs("#mockupLeadName").value = prospect.name || "";
+  qs("#mockupOffer").value = prospect.mockupOffer || defaultMockupOffer(prospect);
+  qs("#mockupNiche").value = prospect.niche || "";
+  qs("#mockupBrief").value = prospect.mockupBrief || defaultMockupBrief(prospect);
+  qs("#mockupLogoInput").value = "";
+  const previewWrap = qs("#mockupPreviewWrap");
+  const previewImage = qs("#mockupPreviewImage");
+  if (prospect.mockupImage) {
+    previewImage.src = prospect.mockupImage;
+    previewWrap.hidden = false;
+  } else {
+    previewImage.removeAttribute("src");
+    previewWrap.hidden = true;
+  }
+  qs("#mockupModal").classList.add("is-open");
+  qs("#mockupModal").setAttribute("aria-hidden", "false");
+}
+
+function closeMockupModal() {
+  activeMockupProspectId = null;
+  mockupLogoDataUrl = "";
+  const modal = qs("#mockupModal");
+  if (!modal) return;
+  modal.classList.remove("is-open");
+  modal.setAttribute("aria-hidden", "true");
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error("Não foi possível ler o ficheiro."));
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImageData(dataUrl) {
+  return new Promise((resolve, reject) => {
+    if (!dataUrl) {
+      resolve(null);
+      return;
+    }
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Não foi possível carregar o logotipo."));
+    image.src = dataUrl;
+  });
+}
+
+function drawRoundRect(ctx, x, y, width, height, radius = 24) {
+  const r = Math.min(radius, width / 2, height / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + width - r, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+  ctx.lineTo(x + width, y + height - r);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+  ctx.lineTo(x + r, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function fillRoundRect(ctx, x, y, width, height, radius, fill) {
+  drawRoundRect(ctx, x, y, width, height, radius);
+  ctx.fillStyle = fill;
+  ctx.fill();
+}
+
+function strokeRoundRect(ctx, x, y, width, height, radius, stroke, lineWidth = 2) {
+  drawRoundRect(ctx, x, y, width, height, radius);
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = lineWidth;
+  ctx.stroke();
+}
+
+function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 4) {
+  const words = String(text || "").replace(/\s+/g, " ").trim().split(" ").filter(Boolean);
+  const lines = [];
+  let line = "";
+  for (const word of words) {
+    const testLine = line ? `${line} ${word}` : word;
+    if (ctx.measureText(testLine).width > maxWidth && line) {
+      lines.push(line);
+      line = word;
+      if (lines.length === maxLines) break;
+    } else {
+      line = testLine;
+    }
+  }
+  if (line && lines.length < maxLines) lines.push(line);
+  lines.forEach((item, index) => ctx.fillText(item, x, y + index * lineHeight));
+  return y + lines.length * lineHeight;
+}
+
+function slugify(value) {
+  return String(value || "mockup")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48) || "mockup";
+}
+
+function shortCanvasText(ctx, text, maxWidth) {
+  const value = String(text || "");
+  if (ctx.measureText(value).width <= maxWidth) return value;
+  let clipped = value;
+  while (clipped.length > 3 && ctx.measureText(`${clipped}...`).width > maxWidth) {
+    clipped = clipped.slice(0, -1);
+  }
+  return `${clipped.trim()}...`;
+}
+
+function drawLogoBlock(ctx, logoImage, name, x, y, width, height, dark = false) {
+  fillRoundRect(ctx, x, y, width, height, 18, dark ? "rgba(255,255,255,0.09)" : "#ffffff");
+  if (logoImage) {
+    const padding = 16;
+    const ratio = Math.min((width - padding * 2) / logoImage.width, (height - padding * 2) / logoImage.height);
+    const drawWidth = logoImage.width * ratio;
+    const drawHeight = logoImage.height * ratio;
+    ctx.drawImage(logoImage, x + (width - drawWidth) / 2, y + (height - drawHeight) / 2, drawWidth, drawHeight);
+    return;
+  }
+  ctx.fillStyle = dark ? "#ffffff" : "#151b4b";
+  ctx.font = "900 34px Arial";
+  ctx.textBaseline = "middle";
+  const label = String(name || "Cliente").slice(0, 24);
+  ctx.fillText(shortCanvasText(ctx, label, width - 48), x + 24, y + height / 2);
+}
+
+function drawWebsiteScreen(ctx, options) {
+  const { x, y, width, height, logoImage, name, niche, offer, brief, compact = false } = options;
+  fillRoundRect(ctx, x, y, width, height, 28, "#ffffff");
+  strokeRoundRect(ctx, x, y, width, height, 28, "rgba(21,27,75,0.12)", 2);
+
+  const heroHeight = compact ? height * 0.58 : height * 0.54;
+  fillRoundRect(ctx, x + 18, y + 18, width - 36, heroHeight - 18, 24, "#151b4b");
+  ctx.fillStyle = "rgba(215,32,63,0.26)";
+  ctx.beginPath();
+  ctx.arc(x + width - 120, y + 92, compact ? 44 : 72, 0, Math.PI * 2);
+  ctx.fill();
+  drawLogoBlock(ctx, logoImage, name, x + 42, y + 46, compact ? 180 : 230, compact ? 62 : 76, true);
+
+  ctx.fillStyle = "#ffffff";
+  ctx.font = compact ? "900 33px Arial" : "900 50px Arial";
+  wrapCanvasText(ctx, `Mais pedidos para ${name || "o seu negócio"}`, x + 42, y + (compact ? 150 : 175), width - 110, compact ? 40 : 58, compact ? 3 : 2);
+
+  ctx.fillStyle = "rgba(255,255,255,0.78)";
+  ctx.font = compact ? "700 18px Arial" : "700 25px Arial";
+  wrapCanvasText(ctx, niche || "Presença digital com foco em conversão", x + 42, y + heroHeight - (compact ? 84 : 78), width - 110, compact ? 24 : 32, 2);
+
+  const ctaWidth = compact ? width - 84 : 250;
+  fillRoundRect(ctx, x + 42, y + heroHeight + 32, ctaWidth, 58, 16, "#d7203f");
+  ctx.fillStyle = "#ffffff";
+  ctx.font = compact ? "900 20px Arial" : "900 22px Arial";
+  ctx.textBaseline = "middle";
+  ctx.fillText(shortCanvasText(ctx, offer || "Pedir diagnóstico", ctaWidth - 48), x + 66, y + heroHeight + 61);
+
+  const cardY = y + heroHeight + 120;
+  const gap = compact ? 12 : 20;
+  const cardWidth = compact ? width - 84 : (width - 104 - gap * 2) / 3;
+  const cards = ["WhatsApp visível", "Marcações simples", "Mobile first"];
+  cards.forEach((card, index) => {
+    const cx = compact ? x + 42 : x + 42 + index * (cardWidth + gap);
+    const cy = compact ? cardY + index * 80 : cardY;
+    fillRoundRect(ctx, cx, cy, cardWidth, compact ? 62 : 92, 16, "#f4f6fb");
+    ctx.fillStyle = "#151b4b";
+    ctx.font = compact ? "900 17px Arial" : "900 20px Arial";
+    ctx.textBaseline = "top";
+    ctx.fillText(card, cx + 18, cy + 18);
+  });
+
+  if (!compact) {
+    ctx.fillStyle = "#667085";
+    ctx.font = "600 19px Arial";
+    wrapCanvasText(ctx, brief || "Página clara, rápida e preparada para transformar visitas em contactos.", x + 42, y + height - 88, width - 84, 27, 2);
+  }
+}
+
+async function createProspectMockupImage(prospect, logoDataUrl, fields) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1600;
+  canvas.height = 1000;
+  const ctx = canvas.getContext("2d");
+  const logoImage = await loadImageData(logoDataUrl);
+  const name = fields.name || prospect.name || "Cliente";
+  const niche = fields.niche || prospect.niche || "Negócio local";
+  const offer = fields.offer || defaultMockupOffer(prospect);
+  const brief = fields.brief || defaultMockupBrief(prospect);
+
+  const gradient = ctx.createLinearGradient(0, 0, 1600, 1000);
+  gradient.addColorStop(0, "#f7f8fc");
+  gradient.addColorStop(1, "#e9edf7");
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 1600, 1000);
+
+  ctx.fillStyle = "#151b4b";
+  ctx.font = "900 44px Arial";
+  ctx.fillText("Mockup personalizado UNEED", 96, 92);
+  ctx.fillStyle = "#667085";
+  ctx.font = "700 24px Arial";
+  ctx.fillText("Visual rápido para imaginar uma presença digital mais preparada para converter.", 96, 132);
+
+  fillRoundRect(ctx, 92, 185, 1018, 636, 38, "rgba(21,27,75,0.08)");
+  fillRoundRect(ctx, 80, 170, 1018, 636, 38, "#ffffff");
+  drawWebsiteScreen(ctx, { x: 120, y: 210, width: 938, height: 556, logoImage, name, niche, offer, brief });
+
+  fillRoundRect(ctx, 1118, 132, 338, 734, 52, "#0f143e");
+  fillRoundRect(ctx, 1138, 156, 298, 686, 42, "#ffffff");
+  fillRoundRect(ctx, 1230, 174, 116, 15, 8, "#0f143e");
+  drawWebsiteScreen(ctx, { x: 1156, y: 205, width: 262, height: 596, logoImage, name, niche, offer, brief, compact: true });
+
+  fillRoundRect(ctx, 96, 848, 1360, 78, 22, "#151b4b");
+  ctx.fillStyle = "#ffffff";
+  ctx.font = "900 26px Arial";
+  ctx.textBaseline = "middle";
+  ctx.fillText(shortCanvasText(ctx, `${name} · ${offer}`, 1040), 130, 887);
+  ctx.fillStyle = "rgba(255,255,255,0.74)";
+  ctx.font = "700 20px Arial";
+  ctx.fillText("Conceito visual gerado para abordagem comercial personalizada", 130, 916);
+  ctx.fillStyle = "#d7203f";
+  ctx.beginPath();
+  ctx.arc(1416, 886, 13, 0, Math.PI * 2);
+  ctx.fill();
+
+  return canvas.toDataURL("image/jpeg", 0.9);
+}
+
+async function generateMockupForActive() {
+  const prospect = state.instagramProspects.find((item) => item.id === activeMockupProspectId);
+  if (!prospect) return;
+  const button = qs("#generateMockupBtn");
+  button.disabled = true;
+  button.textContent = "A gerar...";
+  try {
+    const fields = {
+      name: qs("#mockupLeadName").value.trim(),
+      offer: qs("#mockupOffer").value.trim(),
+      niche: qs("#mockupNiche").value.trim(),
+      brief: qs("#mockupBrief").value.trim(),
+    };
+    const image = await createProspectMockupImage(prospect, mockupLogoDataUrl, fields);
+    Object.assign(prospect, {
+      name: fields.name || prospect.name,
+      niche: fields.niche || prospect.niche,
+      mockupImage: image,
+      mockupOffer: fields.offer,
+      mockupBrief: fields.brief,
+      mockupGeneratedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    saveState();
+    qs("#mockupPreviewImage").src = image;
+    qs("#mockupPreviewWrap").hidden = false;
+    renderInstagramProspecting();
+    showSuccessModal("Mockup criado e guardado no lead.");
+  } catch (error) {
+    showSuccessModal(error.message || "Não foi possível gerar o mockup.");
+  } finally {
+    button.disabled = false;
+    button.textContent = "Gerar mockup";
+  }
+}
+
+async function copyProspectMockup(id) {
+  const prospect = state.instagramProspects.find((item) => item.id === id);
+  if (!prospect?.mockupImage) return;
+  try {
+    const blob = await (await fetch(prospect.mockupImage)).blob();
+    if (!navigator.clipboard || !window.ClipboardItem) throw new Error("Clipboard indisponível");
+    await navigator.clipboard.write([new ClipboardItem({ [blob.type]: blob })]);
+    showSuccessModal("Mockup copiado. Podes colar diretamente no WhatsApp, email ou Canva.");
+  } catch {
+    downloadProspectMockup(id);
+    showSuccessModal("O browser não permitiu copiar a imagem. Fiz download do mockup.");
+  }
+}
+
+function downloadProspectMockup(id) {
+  const prospect = state.instagramProspects.find((item) => item.id === id);
+  if (!prospect?.mockupImage) return;
+  const link = document.createElement("a");
+  link.href = prospect.mockupImage;
+  link.download = `mockup-${slugify(prospect.name)}.jpg`;
+  link.click();
 }
 
 function normalizedProspectKeys(prospect) {
@@ -2109,10 +2433,22 @@ function renderInstagramProspecting() {
                     ${safeExternalUrl(prospect.mapsUrl) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.mapsUrl))}" target="_blank" rel="noopener">Google Maps</a>` : ""}
                     ${prospect.message ? renderProspectMessage(prospect) : ""}
                     ${prospect.notes ? `<details class="prospect-message"><summary>Análise do lead</summary><p>${escapeHtml(prospect.notes)}</p></details>` : ""}
+                    ${
+                      prospect.mockupImage
+                        ? `<div class="prospect-mockup-preview">
+                            <img src="${escapeAttr(prospect.mockupImage)}" alt="Mockup de ${escapeAttr(prospect.name || "lead")}" />
+                            <div class="mockup-actions">
+                              <button class="button ghost mini" data-copy-mockup="${escapeAttr(prospect.id)}" type="button">Copiar imagem</button>
+                              <button class="button ghost mini" data-download-mockup="${escapeAttr(prospect.id)}" type="button">Descarregar</button>
+                            </div>
+                          </div>`
+                        : ""
+                    }
                     <select class="status-select" data-instagram-status-id="${escapeAttr(prospect.id)}">
                       ${instagramProspectStatuses.map((item) => `<option ${item === prospect.status ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
                     </select>
                     <div class="deal-actions">
+                      <button class="button primary mini" data-instagram-mockup="${escapeAttr(prospect.id)}" type="button">${prospect.mockupImage ? "Refazer mockup" : "Criar mockup"}</button>
                       <button class="button ghost mini" data-instagram-edit="${escapeAttr(prospect.id)}" type="button">Editar</button>
                       <button class="button danger mini" data-instagram-delete="${escapeAttr(prospect.id)}" type="button">Apagar</button>
                     </div>
@@ -3187,6 +3523,16 @@ function bindEvents() {
   qs("#successModal").addEventListener("click", (event) => {
     if (event.target.id === "successModal") closeSuccessModal();
   });
+  qs("#closeMockupModal")?.addEventListener("click", closeMockupModal);
+  qs("#cancelMockupBtn")?.addEventListener("click", closeMockupModal);
+  qs("#mockupModal")?.addEventListener("click", (event) => {
+    if (event.target.id === "mockupModal") closeMockupModal();
+  });
+  qs("#mockupLogoInput")?.addEventListener("change", async (event) => {
+    const file = event.target.files?.[0];
+    mockupLogoDataUrl = file ? await readFileAsDataUrl(file) : "";
+  });
+  qs("#generateMockupBtn")?.addEventListener("click", generateMockupForActive);
 
   qs("#proposalForm").addEventListener("input", () => {
     const proposal = readForm();
@@ -3342,6 +3688,27 @@ function bindEvents() {
   qs("#prospectMunicipalityFilter").addEventListener("change", renderInstagramProspecting);
 
   qs("#instagramKanban").addEventListener("click", (event) => {
+    const mockupButton = event.target.closest("[data-instagram-mockup]");
+    if (mockupButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      openMockupModal(mockupButton.dataset.instagramMockup);
+      return;
+    }
+    const copyMockupButton = event.target.closest("[data-copy-mockup]");
+    if (copyMockupButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      copyProspectMockup(copyMockupButton.dataset.copyMockup);
+      return;
+    }
+    const downloadMockupButton = event.target.closest("[data-download-mockup]");
+    if (downloadMockupButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      downloadProspectMockup(downloadMockupButton.dataset.downloadMockup);
+      return;
+    }
     const copyButton = event.target.closest("[data-copy-prospect]");
     if (copyButton) {
       event.preventDefault();

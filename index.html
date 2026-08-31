@@ -996,9 +996,51 @@
       </div>
     </div>
 
+    <div class="modal" id="mockupModal" aria-hidden="true">
+      <div class="modal-card mockup-modal-card" role="dialog" aria-modal="true" aria-labelledby="mockupModalTitle">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">Abordagem personalizada</p>
+            <strong id="mockupModalTitle">Criar mockup</strong>
+          </div>
+          <button class="icon-button" id="closeMockupModal" type="button" aria-label="Fechar">×</button>
+        </div>
+        <p>Gera uma imagem pronta para enviar ao lead, com uma base visual consistente e detalhes adaptados ao negócio.</p>
+        <div class="mockup-form-grid">
+          <label>
+            Nome/marca do cliente
+            <input id="mockupLeadName" placeholder="Ex: Clínica Aurora" />
+          </label>
+          <label>
+            Oferta ou CTA
+            <input id="mockupOffer" placeholder="Ex: Marcar consulta online" />
+          </label>
+          <label>
+            Logotipo do cliente
+            <input id="mockupLogoInput" type="file" accept="image/*" />
+          </label>
+          <label>
+            Área de negócio
+            <input id="mockupNiche" placeholder="Ex: estética, clínica, restauração..." />
+          </label>
+          <label class="full">
+            Detalhes a destacar
+            <textarea id="mockupBrief" rows="4" placeholder="Ex: quer mais marcações, precisa de WhatsApp visível, não tem sistema de reservas..."></textarea>
+          </label>
+        </div>
+        <div class="mockup-preview-large" id="mockupPreviewWrap" hidden>
+          <img id="mockupPreviewImage" alt="Mockup gerado" />
+        </div>
+        <div class="modal-actions">
+          <button class="button ghost" id="cancelMockupBtn" type="button">Cancelar</button>
+          <button class="button primary" id="generateMockupBtn" type="button">Gerar mockup</button>
+        </div>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./supabase-config.js"></script>
     <script src="./pricing.js"></script>
-    <script src="./app.js?v=20260821-8"></script>
+    <script src="./app.js?v=20260831-1"></script>
   </body>
 </html>

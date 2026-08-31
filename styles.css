@@ -2544,6 +2544,34 @@ textarea {
   line-height: 1.45;
 }
 
+.prospect-mockup-preview {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(24, 29, 73, 0.12);
+  border-radius: var(--radius);
+  background: #f8f9fc;
+}
+
+.prospect-mockup-preview img {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.mockup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mockup-actions .button {
+  flex: 1;
+}
+
 .fiscal-breakdown {
   padding: 8px 10px;
   border-radius: 10px;
@@ -2687,6 +2715,55 @@ textarea {
   color: var(--muted);
 }
 
+.modal-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.modal-heading strong {
+  margin-bottom: 0;
+}
+
+.mockup-modal-card {
+  width: min(760px, 100%);
+  max-height: min(92vh, 920px);
+  overflow: auto;
+}
+
+.mockup-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.mockup-form-grid .full {
+  grid-column: 1 / -1;
+}
+
+.mockup-preview-large {
+  margin-top: 16px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #f8f9fc;
+}
+
+.mockup-preview-large img {
+  display: block;
+  width: 100%;
+  border-radius: 10px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 18px;
+}
+
 @media (max-width: 1180px) {
   .proposal-layout,
   .contracts-layout,
@@ -2714,6 +2791,17 @@ textarea {
 
   .contract-preview-wrap {
     position: static;
+  }
+}
+
+@media (max-width: 720px) {
+  .mockup-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-actions {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 

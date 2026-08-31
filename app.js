@@ -2006,6 +2006,21 @@ function readFileAsDataUrl(file) {
   });
 }
 
+async function prepareMockupLogo(file) {
+  if (!file) return "";
+  const dataUrl = await readFileAsDataUrl(file);
+  const image = await loadImageData(dataUrl);
+  if (!image) return dataUrl;
+  const maxSide = 900;
+  const ratio = Math.min(1, maxSide / Math.max(image.width, image.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(image.width * ratio));
+  canvas.height = Math.max(1, Math.round(image.height * ratio));
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/png");
+}
+
 function loadImageData(dataUrl) {
   return new Promise((resolve, reject) => {
     if (!dataUrl) {
@@ -2206,7 +2221,7 @@ async function generateMockupForActive() {
   if (!prospect) return;
   const button = qs("#generateMockupBtn");
   button.disabled = true;
-  button.textContent = "A gerar...";
+  button.textContent = "A gerar com IA...";
   try {
     const fields = {
       name: qs("#mockupLeadName").value.trim(),
@@ -2214,7 +2229,7 @@ async function generateMockupForActive() {
       niche: qs("#mockupNiche").value.trim(),
       brief: qs("#mockupBrief").value.trim(),
     };
-    const image = await createProspectMockupImage(prospect, mockupLogoDataUrl, fields);
+    const image = await createAiProspectMockupImage(prospect, fields);
     Object.assign(prospect, {
       name: fields.name || prospect.name,
       niche: fields.niche || prospect.niche,
@@ -2230,11 +2245,41 @@ async function generateMockupForActive() {
     renderInstagramProspecting();
     showSuccessModal("Mockup criado e guardado no lead.");
   } catch (error) {
-    showSuccessModal(error.message || "Não foi possível gerar o mockup.");
+    showSuccessModal(error.message || "Não foi possível gerar o mockup por IA.");
   } finally {
     button.disabled = false;
-    button.textContent = "Gerar mockup";
+    button.textContent = "Gerar mockup IA";
   }
+}
+
+async function createAiProspectMockupImage(prospect, fields) {
+  const client = getSupabaseClient();
+  const { data } = client ? await client.auth.getSession() : { data: null };
+  const token = data?.session?.access_token || "";
+
+  if (!token) {
+    return createProspectMockupImage(prospect, mockupLogoDataUrl, fields);
+  }
+
+  const response = await fetch("/api/mockup/generate", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      name: fields.name || prospect.name,
+      offer: fields.offer || defaultMockupOffer(prospect),
+      niche: fields.niche || prospect.niche,
+      brief: fields.brief || defaultMockupBrief(prospect),
+      logoDataUrl: mockupLogoDataUrl,
+    }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(result.error || "Não foi possível gerar o mockup por IA.");
+  }
+  return result.image;
 }
 
 async function copyProspectMockup(id) {
@@ -2448,7 +2493,7 @@ function renderInstagramProspecting() {
                       ${instagramProspectStatuses.map((item) => `<option ${item === prospect.status ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
                     </select>
                     <div class="deal-actions">
-                      <button class="button primary mini" data-instagram-mockup="${escapeAttr(prospect.id)}" type="button">${prospect.mockupImage ? "Refazer mockup" : "Criar mockup"}</button>
+                      <button class="button primary mini" data-instagram-mockup="${escapeAttr(prospect.id)}" type="button">${prospect.mockupImage ? "Refazer mockup IA" : "Criar mockup IA"}</button>
                       <button class="button ghost mini" data-instagram-edit="${escapeAttr(prospect.id)}" type="button">Editar</button>
                       <button class="button danger mini" data-instagram-delete="${escapeAttr(prospect.id)}" type="button">Apagar</button>
                     </div>
@@ -3530,7 +3575,7 @@ function bindEvents() {
   });
   qs("#mockupLogoInput")?.addEventListener("change", async (event) => {
     const file = event.target.files?.[0];
-    mockupLogoDataUrl = file ? await readFileAsDataUrl(file) : "";
+    mockupLogoDataUrl = file ? await prepareMockupLogo(file) : "";
   });
   qs("#generateMockupBtn")?.addEventListener("click", generateMockupForActive);
 

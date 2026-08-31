@@ -76,6 +76,23 @@ OPENAI_PROSPECT_MODEL="gpt-5-mini"
 
 A deduplicação usa, por ordem, Google Place ID, domínio, Instagram, telefone e nome + município. Leads que permanecem no Kanban e rejeições automáticas não voltam a aparecer. Um lead apagado do Kanban volta a ficar elegível.
 
+## Mockups IA para prospeção
+
+No Kanban de **Prospeção IG**, cada lead pode gerar um mockup premium com portátil e telemóvel. O CRM envia o logotipo e o contexto do lead para a OpenAI através de uma função protegida por login Supabase. A chave da OpenAI fica apenas na Vercel.
+
+Variáveis recomendadas na Vercel:
+
+```bash
+OPENAI_API_KEY=sk-...
+OPENAI_TEXT_MODEL=gpt-5
+OPENAI_IMAGE_MODEL=gpt-image-1
+OPENAI_IMAGE_QUALITY=medium
+OPENAI_IMAGE_SIZE=1536x1024
+OPENAI_MOCKUP_HOURLY_LIMIT=20
+```
+
+`OPENAI_IMAGE_QUALITY=medium` é o modo recomendado para equilibrar qualidade e custo. `OPENAI_MOCKUP_HOURLY_LIMIT` limita gerações por utilizador autenticado para evitar gastos acidentais.
+
 ## Colocar online com Supabase + Vercel
 
 Este é o caminho recomendado para começar online com baixo custo:
@@ -98,6 +115,7 @@ Passos:
 ```bash
 VITE_SUPABASE_URL=https://xxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=ey...
+OPENAI_API_KEY=sk-...
 ```
 
 7. Confirmar build:

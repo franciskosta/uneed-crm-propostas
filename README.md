@@ -69,7 +69,7 @@ O separador **Prospeção IG** inclui agora descoberta automática de negócios,
 ```bash
 GOOGLE_PLACES_API_KEY="a_tua_chave_google_places"
 OPENAI_API_KEY="a_tua_chave_openai"
-OPENAI_PROSPECT_MODEL="gpt-5-mini"
+OPENAI_PROSPECT_MODEL="gpt-4o-mini"
 ```
 
 `GOOGLE_PLACES_API_KEY` é obrigatória. `OPENAI_API_KEY` é recomendada para análise e mensagens personalizadas; sem ela, o CRM aplica uma avaliação determinística baseada nos sinais públicos encontrados. As chaves ficam apenas no backend e nunca são enviadas para o navegador.

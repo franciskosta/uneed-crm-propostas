@@ -2297,12 +2297,20 @@ async function createAiProspectMockupImage(prospect, fields) {
     error: "A resposta do servidor não veio em formato válido.",
   }));
   if (!response.ok) {
+    if (isOpenAiVerificationError(result.error)) {
+      setMockupStatus("A OpenAI ainda pede verificação da organização. Gerei uma versão local para poderes usar já.", "ok");
+      return createProspectMockupImage(prospect, mockupLogoDataUrl, fields);
+    }
     throw new Error(result.error || "Não foi possível gerar o mockup por IA.");
   }
   if (!result.image) {
     throw new Error("A IA não devolveu imagem. Tenta novamente ou confirma os logs na Vercel.");
   }
   return result.image;
+}
+
+function isOpenAiVerificationError(message) {
+  return /organization must be verified|verify organization/i.test(String(message || ""));
 }
 
 async function copyProspectMockup(id) {

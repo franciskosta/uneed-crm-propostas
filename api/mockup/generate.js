@@ -40,6 +40,51 @@ function makeImageTool() {
   return tool;
 }
 
+function imageOptionsForm() {
+  const form = new FormData();
+  form.append("model", process.env.OPENAI_IMAGE_MODEL || "gpt-image-1");
+  form.append("quality", process.env.OPENAI_IMAGE_QUALITY || "medium");
+  form.append("size", process.env.OPENAI_IMAGE_SIZE || "1536x1024");
+  form.append("output_format", "jpeg");
+  return form;
+}
+
+function dataUrlToBlob(dataUrl) {
+  const match = String(dataUrl || "").match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) return null;
+  return new Blob([Buffer.from(match[2], "base64")], { type: match[1] });
+}
+
+async function generateWithImagesApi(apiKey, prompt, logoDataUrl) {
+  const form = imageOptionsForm();
+  form.append("prompt", prompt);
+
+  let endpoint = "https://api.openai.com/v1/images/generations";
+  const logoBlob = dataUrlToBlob(logoDataUrl);
+  if (logoBlob) {
+    endpoint = "https://api.openai.com/v1/images/edits";
+    form.append("image", logoBlob, "client-logo.png");
+  }
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+    },
+    body: form,
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    const message = data?.error?.message || "Não foi possível gerar o mockup por IA.";
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
+  }
+
+  return data?.data?.[0]?.b64_json || "";
+}
+
 function rateLimit(userId) {
   const now = Date.now();
   const windowMs = 60 * 60 * 1000;
@@ -117,26 +162,31 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: process.env.OPENAI_TEXT_MODEL || "gpt-5",
-        input: [{ role: "user", content }],
-        tools: [makeImageTool()],
-      }),
-    });
+    let imageBase64 = await generateWithImagesApi(apiKey, prompt, logoDataUrl);
 
-    const data = await response.json();
-    if (!response.ok) {
-      res.status(response.status).json({ error: data?.error?.message || "Não foi possível gerar o mockup por IA." });
-      return;
+    if (!imageBase64) {
+      const response = await fetch("https://api.openai.com/v1/responses", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: process.env.OPENAI_TEXT_MODEL || "gpt-5",
+          input: [{ role: "user", content }],
+          tools: [makeImageTool()],
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        res.status(response.status).json({ error: data?.error?.message || "Não foi possível gerar o mockup por IA." });
+        return;
+      }
+
+      imageBase64 = findGeneratedImage(data.output);
     }
 
-    const imageBase64 = findGeneratedImage(data.output);
     if (!imageBase64) {
       res.status(502).json({ error: "A IA não devolveu uma imagem." });
       return;
@@ -147,6 +197,6 @@ module.exports = async function handler(req, res) {
       source: "openai",
     });
   } catch (error) {
-    res.status(500).json({ error: error.message || "Erro ao contactar a IA." });
+    res.status(error.status || 500).json({ error: error.message || "Erro ao contactar a IA." });
   }
 };

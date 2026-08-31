@@ -2757,6 +2757,22 @@ textarea {
   border-radius: 10px;
 }
 
+.mockup-status {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid #f1b7c1;
+  border-radius: 10px;
+  background: #fff4f6;
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.mockup-status.is-ok {
+  border-color: #a7d9c8;
+  background: #f0fbf7;
+  color: #287b64;
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;

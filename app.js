@@ -260,6 +260,7 @@ let followupAscending = true;
 let catalogCategoryFilter = "";
 let activeMockupProspectId = null;
 let mockupLogoDataUrl = "";
+let mockupLogoPromise = Promise.resolve("");
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -1970,6 +1971,8 @@ function openMockupModal(id) {
   if (!prospect) return;
   activeMockupProspectId = id;
   mockupLogoDataUrl = "";
+  mockupLogoPromise = Promise.resolve("");
+  setMockupStatus("");
   qs("#mockupLeadName").value = prospect.name || "";
   qs("#mockupOffer").value = prospect.mockupOffer || defaultMockupOffer(prospect);
   qs("#mockupNiche").value = prospect.niche || "";
@@ -1991,10 +1994,19 @@ function openMockupModal(id) {
 function closeMockupModal() {
   activeMockupProspectId = null;
   mockupLogoDataUrl = "";
+  mockupLogoPromise = Promise.resolve("");
   const modal = qs("#mockupModal");
   if (!modal) return;
   modal.classList.remove("is-open");
   modal.setAttribute("aria-hidden", "true");
+}
+
+function setMockupStatus(message = "", type = "error") {
+  const status = qs("#mockupStatus");
+  if (!status) return;
+  status.textContent = message;
+  status.hidden = !message;
+  status.classList.toggle("is-ok", type === "ok");
 }
 
 function readFileAsDataUrl(file) {
@@ -2222,13 +2234,16 @@ async function generateMockupForActive() {
   const button = qs("#generateMockupBtn");
   button.disabled = true;
   button.textContent = "A gerar com IA...";
+  setMockupStatus("A preparar o pedido para a IA...", "ok");
   try {
+    mockupLogoDataUrl = await mockupLogoPromise;
     const fields = {
       name: qs("#mockupLeadName").value.trim(),
       offer: qs("#mockupOffer").value.trim(),
       niche: qs("#mockupNiche").value.trim(),
       brief: qs("#mockupBrief").value.trim(),
     };
+    setMockupStatus("A gerar imagem com IA. Pode demorar alguns segundos...", "ok");
     const image = await createAiProspectMockupImage(prospect, fields);
     Object.assign(prospect, {
       name: fields.name || prospect.name,
@@ -2243,9 +2258,9 @@ async function generateMockupForActive() {
     qs("#mockupPreviewImage").src = image;
     qs("#mockupPreviewWrap").hidden = false;
     renderInstagramProspecting();
-    showSuccessModal("Mockup criado e guardado no lead.");
+    setMockupStatus("Mockup criado e guardado no lead.", "ok");
   } catch (error) {
-    showSuccessModal(error.message || "Não foi possível gerar o mockup por IA.");
+    setMockupStatus(error.message || "Não foi possível gerar o mockup por IA.");
   } finally {
     button.disabled = false;
     button.textContent = "Gerar mockup IA";
@@ -2258,7 +2273,10 @@ async function createAiProspectMockupImage(prospect, fields) {
   const token = data?.session?.access_token || "";
 
   if (!token) {
-    return createProspectMockupImage(prospect, mockupLogoDataUrl, fields);
+    if (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") {
+      return createProspectMockupImage(prospect, mockupLogoDataUrl, fields);
+    }
+    throw new Error("A sessão Supabase não está ativa. Sai e volta a entrar no CRM antes de gerar o mockup IA.");
   }
 
   const response = await fetch("/api/mockup/generate", {
@@ -2275,9 +2293,14 @@ async function createAiProspectMockupImage(prospect, fields) {
       logoDataUrl: mockupLogoDataUrl,
     }),
   });
-  const result = await response.json().catch(() => ({}));
+  const result = await response.json().catch(() => ({
+    error: "A resposta do servidor não veio em formato válido.",
+  }));
   if (!response.ok) {
     throw new Error(result.error || "Não foi possível gerar o mockup por IA.");
+  }
+  if (!result.image) {
+    throw new Error("A IA não devolveu imagem. Tenta novamente ou confirma os logs na Vercel.");
   }
   return result.image;
 }
@@ -3575,7 +3598,15 @@ function bindEvents() {
   });
   qs("#mockupLogoInput")?.addEventListener("change", async (event) => {
     const file = event.target.files?.[0];
-    mockupLogoDataUrl = file ? await prepareMockupLogo(file) : "";
+    setMockupStatus(file ? "A preparar o logotipo..." : "");
+    mockupLogoPromise = file ? prepareMockupLogo(file) : Promise.resolve("");
+    try {
+      mockupLogoDataUrl = await mockupLogoPromise;
+      setMockupStatus(file ? "Logotipo pronto para gerar o mockup." : "", "ok");
+    } catch (error) {
+      mockupLogoDataUrl = "";
+      setMockupStatus(error.message || "Não foi possível preparar o logotipo.");
+    }
   });
   qs("#generateMockupBtn")?.addEventListener("click", generateMockupForActive);
 

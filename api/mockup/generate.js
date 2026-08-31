@@ -124,7 +124,7 @@ module.exports = async function handler(req, res) {
         "content-type": "application/json",
       },
       body: JSON.stringify({
-        model: process.env.OPENAI_TEXT_MODEL || "gpt-4.1",
+        model: process.env.OPENAI_TEXT_MODEL || "gpt-4o-mini",
         input: [{ role: "user", content }],
         tools: [makeImageTool()],
       }),

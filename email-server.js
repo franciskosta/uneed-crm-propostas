@@ -292,17 +292,19 @@ async function inspectProspectWebsite(url) {
 }
 
 async function analyzeProspect(business, website, niche) {
-  if (!process.env.OPENAI_API_KEY) {
+  const fallbackAnalysis = () => {
     const score = Math.min(95, 55 + (!website.exists ? 25 : 0) + (!website.hasBooking ? 10 : 0) + (business.phone ? 5 : 0));
     return { score, shouldContact: score >= 60, opportunity: website.exists ? "Simplificar os pedidos e marcações" : "Reunir a informação do negócio numa página própria", reason: website.exists ? "A presença atual não evidencia um percurso completo para pedidos." : "Não foi encontrado um website próprio funcional.", message: `Olá ${business.name}! Sou o Francisco, da Uneed Soluções Digitais.\n\nEstive a conhecer a vossa presença online e gostei da forma como apresentam o negócio 🙂\n\nReparei que uma página própria poderia ajudar a reunir a informação e tornar os pedidos de marcação mais simples.\n\nNa Uneed criamos páginas profissionais prontas a usar, com domínio, email, alojamento, suporte e marcações integradas. Começa nos 39€ + IVA/mês, sem fidelização.\n\nFaria sentido preparar-vos uma simulação personalizada, sem qualquer compromisso da vossa parte?`, confidence: 65 };
-  }
+  };
+  if (!process.env.OPENAI_API_KEY) return fallbackAnalysis();
   const prompt = `Avalia este negócio para UNEED Presença. Responde apenas JSON com score (0-100), shouldContact, opportunity, reason, message em português de Portugal e confidence. Mantém reason em uma ou duas frases curtas. Não inventes factos nem digas que visitaste fisicamente o espaço. Escreve como uma pessoa atenta e simpática, não como um relatório ou anúncio. A message deve ser calorosa, simples e pronta a enviar por Instagram, com exatamente 5 parágrafos curtos separados por duas quebras de linha: 1) "Olá [nome]! Sou o Francisco, da Uneed Soluções Digitais."; 2) uma observação positiva e natural baseada apenas num dado real, começando por exemplo por "Estive a ver..." ou "Gostei de..."; 3) algo concreto que uma página própria poderia facilitar, explicado sem termos técnicos; 4) "Na Uneed criamos páginas profissionais prontas a usar, com domínio, email, alojamento, suporte e marcações integradas. Começa nos 39€ + IVA/mês, sem fidelização."; 5) uma pergunta suave como "Faria sentido preparar-vos uma simulação personalizada, sem qualquer compromisso da vossa parte?". O tratamento é sempre profissional e dirigido à empresa ou instituição. Nunca trates o destinatário por tu e nunca uses tu, te, tens, queres, podes, teu, tua, contigo ou para ti. Podes usar a vossa marca, o vosso espaço, a sua empresa, consigo e gostaria. Evita expressões artificiais como "trabalho com salões para melhorar a presença online", "captar mais clientes", "tornar a gestão mais eficiente", "oportunidade simples", "forte confiança da clientela" ou "recomendado contacto". Não uses linguagem técnica, listas ou elogios exagerados. Usa no máximo um smile simples, apenas se ficar natural. Nicho: ${JSON.stringify(niche)} Negócio: ${JSON.stringify(business)} Website: ${JSON.stringify(website)}`;
-  const result = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: process.env.OPENAI_PROSPECT_MODEL || "gpt-5-mini", input: prompt, text: { format: { type: "json_object" } } }) });
+  const result = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: process.env.OPENAI_PROSPECT_MODEL || "gpt-4o-mini", input: prompt, text: { format: { type: "json_object" } } }) });
   if (!result.ok) {
     let detail = "";
     try {
       detail = (await result.json())?.error?.message || "";
     } catch {}
+    if (/does not have access to model|organization must be verified|verify organization|model .*not found/i.test(String(detail))) return fallbackAnalysis();
     throw new Error(`OpenAI respondeu ${result.status}${detail ? `: ${detail}` : ""}`);
   }
   const data = await result.json();

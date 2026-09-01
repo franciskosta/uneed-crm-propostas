@@ -1,3 +1,6 @@
+const fs = require("fs");
+const path = require("path");
+
 async function verifySession(req) {
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
   const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
@@ -23,6 +26,13 @@ function dataUrlToBlob(dataUrl) {
   if (!match) return null;
   const bytes = Buffer.from(match[2], "base64");
   return new Blob([bytes], { type: match[1] });
+}
+
+function getTemplateBlob() {
+  const templatePath = path.join(process.cwd(), "assets", "mockup-template-premium.png");
+  if (!fs.existsSync(templatePath)) return null;
+  const bytes = fs.readFileSync(templatePath);
+  return new Blob([bytes], { type: "image/png" });
 }
 
 function rateLimit(userId) {
@@ -103,12 +113,13 @@ module.exports = async function handler(req, res) {
 
   const prompt = [
     "Create one ultra-realistic premium landscape advertising mockup image for a digital agency outreach message.",
-    "Composition: a realistic open laptop on the left/center and a realistic smartphone on the right, both showing the same bespoke landing page concept for the client. Dark matte studio background, premium softbox lighting, subtle reflections, sharp focus, high-end product photography, polished commercial look.",
-    "The device screens must look like a real modern conversion-focused website, not a flat wireframe: elegant hero section, clear CTA button, booking/WhatsApp cues, service/benefit blocks, strong spacing, professional UX, dark navy, white and red UNEED-style accents.",
+    "Use the supplied premium device mockup image as the main visual reference. Keep its overall composition: realistic open laptop on the left/center, realistic smartphone on the right, dark matte studio background, premium lighting, elegant shadows and a polished commercial look.",
+    "Replace only the website shown on the device screens with a bespoke conversion-focused website concept for the client. Keep the devices, perspective, proportions, background mood and premium photographic style very close to the reference image.",
+    "The device screens must look like a real modern landing page, not a flat wireframe: elegant hero section, clear CTA button, booking/WhatsApp cues, service/benefit blocks, strong spacing, professional UX, dark navy, white and red UNEED-style accents.",
     `Client/business name for context: ${visualName}.`,
     `Business area for visual direction only, not as a long visible headline: ${visualNiche}.`,
     brief ? `Commercial notes to reflect visually, mostly through layout and icons, not long text: ${brief}.` : "",
-    "Use the uploaded image as the actual client logo artwork on the website screens. Preserve the logo identity, proportions, lettering and main visual characteristics as much as possible. Do not redraw or retype the logo unless unavoidable.",
+    "Use the uploaded client logo image as the actual client logo artwork on the website screens. Preserve the logo identity, proportions, lettering and main visual characteristics as much as possible. Do not redraw or retype the logo unless unavoidable.",
     "If the uploaded logo has a white or noisy background, visually clean/remove the background for the screen design. If contrast requires it, use a clean white or monochrome version inside the screen while keeping the logo recognizable.",
     "TEXT ACCURACY RULES: keep readable text extremely minimal. The only readable website text allowed is copied exactly from this list:",
     `Headline: "${visualHeadline}"`,
@@ -122,20 +133,43 @@ module.exports = async function handler(req, res) {
 
   try {
     const imageModel = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
-    let response;
+    const templateBlob = getTemplateBlob();
     const logoBlob = dataUrlToBlob(logoDataUrl);
-    if (logoBlob) {
+
+    async function requestEdit(imageFieldName = "image[]", includeFidelity = true) {
       const form = new FormData();
       form.append("model", imageModel);
       form.append("prompt", prompt);
-      form.append("image", logoBlob, "client-logo.png");
+      if (templateBlob) form.append(imageFieldName, templateBlob, "mockup-template-premium.png");
+      if (logoBlob) form.append(imageFieldName, logoBlob, "client-logo.png");
       form.append("quality", process.env.OPENAI_IMAGE_QUALITY || "medium");
       form.append("size", process.env.OPENAI_IMAGE_SIZE || "1536x1024");
-      response = await fetch("https://api.openai.com/v1/images/edits", {
+      if (includeFidelity) form.append("input_fidelity", "high");
+      return fetch("https://api.openai.com/v1/images/edits", {
         method: "POST",
         headers: { authorization: `Bearer ${apiKey}` },
         body: form,
       });
+    }
+
+    let response;
+    if (templateBlob || logoBlob) {
+      response = await requestEdit("image[]");
+      if (!response.ok && response.status === 400) {
+        const firstError = await response.clone().json().catch(() => null);
+        const message = firstError?.error?.message || "";
+        if (/input_fidelity|unknown parameter|invalid/i.test(message)) {
+          response = await requestEdit("image[]", false);
+        } else if (/image|file|multipart/i.test(message)) {
+          response = await requestEdit("image", true);
+          if (!response.ok && response.status === 400) {
+            const secondError = await response.clone().json().catch(() => null);
+            if (/input_fidelity|unknown parameter|invalid/i.test(secondError?.error?.message || "")) {
+              response = await requestEdit("image", false);
+            }
+          }
+        }
+      }
     } else {
       response = await fetch("https://api.openai.com/v1/images/generations", {
         method: "POST",

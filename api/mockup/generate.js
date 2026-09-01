@@ -37,6 +37,23 @@ function rateLimit(userId) {
   return true;
 }
 
+function cleanVisualText(value, fallback, limit = 34) {
+  const clean = String(value || "")
+    .normalize("NFC")
+    .replace(/[^\p{L}\p{N}\s.,!?&+€%\/-]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return (clean || fallback).slice(0, limit).trim() || fallback;
+}
+
+function inferMockupHeadline(brief, niche) {
+  const source = `${brief} ${niche}`.toLowerCase();
+  if (/marcaç|marcac|agenda|hor[aá]rio|horario|booking|reserva/.test(source)) return "Marcações online simples";
+  if (/whatsapp|contacto|contato|mensagem/.test(source)) return "Contactos mais rápidos";
+  if (/site|website|presen|digital/.test(source)) return "Presença digital profissional";
+  return "Mais pedidos online";
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("allow", "POST");
@@ -75,25 +92,32 @@ module.exports = async function handler(req, res) {
   const offer = String(body.offer || "Pedir diagnóstico gratuito").trim().slice(0, 120);
   const brief = String(body.brief || "").trim().slice(0, 900);
   const logoDataUrl = String(body.logoDataUrl || "").trim();
+  const visualName = cleanVisualText(name, "Cliente", 34);
+  const visualNiche = cleanVisualText(niche, "negócio local", 34);
+  const visualCta = cleanVisualText(offer, "Pedir diagnóstico", 28);
+  const visualHeadline = cleanVisualText(body.headline || inferMockupHeadline(brief, niche), "Mais pedidos online", 34);
   if (logoDataUrl.length > 4_000_000) {
     res.status(413).json({ error: "O logotipo é demasiado pesado. Usa uma imagem mais leve." });
     return;
   }
 
   const prompt = [
-    "Create one premium landscape marketing mockup image for a digital agency outreach message.",
-    "Visual style: realistic laptop and smartphone mockup on a dark elegant studio background, premium lighting, sharp product-advertising composition, similar to a modern SaaS website presentation.",
-    "The laptop and smartphone screens must show a bespoke modern landing page concept for the client's business.",
-    `Client/business name: ${name}.`,
-    `Business area: ${niche}.`,
-    `Primary CTA shown on the website: ${offer}.`,
-    brief ? `Commercial notes to reflect subtly in the website concept: ${brief}.` : "",
-    "Use the uploaded image as the client logo on the website screens. Preserve the logo identity, proportions, lettering and main visual characteristics as much as possible.",
-    "If the uploaded logo has a white or noisy background, remove or visually clean the background for the mockup.",
-    "If contrast requires it, create a white or monochrome version of the uploaded logo only inside the screen design, while keeping it recognizable.",
-    "Make the screen UI look like a real high-quality website, not a flat wireframe. Include a hero section, clear CTA, and a few elegant service/benefit blocks.",
-    "Visible text should be minimal and in Portuguese. Do not invent another brand name. Do not add watermarks.",
-    "Output a single finished image ready to send by WhatsApp or Instagram DM.",
+    "Create one ultra-realistic premium landscape advertising mockup image for a digital agency outreach message.",
+    "Composition: a realistic open laptop on the left/center and a realistic smartphone on the right, both showing the same bespoke landing page concept for the client. Dark matte studio background, premium softbox lighting, subtle reflections, sharp focus, high-end product photography, polished commercial look.",
+    "The device screens must look like a real modern conversion-focused website, not a flat wireframe: elegant hero section, clear CTA button, booking/WhatsApp cues, service/benefit blocks, strong spacing, professional UX, dark navy, white and red UNEED-style accents.",
+    `Client/business name for context: ${visualName}.`,
+    `Business area for visual direction only, not as a long visible headline: ${visualNiche}.`,
+    brief ? `Commercial notes to reflect visually, mostly through layout and icons, not long text: ${brief}.` : "",
+    "Use the uploaded image as the actual client logo artwork on the website screens. Preserve the logo identity, proportions, lettering and main visual characteristics as much as possible. Do not redraw or retype the logo unless unavoidable.",
+    "If the uploaded logo has a white or noisy background, visually clean/remove the background for the screen design. If contrast requires it, use a clean white or monochrome version inside the screen while keeping the logo recognizable.",
+    "TEXT ACCURACY RULES: keep readable text extremely minimal. The only readable website text allowed is copied exactly from this list:",
+    `Headline: "${visualHeadline}"`,
+    `CTA button: "${visualCta}"`,
+    "Small chips: \"WhatsApp\", \"Marcações\", \"Mobile first\"",
+    `If the business name appears as normal text outside the logo, spell it exactly: "${visualName}".`,
+    "Do not write paragraphs, fake navigation labels, lorem ipsum, pseudo-words, random accents, distorted Portuguese, or gibberish. Represent secondary copy and menus as clean grey UI lines, icons, cards and abstract interface shapes instead of readable words.",
+    "All visible words must be large enough to read and perfectly spelled in Portuguese. If a word might become unclear, omit it and use a visual placeholder line instead.",
+    "No watermarks, no extra brands, no unrelated text. Output a single finished image ready to send by WhatsApp or Instagram DM.",
   ].filter(Boolean).join("\n");
 
   try {

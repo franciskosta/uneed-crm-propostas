@@ -2033,7 +2033,7 @@ async function prepareMockupLogo(file) {
   return canvas.toDataURL("image/png");
 }
 
-function loadImageData(dataUrl) {
+function loadImageData(dataUrl, errorMessage = "Não foi possível carregar a imagem.") {
   return new Promise((resolve, reject) => {
     if (!dataUrl) {
       resolve(null);
@@ -2041,7 +2041,7 @@ function loadImageData(dataUrl) {
     }
     const image = new Image();
     image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error("Não foi possível carregar o logotipo."));
+    image.onerror = () => reject(new Error(errorMessage));
     image.src = dataUrl;
   });
 }
@@ -2072,6 +2072,15 @@ function strokeRoundRect(ctx, x, y, width, height, radius, stroke, lineWidth = 2
   ctx.strokeStyle = stroke;
   ctx.lineWidth = lineWidth;
   ctx.stroke();
+}
+
+function drawImageCover(ctx, image, x, y, width, height) {
+  if (!image) return false;
+  const scale = Math.max(width / image.width, height / image.height);
+  const drawWidth = image.width * scale;
+  const drawHeight = image.height * scale;
+  ctx.drawImage(image, x + (width - drawWidth) / 2, y + (height - drawHeight) / 2, drawWidth, drawHeight);
+  return true;
 }
 
 function wrapCanvasText(ctx, text, x, y, maxWidth, lineHeight, maxLines = 4) {
@@ -2131,98 +2140,115 @@ function drawLogoBlock(ctx, logoImage, name, x, y, width, height, dark = false) 
 }
 
 function drawWebsiteScreen(ctx, options) {
-  const { x, y, width, height, logoImage, name, niche, offer, brief, compact = false } = options;
+  const { x, y, width, height, logoImage, name, niche, offer, backgroundImage, compact = false } = options;
   fillRoundRect(ctx, x, y, width, height, 28, "#ffffff");
   strokeRoundRect(ctx, x, y, width, height, 28, "rgba(21,27,75,0.12)", 2);
 
-  const heroHeight = compact ? height * 0.58 : height * 0.54;
-  fillRoundRect(ctx, x + 18, y + 18, width - 36, heroHeight - 18, 24, "#151b4b");
-  ctx.fillStyle = "rgba(215,32,63,0.26)";
-  ctx.beginPath();
-  ctx.arc(x + width - 120, y + 92, compact ? 44 : 72, 0, Math.PI * 2);
-  ctx.fill();
-  drawLogoBlock(ctx, logoImage, name, x + 42, y + 46, compact ? 180 : 230, compact ? 62 : 76, true);
-
-  ctx.fillStyle = "#ffffff";
-  ctx.font = compact ? "900 33px Arial" : "900 50px Arial";
-  wrapCanvasText(ctx, `Mais pedidos para ${name || "o seu negócio"}`, x + 42, y + (compact ? 150 : 175), width - 110, compact ? 40 : 58, compact ? 3 : 2);
-
-  ctx.fillStyle = "rgba(255,255,255,0.78)";
-  ctx.font = compact ? "700 18px Arial" : "700 25px Arial";
-  wrapCanvasText(ctx, niche || "Presença digital com foco em conversão", x + 42, y + heroHeight - (compact ? 84 : 78), width - 110, compact ? 24 : 32, 2);
-
-  const ctaWidth = compact ? width - 84 : 250;
-  fillRoundRect(ctx, x + 42, y + heroHeight + 32, ctaWidth, 58, 16, "#d7203f");
-  ctx.fillStyle = "#ffffff";
-  ctx.font = compact ? "900 20px Arial" : "900 22px Arial";
-  ctx.textBaseline = "middle";
-  ctx.fillText(shortCanvasText(ctx, offer || "Pedir diagnóstico", ctaWidth - 48), x + 66, y + heroHeight + 61);
-
-  const cardY = y + heroHeight + 120;
-  const gap = compact ? 12 : 20;
-  const cardWidth = compact ? width - 84 : (width - 104 - gap * 2) / 3;
-  const cards = ["WhatsApp visível", "Marcações simples", "Mobile first"];
-  cards.forEach((card, index) => {
-    const cx = compact ? x + 42 : x + 42 + index * (cardWidth + gap);
-    const cy = compact ? cardY + index * 80 : cardY;
-    fillRoundRect(ctx, cx, cy, cardWidth, compact ? 62 : 92, 16, "#f4f6fb");
-    ctx.fillStyle = "#151b4b";
-    ctx.font = compact ? "900 17px Arial" : "900 20px Arial";
-    ctx.textBaseline = "top";
-    ctx.fillText(card, cx + 18, cy + 18);
-  });
-
-  if (!compact) {
-    ctx.fillStyle = "#667085";
-    ctx.font = "600 19px Arial";
-    wrapCanvasText(ctx, brief || "Página clara, rápida e preparada para transformar visitas em contactos.", x + 42, y + height - 88, width - 84, 27, 2);
+  const heroX = x + 18;
+  const heroY = y + 18;
+  const heroWidth = width - 36;
+  const heroHeight = compact ? Math.round(height * 0.72) : Math.round(height * 0.68);
+  drawRoundRect(ctx, heroX, heroY, heroWidth, heroHeight, compact ? 24 : 28);
+  ctx.save();
+  ctx.clip();
+  if (!drawImageCover(ctx, backgroundImage, heroX, heroY, heroWidth, heroHeight)) {
+    const fallback = ctx.createLinearGradient(heroX, heroY, heroX + heroWidth, heroY + heroHeight);
+    fallback.addColorStop(0, "#081126");
+    fallback.addColorStop(0.58, "#151b4b");
+    fallback.addColorStop(1, "#090d22");
+    ctx.fillStyle = fallback;
+    ctx.fillRect(heroX, heroY, heroWidth, heroHeight);
   }
+  const overlay = ctx.createLinearGradient(heroX, heroY, heroX + heroWidth, heroY + heroHeight);
+  overlay.addColorStop(0, "rgba(0,0,0,0.18)");
+  overlay.addColorStop(0.52, "rgba(3,7,25,0.52)");
+  overlay.addColorStop(1, "rgba(3,7,25,0.78)");
+  ctx.fillStyle = overlay;
+  ctx.fillRect(heroX, heroY, heroWidth, heroHeight);
+  ctx.restore();
+
+  const logoWidth = compact ? Math.min(150, heroWidth - 56) : 260;
+  const logoHeight = compact ? 72 : 96;
+  drawLogoBlock(ctx, logoImage, name, heroX + (compact ? 26 : heroWidth - logoWidth - 56), heroY + (compact ? 34 : 54), logoWidth, logoHeight, true);
+
+  const ctaWidth = compact ? 166 : 270;
+  const ctaX = compact ? heroX + 28 : heroX + heroWidth - ctaWidth - 56;
+  const ctaY = compact ? heroY + heroHeight - 108 : heroY + heroHeight - 120;
+  fillRoundRect(ctx, ctaX, ctaY, ctaWidth, compact ? 54 : 62, 18, "#d7203f");
+  ctx.fillStyle = "#ffffff";
+  ctx.font = compact ? "900 17px Arial" : "900 22px Arial";
+  ctx.textBaseline = "middle";
+  const ctaLabel = shortCanvasText(ctx, offer || "Pedir diagnóstico", compact ? 118 : 222);
+  ctx.fillText(ctaLabel, ctaX + 24, ctaY + (compact ? 27 : 31));
+
+  if (compact) return;
+
+  const cardY = y + heroHeight + 48;
+  const cardWidth = (width - 104 - 40) / 3;
+  [
+    ["WhatsApp", "#d7203f"],
+    ["Agenda", "#151b4b"],
+    ["Mobile", "#2d6cdf"],
+  ].forEach(([card, color], index) => {
+    const cx = x + 42 + index * (cardWidth + 20);
+    fillRoundRect(ctx, cx, cardY, cardWidth, 98, 18, "#f5f7fb");
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(cx + 42, cardY + 49, 18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#151b4b";
+    ctx.font = "900 23px Arial";
+    ctx.textBaseline = "middle";
+    ctx.fillText(card, cx + 76, cardY + 49);
+  });
 }
 
-async function createProspectMockupImage(prospect, logoDataUrl, fields) {
+async function createProspectMockupImage(prospect, logoDataUrl, fields, backgroundDataUrl = "") {
   const canvas = document.createElement("canvas");
   canvas.width = 1600;
   canvas.height = 1000;
   const ctx = canvas.getContext("2d");
-  const logoImage = await loadImageData(logoDataUrl);
+  const logoImage = await loadImageData(logoDataUrl, "Não foi possível carregar o logotipo.");
+  const backgroundImage = await loadImageData(backgroundDataUrl, "Não foi possível carregar o fundo gerado pela IA.");
   const name = fields.name || prospect.name || "Cliente";
   const niche = fields.niche || prospect.niche || "Negócio local";
   const offer = fields.offer || defaultMockupOffer(prospect);
-  const brief = fields.brief || defaultMockupBrief(prospect);
 
   const gradient = ctx.createLinearGradient(0, 0, 1600, 1000);
-  gradient.addColorStop(0, "#f7f8fc");
-  gradient.addColorStop(1, "#e9edf7");
+  gradient.addColorStop(0, "#060a12");
+  gradient.addColorStop(0.55, "#101736");
+  gradient.addColorStop(1, "#030509");
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, 1600, 1000);
 
-  ctx.fillStyle = "#151b4b";
-  ctx.font = "900 44px Arial";
-  ctx.fillText("Mockup personalizado UNEED", 96, 92);
-  ctx.fillStyle = "#667085";
-  ctx.font = "700 24px Arial";
-  ctx.fillText("Visual rápido para imaginar uma presença digital mais preparada para converter.", 96, 132);
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  ctx.beginPath();
+  ctx.ellipse(820, 884, 640, 72, 0, 0, Math.PI * 2);
+  ctx.fill();
 
-  fillRoundRect(ctx, 92, 185, 1018, 636, 38, "rgba(21,27,75,0.08)");
-  fillRoundRect(ctx, 80, 170, 1018, 636, 38, "#ffffff");
-  drawWebsiteScreen(ctx, { x: 120, y: 210, width: 938, height: 556, logoImage, name, niche, offer, brief });
+  fillRoundRect(ctx, 112, 132, 1060, 672, 44, "#050914");
+  strokeRoundRect(ctx, 112, 132, 1060, 672, 44, "rgba(255,255,255,0.42)", 3);
+  drawWebsiteScreen(ctx, { x: 142, y: 164, width: 1000, height: 602, logoImage, name, niche, offer, backgroundImage });
+  fillRoundRect(ctx, 330, 802, 620, 34, 8, "#171b24");
+  fillRoundRect(ctx, 186, 836, 910, 34, 16, "#2b303c");
 
-  fillRoundRect(ctx, 1118, 132, 338, 734, 52, "#0f143e");
-  fillRoundRect(ctx, 1138, 156, 298, 686, 42, "#ffffff");
-  fillRoundRect(ctx, 1230, 174, 116, 15, 8, "#0f143e");
-  drawWebsiteScreen(ctx, { x: 1156, y: 205, width: 262, height: 596, logoImage, name, niche, offer, brief, compact: true });
+  fillRoundRect(ctx, 1144, 260, 322, 618, 50, "#050914");
+  strokeRoundRect(ctx, 1144, 260, 322, 618, 50, "rgba(255,255,255,0.42)", 3);
+  fillRoundRect(ctx, 1251, 282, 110, 18, 9, "#0f143e");
+  drawWebsiteScreen(ctx, { x: 1164, y: 314, width: 282, height: 520, logoImage, name, niche, offer, backgroundImage, compact: true });
 
-  fillRoundRect(ctx, 96, 848, 1360, 78, 22, "#151b4b");
+  fillRoundRect(ctx, 292, 866, 940, 64, 20, "rgba(8,13,33,0.92)");
   ctx.fillStyle = "#ffffff";
-  ctx.font = "900 26px Arial";
+  ctx.font = "900 24px Arial";
   ctx.textBaseline = "middle";
-  ctx.fillText(shortCanvasText(ctx, `${name} · ${offer}`, 1040), 130, 887);
-  ctx.fillStyle = "rgba(255,255,255,0.74)";
-  ctx.font = "700 20px Arial";
-  ctx.fillText("Conceito visual gerado para abordagem comercial personalizada", 130, 916);
+  ctx.fillText(shortCanvasText(ctx, `${name} · conceito visual personalizado`, 750), 326, 898);
   ctx.fillStyle = "#d7203f";
   ctx.beginPath();
-  ctx.arc(1416, 886, 13, 0, Math.PI * 2);
+  ctx.arc(1190, 898, 12, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#d7203f";
+  ctx.beginPath();
+  ctx.arc(1494, 120, 10, 0, Math.PI * 2);
   ctx.fill();
 
   return canvas.toDataURL("image/jpeg", 0.9);
@@ -2243,8 +2269,9 @@ async function generateMockupForActive() {
       niche: qs("#mockupNiche").value.trim(),
       brief: qs("#mockupBrief").value.trim(),
     };
-    setMockupStatus("A gerar imagem com IA. Pode demorar alguns segundos...", "ok");
-    const image = await createAiProspectMockupImage(prospect, fields);
+    setMockupStatus("A gerar fundo visual com IA e a montar o mockup...", "ok");
+    const background = await createAiProspectMockupImage(prospect, fields);
+    const image = await createProspectMockupImage(prospect, mockupLogoDataUrl, fields, background);
     Object.assign(prospect, {
       name: fields.name || prospect.name,
       niche: fields.niche || prospect.niche,
@@ -2296,10 +2323,11 @@ async function createAiProspectMockupImage(prospect, fields) {
   if (!response.ok) {
     throw new Error(result.error || "Não foi possível gerar o mockup por IA.");
   }
-  if (!result.image) {
-    throw new Error("A IA não devolveu imagem. Tenta novamente ou confirma os logs na Vercel.");
+  const background = result.background || result.image;
+  if (!background) {
+    throw new Error("A IA não devolveu fundo visual. Tenta novamente ou confirma os logs na Vercel.");
   }
-  return result.image;
+  return background;
 }
 
 function isOpenAiAccessError(message) {

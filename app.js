@@ -2329,7 +2329,7 @@ async function createProspectMockupImage(prospect, logoDataUrl, fields) {
   canvas.width = 1536;
   canvas.height = 1024;
   const ctx = canvas.getContext("2d");
-  const templateImage = await loadImageData("./assets/mockup-template-premium.png", "Não foi possível carregar o modelo premium.");
+  const templateImage = await loadImageData("./assets/mockup-template-premium.png?v=20260901-3", "Não foi possível carregar o modelo premium.");
   const logoImage = await loadImageData(logoDataUrl, "Não foi possível carregar o logotipo.");
   const name = fields.name || prospect.name || "Cliente";
 

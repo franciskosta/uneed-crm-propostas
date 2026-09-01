@@ -54,9 +54,9 @@ module.exports = async function handler(req, res) {
     return;
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = process.env.OPENAI_IMAGE_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    res.status(503).json({ error: "OPENAI_API_KEY não configurada na Vercel." });
+    res.status(503).json({ error: "OPENAI_IMAGE_API_KEY não configurada na Vercel." });
     return;
   }
 

@@ -68,11 +68,11 @@ O separador **Prospeção IG** inclui agora descoberta automática de negócios,
 
 ```bash
 GOOGLE_PLACES_API_KEY="a_tua_chave_google_places"
-OPENAI_API_KEY="a_tua_chave_openai"
+OPENAI_PROSPECT_API_KEY="sk-..."
 OPENAI_PROSPECT_MODEL="gpt-4o-mini"
 ```
 
-`GOOGLE_PLACES_API_KEY` é obrigatória. `OPENAI_API_KEY` é recomendada para análise e mensagens personalizadas; sem ela, o CRM aplica uma avaliação determinística baseada nos sinais públicos encontrados. As chaves ficam apenas no backend e nunca são enviadas para o navegador.
+`GOOGLE_PLACES_API_KEY` é obrigatória. `OPENAI_PROSPECT_API_KEY` é recomendada para análise e mensagens personalizadas; sem ela, o CRM aplica uma avaliação determinística baseada nos sinais públicos encontrados. Se `OPENAI_PROSPECT_API_KEY` não existir, o backend ainda tenta usar `OPENAI_API_KEY` como fallback. As chaves ficam apenas no backend e nunca são enviadas para o navegador.
 
 A deduplicação usa, por ordem, Google Place ID, domínio, Instagram, telefone e nome + município. Leads que permanecem no Kanban e rejeições automáticas não voltam a aparecer. Um lead apagado do Kanban volta a ficar elegível.
 
@@ -83,14 +83,14 @@ No Kanban de **Prospeção IG**, cada lead pode gerar um mockup premium com port
 Variáveis recomendadas na Vercel:
 
 ```bash
-OPENAI_API_KEY=sk-...
+OPENAI_IMAGE_API_KEY=sk-...
 OPENAI_IMAGE_MODEL=gpt-image-1
 OPENAI_IMAGE_QUALITY=medium
 OPENAI_IMAGE_SIZE=1536x1024
 OPENAI_MOCKUP_HOURLY_LIMIT=20
 ```
 
-O mockup usa diretamente `OPENAI_IMAGE_MODEL`, sem depender de um modelo de texto. `OPENAI_IMAGE_QUALITY=medium` é o modo recomendado para equilibrar qualidade e custo. `OPENAI_MOCKUP_HOURLY_LIMIT` limita gerações por utilizador autenticado para evitar gastos acidentais.
+O mockup usa `OPENAI_IMAGE_API_KEY` e `OPENAI_IMAGE_MODEL`, sem depender da chave/modelo de prospeção. Se `OPENAI_IMAGE_API_KEY` não existir, o backend ainda tenta usar `OPENAI_API_KEY` como fallback. `OPENAI_IMAGE_QUALITY=medium` é o modo recomendado para equilibrar qualidade e custo. `OPENAI_MOCKUP_HOURLY_LIMIT` limita gerações por utilizador autenticado para evitar gastos acidentais.
 
 ## Colocar online com Supabase + Vercel
 
@@ -114,7 +114,8 @@ Passos:
 ```bash
 VITE_SUPABASE_URL=https://xxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=ey...
-OPENAI_API_KEY=sk-...
+OPENAI_PROSPECT_API_KEY=sk-...
+OPENAI_IMAGE_API_KEY=sk-...
 ```
 
 7. Confirmar build:

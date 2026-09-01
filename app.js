@@ -2273,9 +2273,6 @@ async function createAiProspectMockupImage(prospect, fields) {
   const token = data?.session?.access_token || "";
 
   if (!token) {
-    if (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") {
-      return createProspectMockupImage(prospect, mockupLogoDataUrl, fields);
-    }
     throw new Error("A sessão Supabase não está ativa. Sai e volta a entrar no CRM antes de gerar o mockup IA.");
   }
 
@@ -2297,10 +2294,6 @@ async function createAiProspectMockupImage(prospect, fields) {
     error: "A resposta do servidor não veio em formato válido.",
   }));
   if (!response.ok) {
-    if (result.fallback === "local" || isOpenAiAccessError(result.error)) {
-      setMockupStatus("A OpenAI ainda não deixou este projeto usar o modelo de imagem. Gerei uma versão local para poderes usar já.", "ok");
-      return createProspectMockupImage(prospect, mockupLogoDataUrl, fields);
-    }
     throw new Error(result.error || "Não foi possível gerar o mockup por IA.");
   }
   if (!result.image) {

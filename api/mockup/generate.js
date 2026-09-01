@@ -131,11 +131,11 @@ module.exports = async function handler(req, res) {
     const data = await response.json();
     if (!response.ok) {
       const message = data?.error?.message || "Não foi possível gerar o mockup por IA.";
-      if (isOpenAiAccessError(message)) {
-        res.status(424).json({ error: message, fallback: "local" });
-        return;
-      }
-      res.status(response.status).json({ error: data?.error?.message || "Não foi possível gerar o mockup por IA." });
+      res.status(response.status).json({
+        error: message,
+        model: imageModel,
+        source: "openai",
+      });
       return;
     }
 

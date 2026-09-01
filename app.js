@@ -2213,35 +2213,75 @@ function createMonochromeLogoCanvas(logoImage, maxWidth, maxHeight) {
   sourceCtx.drawImage(logoImage, 0, 0, sourceWidth, sourceHeight);
   const sourceData = sourceCtx.getImageData(0, 0, sourceWidth, sourceHeight);
   const sourcePixels = sourceData.data;
-  const samplePoints = [
-    0,
-    Math.max(0, sourceWidth - 1),
-    Math.max(0, (sourceHeight - 1) * sourceWidth),
-    Math.max(0, sourceHeight * sourceWidth - 1),
-  ];
-  const edgeColor = samplePoints.reduce(
-    (acc, point) => {
-      const offset = point * 4;
-      acc.red += sourcePixels[offset];
-      acc.green += sourcePixels[offset + 1];
-      acc.blue += sourcePixels[offset + 2];
-      acc.alpha += sourcePixels[offset + 3];
-      return acc;
-    },
-    { red: 0, green: 0, blue: 0, alpha: 0 }
-  );
-  edgeColor.red /= samplePoints.length;
-  edgeColor.green /= samplePoints.length;
-  edgeColor.blue /= samplePoints.length;
-  edgeColor.alpha /= samplePoints.length;
+  const cornerSize = Math.max(1, Math.round(Math.min(sourceWidth, sourceHeight) * 0.04));
+  const edgeColor = { red: 0, green: 0, blue: 0, alpha: 0, count: 0 };
+  const sampleCorner = (startX, startY) => {
+    for (let y = startY; y < startY + cornerSize; y += 1) {
+      for (let x = startX; x < startX + cornerSize; x += 1) {
+        const offset = (y * sourceWidth + x) * 4;
+        edgeColor.red += sourcePixels[offset];
+        edgeColor.green += sourcePixels[offset + 1];
+        edgeColor.blue += sourcePixels[offset + 2];
+        edgeColor.alpha += sourcePixels[offset + 3];
+        edgeColor.count += 1;
+      }
+    }
+  };
+  sampleCorner(0, 0);
+  sampleCorner(sourceWidth - cornerSize, 0);
+  sampleCorner(0, sourceHeight - cornerSize);
+  sampleCorner(sourceWidth - cornerSize, sourceHeight - cornerSize);
+  edgeColor.red /= edgeColor.count;
+  edgeColor.green /= edgeColor.count;
+  edgeColor.blue /= edgeColor.count;
+  edgeColor.alpha /= edgeColor.count;
   const edgeLuminance = edgeColor.red * 0.299 + edgeColor.green * 0.587 + edgeColor.blue * 0.114;
-  const isBackgroundPixel = (red, green, blue, alpha) => {
+  const isBackgroundCandidate = (red, green, blue, alpha) => {
     if (alpha <= 16) return true;
     const luminance = red * 0.299 + green * 0.587 + blue * 0.114;
+    const chroma = Math.max(red, green, blue) - Math.min(red, green, blue);
     const edgeDistance = Math.hypot(red - edgeColor.red, green - edgeColor.green, blue - edgeColor.blue);
-    const isFlatLight = Math.max(red, green, blue) - Math.min(red, green, blue) < 14 && luminance > 246;
-    return (edgeColor.alpha > 220 && edgeDistance < 42) || (edgeColor.alpha > 220 && edgeLuminance > 238 && isFlatLight);
+    const isFlatLight = chroma < 30 && luminance > 235;
+    const isFlatDark = chroma < 24 && luminance < 42;
+    const edgeTolerance = edgeLuminance < 55 || edgeLuminance > 220 ? 52 : 38;
+    return isFlatLight || isFlatDark || (edgeColor.alpha > 180 && edgeDistance < edgeTolerance);
   };
+
+  const pixelCount = sourceWidth * sourceHeight;
+  const backgroundMask = new Uint8Array(pixelCount);
+  const queued = new Uint8Array(pixelCount);
+  const queue = new Uint32Array(pixelCount);
+  let queueStart = 0;
+  let queueEnd = 0;
+  const enqueueBackground = (x, y) => {
+    const point = y * sourceWidth + x;
+    if (queued[point]) return;
+    const offset = point * 4;
+    if (!isBackgroundCandidate(sourcePixels[offset], sourcePixels[offset + 1], sourcePixels[offset + 2], sourcePixels[offset + 3])) return;
+    queued[point] = 1;
+    queue[queueEnd] = point;
+    queueEnd += 1;
+  };
+  for (let x = 0; x < sourceWidth; x += 1) {
+    enqueueBackground(x, 0);
+    enqueueBackground(x, sourceHeight - 1);
+  }
+  for (let y = 1; y < sourceHeight - 1; y += 1) {
+    enqueueBackground(0, y);
+    enqueueBackground(sourceWidth - 1, y);
+  }
+  while (queueStart < queueEnd) {
+    const point = queue[queueStart];
+    queueStart += 1;
+    backgroundMask[point] = 1;
+    const x = point % sourceWidth;
+    const y = Math.floor(point / sourceWidth);
+    if (x > 0) enqueueBackground(x - 1, y);
+    if (x + 1 < sourceWidth) enqueueBackground(x + 1, y);
+    if (y > 0) enqueueBackground(x, y - 1);
+    if (y + 1 < sourceHeight) enqueueBackground(x, y + 1);
+  }
+
   let left = sourceWidth;
   let top = sourceHeight;
   let right = -1;
@@ -2249,7 +2289,7 @@ function createMonochromeLogoCanvas(logoImage, maxWidth, maxHeight) {
   for (let y = 0; y < sourceHeight; y += 1) {
     for (let x = 0; x < sourceWidth; x += 1) {
       const index = (y * sourceWidth + x) * 4;
-      if (!isBackgroundPixel(sourcePixels[index], sourcePixels[index + 1], sourcePixels[index + 2], sourcePixels[index + 3])) {
+      if (!backgroundMask[y * sourceWidth + x] && sourcePixels[index + 3] > 16) {
         left = Math.min(left, x);
         top = Math.min(top, y);
         right = Math.max(right, x);
@@ -2263,6 +2303,11 @@ function createMonochromeLogoCanvas(logoImage, maxWidth, maxHeight) {
     right = sourceWidth - 1;
     bottom = sourceHeight - 1;
   }
+  const boundsPadding = Math.max(2, Math.round(Math.min(right - left + 1, bottom - top + 1) * 0.025));
+  left = Math.max(0, left - boundsPadding);
+  top = Math.max(0, top - boundsPadding);
+  right = Math.min(sourceWidth - 1, right + boundsPadding);
+  bottom = Math.min(sourceHeight - 1, bottom + boundsPadding);
   const cropWidth = right - left + 1;
   const cropHeight = bottom - top + 1;
   const cropCanvas = document.createElement("canvas");
@@ -2280,7 +2325,9 @@ function createMonochromeLogoCanvas(logoImage, maxWidth, maxHeight) {
     pixels[index] = 255;
     pixels[index + 1] = 255;
     pixels[index + 2] = 255;
-    pixels[index + 3] = isBackgroundPixel(red, green, blue, alpha) ? 0 : Math.max(alpha, 218);
+    const sourceX = left + ((index / 4) % cropWidth);
+    const sourceY = top + Math.floor(index / 4 / cropWidth);
+    pixels[index + 3] = backgroundMask[sourceY * sourceWidth + sourceX] || alpha <= 16 ? 0 : Math.max(alpha, 218);
   }
   cropCtx.putImageData(imageData, 0, 0);
 
@@ -2304,7 +2351,7 @@ function drawTemplateLogo(ctx, logoImage, name, x, y, width, height, options = {
     strokeRoundRect(ctx, x, y, width, height, Math.min(12, height / 2), "rgba(255,255,255,0.62)", 1.5);
   }
   if (logoImage) {
-    const padding = Math.round(Math.min(width, height) * 0.07);
+    const padding = Math.round(Math.min(width, height) * 0.03);
     const processedLogo = createMonochromeLogoCanvas(logoImage, width - padding * 2, height - padding * 2);
     ctx.save();
     ctx.shadowColor = "rgba(0,0,0,0.45)";
@@ -2334,8 +2381,8 @@ async function createProspectMockupImage(prospect, logoDataUrl, fields) {
   const name = fields.name || prospect.name || "Cliente";
 
   ctx.drawImage(templateImage, 0, 0, canvas.width, canvas.height);
-  drawTemplateLogo(ctx, logoImage, name, 162, 119, 202, 55, { fontSize: 23 });
-  drawTemplateLogo(ctx, logoImage, name, 1221, 273, 118, 39, { fontSize: 14 });
+  drawTemplateLogo(ctx, logoImage, name, 150, 114, 235, 64, { fontSize: 23 });
+  drawTemplateLogo(ctx, logoImage, name, 1213, 268, 140, 46, { fontSize: 14 });
 
   return canvas.toDataURL("image/jpeg", 0.93);
 }

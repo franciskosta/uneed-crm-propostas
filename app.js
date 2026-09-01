@@ -2203,55 +2203,98 @@ function drawWebsiteScreen(ctx, options) {
   });
 }
 
-async function createProspectMockupImage(prospect, logoDataUrl, fields, backgroundDataUrl = "") {
+function createMonochromeLogoCanvas(logoImage, maxWidth, maxHeight) {
+  const ratio = Math.min(maxWidth / logoImage.width, maxHeight / logoImage.height, 1);
+  const width = Math.max(1, Math.round(logoImage.width * ratio));
+  const height = Math.max(1, Math.round(logoImage.height * ratio));
   const canvas = document.createElement("canvas");
-  canvas.width = 1600;
-  canvas.height = 1000;
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext("2d");
-  const logoImage = await loadImageData(logoDataUrl, "Não foi possível carregar o logotipo.");
-  const backgroundImage = await loadImageData(backgroundDataUrl, "Não foi possível carregar o fundo gerado pela IA.");
-  const name = fields.name || prospect.name || "Cliente";
-  const niche = fields.niche || prospect.niche || "Negócio local";
-  const offer = fields.offer || defaultMockupOffer(prospect);
+  ctx.drawImage(logoImage, 0, 0, width, height);
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const pixels = imageData.data;
+  const samplePoints = [
+    0,
+    Math.max(0, width - 1),
+    Math.max(0, (height - 1) * width),
+    Math.max(0, height * width - 1),
+  ];
+  const edgeColor = samplePoints.reduce(
+    (acc, point) => {
+      const offset = point * 4;
+      acc.red += pixels[offset];
+      acc.green += pixels[offset + 1];
+      acc.blue += pixels[offset + 2];
+      acc.alpha += pixels[offset + 3];
+      return acc;
+    },
+    { red: 0, green: 0, blue: 0, alpha: 0 }
+  );
+  edgeColor.red /= samplePoints.length;
+  edgeColor.green /= samplePoints.length;
+  edgeColor.blue /= samplePoints.length;
+  edgeColor.alpha /= samplePoints.length;
+  for (let index = 0; index < pixels.length; index += 4) {
+    const red = pixels[index];
+    const green = pixels[index + 1];
+    const blue = pixels[index + 2];
+    const alpha = pixels[index + 3];
+    const luminance = red * 0.299 + green * 0.587 + blue * 0.114;
+    const edgeDistance = Math.hypot(red - edgeColor.red, green - edgeColor.green, blue - edgeColor.blue);
+    const looksLikeLightBackground = alpha > 20 && luminance > 238;
+    const looksLikeSolidBackground = edgeColor.alpha > 240 && edgeDistance < 34;
+    const contrastAlpha = Math.max(110, Math.round((255 - luminance) * 1.7));
+    pixels[index] = 255;
+    pixels[index + 1] = 255;
+    pixels[index + 2] = 255;
+    pixels[index + 3] = looksLikeLightBackground || looksLikeSolidBackground ? 0 : Math.min(alpha, contrastAlpha);
+  }
+  ctx.putImageData(imageData, 0, 0);
+  return canvas;
+}
 
-  const gradient = ctx.createLinearGradient(0, 0, 1600, 1000);
-  gradient.addColorStop(0, "#060a12");
-  gradient.addColorStop(0.55, "#101736");
-  gradient.addColorStop(1, "#030509");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, 1600, 1000);
-
-  ctx.fillStyle = "rgba(255,255,255,0.08)";
-  ctx.beginPath();
-  ctx.ellipse(820, 884, 640, 72, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  fillRoundRect(ctx, 112, 132, 1060, 672, 44, "#050914");
-  strokeRoundRect(ctx, 112, 132, 1060, 672, 44, "rgba(255,255,255,0.42)", 3);
-  drawWebsiteScreen(ctx, { x: 142, y: 164, width: 1000, height: 602, logoImage, name, niche, offer, backgroundImage });
-  fillRoundRect(ctx, 330, 802, 620, 34, 8, "#171b24");
-  fillRoundRect(ctx, 186, 836, 910, 34, 16, "#2b303c");
-
-  fillRoundRect(ctx, 1144, 260, 322, 618, 50, "#050914");
-  strokeRoundRect(ctx, 1144, 260, 322, 618, 50, "rgba(255,255,255,0.42)", 3);
-  fillRoundRect(ctx, 1251, 282, 110, 18, 9, "#0f143e");
-  drawWebsiteScreen(ctx, { x: 1164, y: 314, width: 282, height: 520, logoImage, name, niche, offer, backgroundImage, compact: true });
-
-  fillRoundRect(ctx, 292, 866, 940, 64, 20, "rgba(8,13,33,0.92)");
+function drawTemplateLogo(ctx, logoImage, name, x, y, width, height, options = {}) {
+  const { fontSize = 32, panel = false } = options;
+  if (panel) {
+    fillRoundRect(ctx, x, y, width, height, Math.min(12, height / 2), "rgba(255,255,255,0.06)");
+    strokeRoundRect(ctx, x, y, width, height, Math.min(12, height / 2), "rgba(255,255,255,0.62)", 1.5);
+  }
+  if (logoImage) {
+    const padding = Math.round(Math.min(width, height) * 0.18);
+    const processedLogo = createMonochromeLogoCanvas(logoImage, width - padding * 2, height - padding * 2);
+    ctx.save();
+    ctx.shadowColor = "rgba(0,0,0,0.45)";
+    ctx.shadowBlur = 10;
+    ctx.drawImage(processedLogo, x + (width - processedLogo.width) / 2, y + (height - processedLogo.height) / 2);
+    ctx.restore();
+    return;
+  }
+  ctx.save();
   ctx.fillStyle = "#ffffff";
-  ctx.font = "900 24px Arial";
+  ctx.font = `900 ${fontSize}px Arial`;
   ctx.textBaseline = "middle";
-  ctx.fillText(shortCanvasText(ctx, `${name} · conceito visual personalizado`, 750), 326, 898);
-  ctx.fillStyle = "#d7203f";
-  ctx.beginPath();
-  ctx.arc(1190, 898, 12, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.fillStyle = "#d7203f";
-  ctx.beginPath();
-  ctx.arc(1494, 120, 10, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.textAlign = "center";
+  ctx.shadowColor = "rgba(0,0,0,0.35)";
+  ctx.shadowBlur = 8;
+  ctx.fillText(shortCanvasText(ctx, name || "Cliente", width - 22), x + width / 2, y + height / 2);
+  ctx.restore();
+}
 
-  return canvas.toDataURL("image/jpeg", 0.9);
+async function createProspectMockupImage(prospect, logoDataUrl, fields) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1536;
+  canvas.height = 1024;
+  const ctx = canvas.getContext("2d");
+  const templateImage = await loadImageData("./assets/mockup-template-premium.png", "Não foi possível carregar o modelo premium.");
+  const logoImage = await loadImageData(logoDataUrl, "Não foi possível carregar o logotipo.");
+  const name = fields.name || prospect.name || "Cliente";
+
+  ctx.drawImage(templateImage, 0, 0, canvas.width, canvas.height);
+  drawTemplateLogo(ctx, logoImage, name, 162, 119, 202, 55, { fontSize: 23 });
+  drawTemplateLogo(ctx, logoImage, name, 1221, 273, 118, 39, { fontSize: 14 });
+
+  return canvas.toDataURL("image/jpeg", 0.93);
 }
 
 async function generateMockupForActive() {
@@ -2259,8 +2302,8 @@ async function generateMockupForActive() {
   if (!prospect) return;
   const button = qs("#generateMockupBtn");
   button.disabled = true;
-  button.textContent = "A gerar com IA...";
-  setMockupStatus("A preparar o pedido para a IA...", "ok");
+  button.textContent = "A criar mockup...";
+  setMockupStatus("A aplicar o logotipo no modelo premium...", "ok");
   try {
     mockupLogoDataUrl = await mockupLogoPromise;
     const fields = {
@@ -2269,9 +2312,7 @@ async function generateMockupForActive() {
       niche: qs("#mockupNiche").value.trim(),
       brief: qs("#mockupBrief").value.trim(),
     };
-    setMockupStatus("A gerar fundo visual com IA e a montar o mockup...", "ok");
-    const background = await createAiProspectMockupImage(prospect, fields);
-    const image = await createProspectMockupImage(prospect, mockupLogoDataUrl, fields, background);
+    const image = await createProspectMockupImage(prospect, mockupLogoDataUrl, fields);
     Object.assign(prospect, {
       name: fields.name || prospect.name,
       niche: fields.niche || prospect.niche,
@@ -2287,51 +2328,11 @@ async function generateMockupForActive() {
     renderInstagramProspecting();
     setMockupStatus("Mockup criado e guardado no lead.", "ok");
   } catch (error) {
-    setMockupStatus(error.message || "Não foi possível gerar o mockup por IA.");
+    setMockupStatus(error.message || "Não foi possível criar o mockup.");
   } finally {
     button.disabled = false;
-    button.textContent = "Gerar mockup IA";
+    button.textContent = "Gerar mockup";
   }
-}
-
-async function createAiProspectMockupImage(prospect, fields) {
-  const client = getSupabaseClient();
-  const { data } = client ? await client.auth.getSession() : { data: null };
-  const token = data?.session?.access_token || "";
-
-  if (!token) {
-    throw new Error("A sessão Supabase não está ativa. Sai e volta a entrar no CRM antes de gerar o mockup IA.");
-  }
-
-  const response = await fetch("/api/mockup/generate", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${token}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      name: fields.name || prospect.name,
-      offer: fields.offer || defaultMockupOffer(prospect),
-      niche: fields.niche || prospect.niche,
-      brief: fields.brief || defaultMockupBrief(prospect),
-      logoDataUrl: mockupLogoDataUrl,
-    }),
-  });
-  const result = await response.json().catch(() => ({
-    error: "A resposta do servidor não veio em formato válido.",
-  }));
-  if (!response.ok) {
-    throw new Error(result.error || "Não foi possível gerar o mockup por IA.");
-  }
-  const background = result.background || result.image;
-  if (!background) {
-    throw new Error("A IA não devolveu fundo visual. Tenta novamente ou confirma os logs na Vercel.");
-  }
-  return background;
-}
-
-function isOpenAiAccessError(message) {
-  return /does not have access to model|organization must be verified|verify organization|model .*not found/i.test(String(message || ""));
 }
 
 async function copyProspectMockup(id) {
@@ -2545,7 +2546,7 @@ function renderInstagramProspecting() {
                       ${instagramProspectStatuses.map((item) => `<option ${item === prospect.status ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
                     </select>
                     <div class="deal-actions">
-                      <button class="button primary mini" data-instagram-mockup="${escapeAttr(prospect.id)}" type="button">${prospect.mockupImage ? "Refazer mockup IA" : "Criar mockup IA"}</button>
+                      <button class="button primary mini" data-instagram-mockup="${escapeAttr(prospect.id)}" type="button">${prospect.mockupImage ? "Refazer mockup" : "Criar mockup"}</button>
                       <button class="button ghost mini" data-instagram-edit="${escapeAttr(prospect.id)}" type="button">Editar</button>
                       <button class="button danger mini" data-instagram-delete="${escapeAttr(prospect.id)}" type="button">Apagar</button>
                     </div>

@@ -104,8 +104,7 @@ module.exports = async function handler(req, res) {
   const logoDataUrl = String(body.logoDataUrl || "").trim();
   const visualName = cleanVisualText(name, "Cliente", 34);
   const visualNiche = cleanVisualText(niche, "negócio local", 34);
-  const visualCta = cleanVisualText(offer, "Pedir diagnóstico", 28);
-  const visualHeadline = cleanVisualText(body.headline || inferMockupHeadline(brief, niche), "Mais pedidos online", 34);
+  const visualCta = cleanVisualText(offer, "Pedir diagnóstico", 22);
   if (logoDataUrl.length > 4_000_000) {
     res.status(413).json({ error: "O logotipo é demasiado pesado. Usa uma imagem mais leve." });
     return;
@@ -114,20 +113,19 @@ module.exports = async function handler(req, res) {
   const prompt = [
     "Create one ultra-realistic premium landscape advertising mockup image for a digital agency outreach message.",
     "Use the supplied premium device mockup image as the main visual reference. Keep its overall composition: realistic open laptop on the left/center, realistic smartphone on the right, dark matte studio background, premium lighting, elegant shadows and a polished commercial look.",
-    "Replace only the website shown on the device screens with a bespoke conversion-focused website concept for the client. Keep the devices, perspective, proportions, background mood and premium photographic style very close to the reference image.",
-    "The device screens must look like a real modern landing page, not a flat wireframe: elegant hero section, clear CTA button, booking/WhatsApp cues, service/benefit blocks, strong spacing, professional UX, dark navy, white and red UNEED-style accents.",
+    "Replace the website shown on the device screens with a clearly different bespoke website concept for this specific client. Keep the devices, perspective, proportions, background mood and premium photographic style close to the reference image, but redesign the screen content from scratch.",
+    "Inside the laptop and phone screens, create a premium realistic landing page hero with a large photographic background related to the business area, subtle dark overlay, the client logo, and one red call-to-action button. Use fewer elements, more breathing room and a balanced editorial composition.",
+    "The screen design must feel like a finished premium website preview, not a template: strong image-led hero, logo/nav area, one clear CTA button, a few elegant cards or icons below the fold, refined spacing, dark navy, white and red UNEED-style accents.",
     `Client/business name for context: ${visualName}.`,
-    `Business area for visual direction only, not as a long visible headline: ${visualNiche}.`,
+    `Business area for choosing the hero background image and visual mood: ${visualNiche}.`,
     brief ? `Commercial notes to reflect visually, mostly through layout and icons, not long text: ${brief}.` : "",
     "Use the uploaded client logo image as the actual client logo artwork on the website screens. Preserve the logo identity, proportions, lettering and main visual characteristics as much as possible. Do not redraw or retype the logo unless unavoidable.",
     "If the uploaded logo has a white or noisy background, visually clean/remove the background for the screen design. If contrast requires it, use a clean white or monochrome version inside the screen while keeping the logo recognizable.",
-    "TEXT ACCURACY RULES: keep readable text extremely minimal. The only readable website text allowed is copied exactly from this list:",
-    `Headline: "${visualHeadline}"`,
-    `CTA button: "${visualCta}"`,
-    "Small chips: \"WhatsApp\", \"Marcações\", \"Mobile first\"",
-    `If the business name appears as normal text outside the logo, spell it exactly: "${visualName}".`,
-    "Do not write paragraphs, fake navigation labels, lorem ipsum, pseudo-words, random accents, distorted Portuguese, or gibberish. Represent secondary copy and menus as clean grey UI lines, icons, cards and abstract interface shapes instead of readable words.",
-    "All visible words must be large enough to read and perfectly spelled in Portuguese. If a word might become unclear, omit it and use a visual placeholder line instead.",
+    "TEXT RULES ARE CRITICAL: do not generate headings, paragraphs, menu labels, service labels, chips, subtitles or small readable text inside the website screens. Avoid all Portuguese body copy because distorted text is unacceptable.",
+    `The only readable text allowed, apart from the client logo itself, is the CTA button label exactly: "${visualCta}".`,
+    "If the CTA label cannot be rendered perfectly, use a red button with a simple white arrow or short white line instead of text.",
+    "Represent all other content as realistic UI structure: image blocks, icons, cards, lines, calendars, WhatsApp-style button icons, booking widgets and abstract interface shapes. No pseudo-words, no fake navigation labels, no lorem ipsum, no random accents, no distorted typography.",
+    "The phone screen should show a simplified responsive version of the same image-led hero, with logo and CTA only; no cramped text.",
     "No watermarks, no extra brands, no unrelated text. Output a single finished image ready to send by WhatsApp or Instagram DM.",
   ].filter(Boolean).join("\n");
 

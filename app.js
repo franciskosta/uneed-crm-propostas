@@ -108,7 +108,7 @@ const defaultContractServiceOptions = [
   ["website_catalogo", "Website catálogo"],
   ["loja_online", "Loja online"],
   ["landing_page", "Landing page"],
-  ["manutencao_wordpress", "Manutenção WordPress"],
+  ["manutencao_wordpress", "Manutenção técnica"],
   ["alojamento", "Alojamento"],
   ["dominio", "Domínio"],
   ["email_profissional", "Email profissional"],
@@ -121,7 +121,8 @@ const defaultContractServiceOptions = [
 
 const defaultContractAddonOptions = [
   ["email_extra", "Email extra"],
-  ["backoffice_catalogo", "Backoffice catálogo"],
+  ["backoffice_catalogo", "Backoffice para gestão de conteúdos"],
+  ["catalogo_online_produtos", "Catálogo online de produtos"],
   ["assistente_guiado_24h", "Assistente guiado 24h"],
   ["assistente_inteligente_24h", "Assistente inteligente 24h"],
   ["sms_lembretes", "SMS/lembretes"],

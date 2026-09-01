@@ -2297,8 +2297,8 @@ async function createAiProspectMockupImage(prospect, fields) {
     error: "A resposta do servidor não veio em formato válido.",
   }));
   if (!response.ok) {
-    if (isOpenAiVerificationError(result.error)) {
-      setMockupStatus("A OpenAI ainda pede verificação da organização. Gerei uma versão local para poderes usar já.", "ok");
+    if (result.fallback === "local" || isOpenAiAccessError(result.error)) {
+      setMockupStatus("A OpenAI ainda não deixou este projeto usar o modelo de imagem. Gerei uma versão local para poderes usar já.", "ok");
       return createProspectMockupImage(prospect, mockupLogoDataUrl, fields);
     }
     throw new Error(result.error || "Não foi possível gerar o mockup por IA.");
@@ -2309,8 +2309,8 @@ async function createAiProspectMockupImage(prospect, fields) {
   return result.image;
 }
 
-function isOpenAiVerificationError(message) {
-  return /organization must be verified|verify organization/i.test(String(message || ""));
+function isOpenAiAccessError(message) {
+  return /does not have access to model|organization must be verified|verify organization|model .*not found/i.test(String(message || ""));
 }
 
 async function copyProspectMockup(id) {

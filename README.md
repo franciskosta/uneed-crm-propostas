@@ -84,14 +84,13 @@ Variáveis recomendadas na Vercel:
 
 ```bash
 OPENAI_API_KEY=sk-...
-OPENAI_TEXT_MODEL=gpt-4o-mini
 OPENAI_IMAGE_MODEL=gpt-image-1
 OPENAI_IMAGE_QUALITY=medium
 OPENAI_IMAGE_SIZE=1536x1024
 OPENAI_MOCKUP_HOURLY_LIMIT=20
 ```
 
-`OPENAI_IMAGE_QUALITY=medium` é o modo recomendado para equilibrar qualidade e custo. `OPENAI_MOCKUP_HOURLY_LIMIT` limita gerações por utilizador autenticado para evitar gastos acidentais.
+O mockup usa diretamente `OPENAI_IMAGE_MODEL`, sem depender de um modelo de texto. `OPENAI_IMAGE_QUALITY=medium` é o modo recomendado para equilibrar qualidade e custo. `OPENAI_MOCKUP_HOURLY_LIMIT` limita gerações por utilizador autenticado para evitar gastos acidentais.
 
 ## Colocar online com Supabase + Vercel
 

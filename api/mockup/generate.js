@@ -14,30 +14,15 @@ async function verifySession(req) {
   return response.json();
 }
 
-function findGeneratedImage(output) {
-  if (!Array.isArray(output)) return "";
-  for (const item of output) {
-    if (item?.type === "image_generation_call" && item.result) return item.result;
-    if (!Array.isArray(item?.content)) continue;
-    for (const content of item.content) {
-      if (content?.type === "output_image" && content.image_base64) return content.image_base64;
-      if (content?.type === "image" && content.image_base64) return content.image_base64;
-    }
-  }
-  return "";
+function isOpenAiAccessError(message) {
+  return /does not have access to model|organization must be verified|verify organization|model .*not found/i.test(String(message || ""));
 }
 
-function makeImageTool() {
-  const imageModel = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
-  const tool = {
-    type: "image_generation",
-    model: imageModel,
-    quality: process.env.OPENAI_IMAGE_QUALITY || "medium",
-    size: process.env.OPENAI_IMAGE_SIZE || "1536x1024",
-    output_format: "jpeg",
-  };
-  if (!imageModel.includes("mini")) tool.input_fidelity = "high";
-  return tool;
+function dataUrlToBlob(dataUrl) {
+  const match = String(dataUrl || "").match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) return null;
+  const bytes = Buffer.from(match[2], "base64");
+  return new Blob([bytes], { type: match[1] });
 }
 
 function rateLimit(userId) {
@@ -111,32 +96,50 @@ module.exports = async function handler(req, res) {
     "Output a single finished image ready to send by WhatsApp or Instagram DM.",
   ].filter(Boolean).join("\n");
 
-  const content = [{ type: "input_text", text: prompt }];
-  if (logoDataUrl.startsWith("data:image/")) {
-    content.push({ type: "input_image", image_url: logoDataUrl, detail: "high" });
-  }
-
   try {
-    const response = await fetch("https://api.openai.com/v1/responses", {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        model: process.env.OPENAI_TEXT_MODEL || "gpt-4o-mini",
-        input: [{ role: "user", content }],
-        tools: [makeImageTool()],
-      }),
-    });
+    const imageModel = process.env.OPENAI_IMAGE_MODEL || "gpt-image-1";
+    let response;
+    const logoBlob = dataUrlToBlob(logoDataUrl);
+    if (logoBlob) {
+      const form = new FormData();
+      form.append("model", imageModel);
+      form.append("prompt", prompt);
+      form.append("image", logoBlob, "client-logo.png");
+      form.append("quality", process.env.OPENAI_IMAGE_QUALITY || "medium");
+      form.append("size", process.env.OPENAI_IMAGE_SIZE || "1536x1024");
+      response = await fetch("https://api.openai.com/v1/images/edits", {
+        method: "POST",
+        headers: { authorization: `Bearer ${apiKey}` },
+        body: form,
+      });
+    } else {
+      response = await fetch("https://api.openai.com/v1/images/generations", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          model: imageModel,
+          prompt,
+          quality: process.env.OPENAI_IMAGE_QUALITY || "medium",
+          size: process.env.OPENAI_IMAGE_SIZE || "1536x1024",
+        }),
+      });
+    }
 
     const data = await response.json();
     if (!response.ok) {
+      const message = data?.error?.message || "Não foi possível gerar o mockup por IA.";
+      if (isOpenAiAccessError(message)) {
+        res.status(424).json({ error: message, fallback: "local" });
+        return;
+      }
       res.status(response.status).json({ error: data?.error?.message || "Não foi possível gerar o mockup por IA." });
       return;
     }
 
-    const imageBase64 = findGeneratedImage(data.output);
+    const imageBase64 = data?.data?.[0]?.b64_json || "";
     if (!imageBase64) {
       res.status(502).json({ error: "A IA não devolveu uma imagem." });
       return;

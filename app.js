@@ -1940,6 +1940,21 @@ function renderProspectMessage(prospect) {
   return `<details class="prospect-message"><summary>Mensagem preparada</summary><div class="prospect-message-paragraphs">${paragraphs.map((paragraph, index) => `<div class="prospect-message-paragraph"><p>${escapeHtml(paragraph)}</p><button class="prospect-copy-button" data-copy-prospect="${escapeAttr(prospect.id)}" data-copy-paragraph="${index}" type="button" aria-label="Copiar parágrafo ${index + 1}">Copiar</button></div>`).join("")}</div></details>`;
 }
 
+function prospectWhatsappFollowupMessage(prospect) {
+  const name = String(prospect.name || "").trim();
+  const greeting = name ? `Olá ${name}!` : "Olá!";
+  const opportunity = String(prospect.opportunity || "").trim();
+  const context = opportunity
+    ? `Na mensagem falava-vos de ${opportunity.charAt(0).toLowerCase()}${opportunity.slice(1)} e da possibilidade de preparar uma simulação personalizada, sem compromisso.`
+    : "Na mensagem falava-vos da possibilidade de melhorar a vossa presença online e de preparar uma simulação personalizada, sem compromisso.";
+  return `${greeting} Sou o Francisco, da Uneed Soluções Digitais.\n\nEnviei-vos há uns dias uma mensagem pelo Instagram, depois de conhecer a vossa presença online, mas não sei se tiveram oportunidade de a ver.\n\n${context}\n\nPosso enviar-vos a simulação por aqui?`;
+}
+
+function renderProspectWhatsappFollowup(prospect) {
+  const message = prospectWhatsappFollowupMessage(prospect);
+  return `<details class="prospect-message"><summary>Follow-up WhatsApp</summary><div class="prospect-message-paragraphs"><div class="prospect-message-paragraph"><p>${escapeHtml(message).replace(/\n/g, "<br>")}</p><button class="prospect-copy-button" data-copy-prospect-followup="${escapeAttr(prospect.id)}" type="button" aria-label="Copiar follow-up para WhatsApp">Copiar</button></div></div></details>`;
+}
+
 function prospectSignalLabel(prospect) {
   const signals = [];
   signals.push(prospect.hasWebsite ? "Site: sim" : "Site: não");
@@ -2602,7 +2617,7 @@ function renderInstagramProspecting() {
           ${
             cards
               .map((prospect) => {
-                const whatsapp = whatsappHref(prospect.phone);
+                const whatsapp = whatsappHref(prospect.phone, prospectWhatsappFollowupMessage(prospect));
                 return `
                   <article class="deal-card prospect-card" data-instagram-open="${escapeAttr(prospect.id)}" draggable="true">
                     <div class="deal-summary">
@@ -2614,13 +2629,14 @@ function renderInstagramProspecting() {
                     </div>
                     <div class="deal-card-body">
                     ${safeExternalUrl(prospect.instagramUrl) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.instagramUrl))}" target="_blank" rel="noopener">Contactar pelo Instagram</a>` : `<span class="card-meta">Instagram não encontrado · usar telefone</span>`}
-                    ${whatsapp ? `<a class="prospect-link whatsapp-link" href="${escapeAttr(whatsapp)}" target="_blank" rel="noopener">Enviar WhatsApp</a>` : ""}
+                    ${whatsapp ? `<a class="prospect-link whatsapp-link" href="${escapeAttr(whatsapp)}" target="_blank" rel="noopener">Enviar follow-up WhatsApp</a>` : ""}
                     ${prospect.niche ? `<span class="card-meta">Nicho: ${escapeHtml(prospect.niche)}</span>` : `<span class="card-meta">Nicho por classificar</span>`}
                     <span class="card-meta prospect-signals">${escapeHtml(prospectSignalLabel(prospect))}</span>
                     ${prospect.score ? `<span class="prospect-score-line">Score ${escapeHtml(prospect.score)} · ${escapeHtml(prospect.district || "")} / ${escapeHtml(prospect.municipality || "")}</span>` : ""}
                     ${safeExternalUrl(prospect.website) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.website))}" target="_blank" rel="noopener">Abrir website</a>` : ""}
                     ${safeExternalUrl(prospect.mapsUrl) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.mapsUrl))}" target="_blank" rel="noopener">Google Maps</a>` : ""}
                     ${prospect.message ? renderProspectMessage(prospect) : ""}
+                    ${renderProspectWhatsappFollowup(prospect)}
                     ${prospect.notes ? `<details class="prospect-message"><summary>Análise do lead</summary><p>${escapeHtml(prospect.notes)}</p></details>` : ""}
                     ${
                       prospect.mockupImage
@@ -3916,6 +3932,20 @@ function bindEvents() {
         navigator.clipboard?.writeText(paragraph).then(() => {
           copyButton.textContent = "Copiado";
           setTimeout(() => { copyButton.textContent = "Copiar"; }, 1400);
+        }).catch(() => {});
+      }
+      return;
+    }
+    const copyFollowupButton = event.target.closest("[data-copy-prospect-followup]");
+    if (copyFollowupButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      const prospect = state.instagramProspects.find((item) => item.id === copyFollowupButton.dataset.copyProspectFollowup);
+      const message = prospect ? prospectWhatsappFollowupMessage(prospect) : "";
+      if (message) {
+        navigator.clipboard?.writeText(message).then(() => {
+          copyFollowupButton.textContent = "Copiado";
+          setTimeout(() => { copyFollowupButton.textContent = "Copiar"; }, 1400);
         }).catch(() => {});
       }
       return;

@@ -10,6 +10,7 @@ const files = [
   "styles.css",
   "app.js",
   "pricing.js",
+  "commercial-core.js",
   "suporte.js",
   "portugal-municipalities.json",
 ];

@@ -8,6 +8,9 @@ create table if not exists public.email_reminders (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   proposal_id text,
+  company_id uuid,
+  lead_id uuid,
+  opportunity_id uuid,
   due_date date,
   to_email text not null,
   subject text not null,
@@ -24,6 +27,9 @@ create table if not exists public.support_tickets (
   email text not null,
   phone text,
   project_url text,
+  company_id uuid,
+  contact_id uuid,
+  project_id uuid,
   category text not null default 'Suporte geral',
   priority text not null default 'Normal',
   status text not null default 'Novo',
@@ -43,6 +49,9 @@ create table if not exists public.missions (
   priority text not null default 'normal',
   target_type text not null,
   target_id text not null,
+  company_id uuid,
+  lead_id uuid,
+  opportunity_id uuid,
   autonomy_level text not null check (autonomy_level in ('OBSERVE','SUGGEST','PREPARE','EXECUTE','AUTONOMOUS')),
   data jsonb not null,
   worker_id text,
@@ -63,10 +72,22 @@ alter table public.missions add column if not exists attempt integer not null de
 alter table public.missions add column if not exists max_attempts integer not null default 3;
 alter table public.missions add column if not exists next_run_at timestamptz;
 alter table public.missions add column if not exists cancel_requested_at timestamptz;
+alter table public.missions add column if not exists company_id uuid;
+alter table public.missions add column if not exists lead_id uuid;
+alter table public.missions add column if not exists opportunity_id uuid;
+alter table public.support_tickets add column if not exists company_id uuid;
+alter table public.support_tickets add column if not exists contact_id uuid;
+alter table public.support_tickets add column if not exists project_id uuid;
+alter table public.email_reminders add column if not exists company_id uuid;
+alter table public.email_reminders add column if not exists lead_id uuid;
+alter table public.email_reminders add column if not exists opportunity_id uuid;
 
 create index if not exists missions_user_status_idx on public.missions(user_id, status, updated_at desc);
 create index if not exists missions_queue_idx on public.missions(status, next_run_at, updated_at);
 create unique index if not exists missions_one_active_target_idx on public.missions(user_id, type, target_type, target_id) where status in ('queued','running','waiting_approval');
+create index if not exists support_tickets_company_idx on public.support_tickets(company_id, updated_at desc);
+create index if not exists missions_company_idx on public.missions(user_id, company_id, updated_at desc);
+create index if not exists missions_lead_idx on public.missions(user_id, lead_id, updated_at desc);
 
 alter table public.crm_state enable row level security;
 alter table public.email_reminders enable row level security;

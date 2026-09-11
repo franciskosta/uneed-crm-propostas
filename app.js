@@ -300,6 +300,7 @@ function loadState() {
 }
 
 function saveState() {
+  window.UNEED_COMMERCIAL_CORE?.migrateState(state);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   queueServerSync();
 }
@@ -387,6 +388,8 @@ async function loadSupabaseState() {
     setSyncStatus("Supabase ligado", "success");
     return true;
   }
+  const needsCommercialCorePersistence =
+    data.data.commercialCore?.schemaVersion !== window.UNEED_COMMERCIAL_CORE?.SCHEMA_VERSION;
   isHydratingFromServer = true;
   state = data.data;
   migrateBrandDefaults();
@@ -397,6 +400,7 @@ async function loadSupabaseState() {
   await loadSupportTickets();
   renderAll();
   isHydratingFromServer = false;
+  if (needsCommercialCorePersistence) await syncSupabaseState();
   setSyncStatus("Supabase ligado", "success");
   return true;
 }
@@ -415,6 +419,8 @@ async function loadServerState() {
       queueServerSync();
       return;
     }
+    const needsCommercialCorePersistence =
+      payload.state.commercialCore?.schemaVersion !== window.UNEED_COMMERCIAL_CORE?.SCHEMA_VERSION;
     isHydratingFromServer = true;
     state = payload.state;
     migrateBrandDefaults();
@@ -423,6 +429,8 @@ async function loadServerState() {
     activeContractId = state.contracts?.[0]?.id || activeContractId;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     renderAll();
+    isHydratingFromServer = false;
+    if (needsCommercialCorePersistence) queueServerSync();
   } catch {
     // Modo local sem API: continua com localStorage.
   } finally {
@@ -887,6 +895,9 @@ function normalizeTicket(ticket = {}) {
     code: ticket.code || `UNEED-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9999)).padStart(4, "0")}`,
     clientName: ticket.clientName || ticket.client_name || "",
     companyName: ticket.companyName || ticket.company_name || "",
+    companyId: ticket.companyId || ticket.company_id || null,
+    contactId: ticket.contactId || ticket.contact_id || null,
+    projectId: ticket.projectId || ticket.project_id || null,
     email: ticket.email || "",
     phone: ticket.phone || "",
     projectUrl: ticket.projectUrl || ticket.project_url || "",
@@ -915,6 +926,7 @@ async function loadSupportTickets() {
       .order("created_at", { ascending: false });
     if (error) return;
     state.tickets = (data || []).map(normalizeTicket);
+    state.tickets.forEach((ticket) => window.UNEED_COMMERCIAL_CORE?.linkTicket(state, ticket));
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   } catch {
     // Se a tabela ainda não existir, a tab Tickets continua em modo local.
@@ -934,6 +946,9 @@ async function updateTicket(id, patch) {
   if ("status" in patch) payload.status = patch.status;
   if ("priority" in patch) payload.priority = patch.priority;
   if ("internalNotes" in patch) payload.internal_notes = patch.internalNotes;
+  payload.company_id = ticket.companyId || null;
+  payload.contact_id = ticket.contactId || null;
+  payload.project_id = ticket.projectId || null;
   payload.updated_at = ticket.updatedAt;
   try {
     await client.from("support_tickets").update(payload).eq("id", id);
@@ -1043,6 +1058,7 @@ function emptyProposal() {
     status: "Novo pedido",
     followupDate: today(),
     validUntil: date.toISOString().slice(0, 10),
+    companyWebsite: "",
     sampleUrl: "",
     services: [],
     discount: 0,
@@ -1432,6 +1448,7 @@ function renderForm() {
   qs("#proposalStatus").value = proposal.status || "Novo pedido";
   qs("#followupDate").value = proposal.followupDate || "";
   qs("#validUntil").value = proposal.validUntil || "";
+  qs("#companyWebsite").value = proposal.companyWebsite || "";
   qs("#sampleUrl").value = proposal.sampleUrl || "";
   qs("#discount").value = proposal.discount || 0;
   qs("#vatMode").value = proposal.vatMode || "0";
@@ -1488,6 +1505,7 @@ function readForm() {
   if (proposal.status !== "Perdido") proposal.lostReason = "";
   proposal.followupDate = qs("#followupDate").value;
   proposal.validUntil = qs("#validUntil").value;
+  proposal.companyWebsite = qs("#companyWebsite").value.trim();
   proposal.sampleUrl = qs("#sampleUrl").value.trim();
   proposal.discount = Number(qs("#discount").value || 0);
   proposal.vatMode = qs("#vatMode").value;
@@ -1624,18 +1642,39 @@ async function loadMissions({ quiet = false } = {}) {
   catch (error) { if (!quiet) showSuccessModal(error.message); qs("#missionList").innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`; }
 }
 
+async function createCommercialMission({ type = "research_company", objective, targetType, targetId, input, trigger }) {
+  if (missionRequestPending) return;
+  missionRequestPending = true;
+  if (trigger) trigger.disabled = true;
+  const originalLabel = trigger?.textContent;
+  if (trigger) trigger.textContent = "A iniciar…";
+  try {
+    const created = await missionApi("", { method: "POST", body: JSON.stringify({ type, objective, targetId, targetType, autonomyLevel: type === "research_company" ? "OBSERVE" : "PREPARE", maxCost: 1, input }) });
+    missions = [created.mission, ...missions.filter((item) => item.id !== created.mission.id)];
+    renderMissions();
+    openMission(created.mission.id);
+    showSuccessModal(created.duplicate ? "Já existe uma análise ativa para esta entidade." : "Análise iniciada. Podes fechar esta página; a Mission continuará no runner.");
+  } catch (error) { showSuccessModal(error.message); await loadMissions({ quiet: true }); }
+  finally { missionRequestPending = false; if (trigger) { trigger.disabled = false; trigger.textContent = originalLabel; } }
+}
+
 async function startLeadMission(type = "qualify_existing_lead") {
   if (missionRequestPending) return;
-  const lead = readForm();
-  if (!lead.companyName && !lead.clientName) { showSuccessModal("Adiciona o nome do cliente ou da empresa antes de executar a análise."); return; }
-  const trigger = type === "research_company" ? qs("#runResearchBtn") : qs("#runFullAnalysisBtn"); missionRequestPending = true; trigger.disabled = true; const originalLabel = trigger.textContent; trigger.textContent = "A iniciar…";
-  try {
-    const researchLead = { id: lead.id, clientName: lead.clientName, companyName: lead.companyName, clientEmail: lead.clientEmail, clientPhone: lead.clientPhone, leadSource: lead.leadSource, sampleUrl: lead.sampleUrl, website: lead.website, location: lead.location, instagram: lead.instagram, internalNotes: lead.internalNotes, services: (lead.services || []).filter((item) => item.selected !== false).map((item) => ({ name: item.name, selected: true })) };
-    const created = await missionApi("", { method: "POST", body: JSON.stringify({ type, objective: `${type === "research_company" ? "Investigar" : "Qualificar"} ${lead.companyName || lead.clientName}`, targetId: lead.id, targetType: "lead", autonomyLevel: type === "research_company" ? "OBSERVE" : "PREPARE", maxCost: 1, input: { lead: researchLead } }) });
-    missions = [created.mission, ...missions.filter((item) => item.id !== created.mission.id)]; renderMissions(); openMission(created.mission.id);
-    showSuccessModal(created.duplicate ? "Já existe uma análise ativa para este Lead." : "Análise iniciada. Podes fechar esta página; a Mission continuará no runner.");
-  } catch (error) { showSuccessModal(error.message); await loadMissions({ quiet: true }); }
-  finally { missionRequestPending = false; trigger.disabled = false; trigger.textContent = originalLabel; }
+  const proposal = readForm();
+  if (!proposal.companyName && !proposal.clientName) { showSuccessModal("Adiciona o nome do cliente ou da empresa antes de executar a análise."); return; }
+  saveState();
+  const context = window.UNEED_COMMERCIAL_CORE?.companyContext(state, proposal.leadId);
+  if (!context) { showSuccessModal("Não foi possível resolver a identidade comercial deste Lead."); return; }
+  const trigger = type === "research_company" ? qs("#runResearchBtn") : qs("#runFullAnalysisBtn");
+  await createCommercialMission({ type, objective: `${type === "research_company" ? "Investigar" : "Qualificar"} ${context.company.name}`, targetId: type === "research_company" ? context.company.id : context.lead.id, targetType: type === "research_company" ? "company" : "lead", input: { ...context, services: (proposal.services || []).filter((item) => item.selected !== false).map((item) => ({ name: item.name, selected: true })) }, trigger });
+}
+
+async function startInstagramResearch(prospectId, trigger) {
+  saveState();
+  const prospect = state.instagramProspects.find((item) => item.id === prospectId);
+  const context = prospect && window.UNEED_COMMERCIAL_CORE?.companyContext(state, prospect.leadId);
+  if (!context) { showSuccessModal("Não foi possível resolver a Company deste Lead."); return; }
+  await createCommercialMission({ type: "research_company", objective: `Investigar ${context.company.name}`, targetType: "company", targetId: context.company.id, input: context, trigger });
 }
 
 function openMission(id) {
@@ -1995,6 +2034,7 @@ function emptyInstagramProspect() {
     id: crypto.randomUUID(),
     name: "",
     instagramUrl: "",
+    website: "",
     phone: "",
     niche: "",
     status: "Por fazer",
@@ -2751,6 +2791,7 @@ function renderInstagramProspecting() {
                       ${instagramProspectStatuses.map((item) => `<option ${item === prospect.status ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
                     </select>
                     <div class="deal-actions">
+                      <button class="button ghost mini" data-instagram-research="${escapeAttr(prospect.id)}" type="button">Investigar empresa</button>
                       <button class="button primary mini" data-instagram-mockup="${escapeAttr(prospect.id)}" type="button">${prospect.mockupImage ? "Refazer mockup" : "Criar mockup"}</button>
                       <button class="button ghost mini" data-instagram-edit="${escapeAttr(prospect.id)}" type="button">Editar</button>
                       <button class="button danger mini" data-instagram-delete="${escapeAttr(prospect.id)}" type="button">Apagar</button>
@@ -2775,6 +2816,7 @@ function readInstagramProspectForm() {
     id,
     name: qs("#instagramName").value.trim(),
     instagramUrl: qs("#instagramUrl").value.trim(),
+    website: qs("#instagramWebsite").value.trim(),
     phone: qs("#instagramPhone").value.trim(),
     status: qs("#instagramStatus").value || "Por fazer",
     niche: qs("#instagramNiche").value,
@@ -2790,6 +2832,7 @@ function clearInstagramProspectForm() {
   qs("#instagramProspectId").value = "";
   qs("#instagramName").value = "";
   qs("#instagramUrl").value = "";
+  qs("#instagramWebsite").value = "";
   qs("#instagramPhone").value = "";
   qs("#instagramStatus").value = "Por fazer";
   qs("#instagramNiche").value = "";
@@ -2805,6 +2848,7 @@ function editInstagramProspect(id) {
   qs("#instagramProspectId").value = prospect.id;
   qs("#instagramName").value = prospect.name || "";
   qs("#instagramUrl").value = prospect.instagramUrl || "";
+  qs("#instagramWebsite").value = prospect.website || "";
   qs("#instagramPhone").value = prospect.phone || "";
   qs("#instagramStatus").value = prospect.status || "Por fazer";
   qs("#instagramNiche").value = prospect.niche || "";
@@ -3381,6 +3425,9 @@ function emptyContract(seed = {}) {
   const sum = seed.id ? totals(seed) : { taxable: 0 };
   return {
     id: crypto.randomUUID(),
+    companyId: seed.companyId || null,
+    proposalId: seed.id || null,
+    opportunityId: seed.opportunityId || null,
     contractNumber: nextContractNumber(),
     status: "Rascunho",
     commercialName: seed.companyName || seed.clientName || "",
@@ -4055,6 +4102,13 @@ function bindEvents() {
           setTimeout(() => { copyFollowupButton.textContent = "Copiar"; }, 1400);
         }).catch(() => {});
       }
+      return;
+    }
+    const researchButton = event.target.closest("[data-instagram-research]");
+    if (researchButton) {
+      event.preventDefault();
+      event.stopPropagation();
+      startInstagramResearch(researchButton.dataset.instagramResearch, researchButton);
       return;
     }
     const deleteButton = event.target.closest("[data-instagram-delete]");

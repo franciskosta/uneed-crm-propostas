@@ -6,6 +6,35 @@ class WebSearchProvider {
   async healthCheck() { return { ok: false }; }
 }
 
+class OpenAIWebSearchProvider extends WebSearchProvider {
+  constructor({ apiKey, model = "gpt-5-mini", fetchImpl = global.fetch, timeoutMs = 45000, costPerQuery = null, inputCostPerMillion = null, outputCostPerMillion = null, maxQueryCost = 0.05 } = {}) {
+    super(); this.id = "openai"; this.apiKey = apiKey; this.model = model; this.fetch = fetchImpl; this.timeoutMs = timeoutMs; this.costPerQuery = costPerQuery; this.inputCostPerMillion = inputCostPerMillion; this.outputCostPerMillion = outputCostPerMillion; this.maxQueryCost = maxQueryCost;
+  }
+  supports() { return Boolean(this.apiKey); }
+  estimateCost() { return this.maxQueryCost; }
+  async search({ query, domains = [], maxResults = 5 }) {
+    if (!this.apiKey) throw new RuntimeError("CONFIGURATION_ERROR", "OPENAI_API_KEY não configurada.");
+    const cleanQuery = String(query || "").trim(); if (!cleanQuery || cleanQuery.length > 600) throw new RuntimeError("INPUT_INVALID", "Query de pesquisa inválida.");
+    const limit = Math.min(Math.max(Number(maxResults), 1), 10); const allowedDomains = domains.slice(0, 3).map((domain) => String(domain).trim()).filter(Boolean);
+    const scope = allowedDomains.length ? ` Limita a pesquisa a: ${allowedDomains.join(", ")}.` : "";
+    let response;
+    try {
+      response = await this.fetch("https://api.openai.com/v1/responses", { method: "POST", signal: AbortSignal.timeout(this.timeoutMs), headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: this.model, tools: [{ type: "web_search" }], tool_choice: "required", max_tool_calls: 1, include: ["web_search_call.action.sources"], input: `Pesquisa web: ${cleanQuery}.${scope} Devolve uma síntese factual e concisa baseada em, no máximo, ${limit} fontes relevantes.` }) });
+    } catch (error) { if (["AbortError","TimeoutError"].includes(error.name)) throw new RuntimeError("AI_TIMEOUT", "Pesquisa web excedeu o timeout."); throw new RuntimeError("AI_UNAVAILABLE", "Pesquisa web indisponível."); }
+    if (response.status === 429) throw new RuntimeError("AI_RATE_LIMIT", "Limite do provider de pesquisa atingido."); if (response.status >= 500) throw new RuntimeError("AI_UNAVAILABLE", "Provider de pesquisa indisponível."); if (!response.ok) throw new RuntimeError([401,403].includes(response.status) ? "AI_AUTH_ERROR" : "AI_BAD_RESPONSE", "Pesquisa web recusada.");
+    const data = await response.json(); const output = Array.isArray(data.output) ? data.output : []; const messages = output.filter((item) => item.type === "message").flatMap((item) => item.content || []).filter((item) => item.type === "output_text");
+    const fallbackSnippet = messages.map((item) => item.text || "").join(" ").replace(/\s+/g, " ").trim().slice(0, 500); const candidates = [];
+    for (const content of messages) for (const annotation of content.annotations || []) if (annotation.type === "url_citation" && annotation.url) candidates.push({ title: annotation.title || "", url: annotation.url, snippet: content.text?.slice(annotation.start_index || 0, annotation.end_index || undefined).replace(/\s+/g, " ").trim() || fallbackSnippet });
+    for (const call of output.filter((item) => item.type === "web_search_call")) for (const source of call.action?.sources || []) if (source.url) candidates.push({ title: source.title || "", url: source.url, snippet: fallbackSnippet });
+    const results = [...new Map(candidates.map((item) => [item.url, item])).values()].slice(0, limit).map((item) => ({ ...item, source: "openai", publishedAt: null }));
+    if (!results.length) throw new RuntimeError("AI_BAD_RESPONSE", "Pesquisa web não devolveu fontes utilizáveis.");
+    const inputTokens = Number(data.usage?.input_tokens || 0); const outputTokens = Number(data.usage?.output_tokens || 0); const searchCalls = output.filter((item) => item.type === "web_search_call").length;
+    const hasKnownCost = this.costPerQuery != null && this.inputCostPerMillion != null && this.outputCostPerMillion != null; const cost = hasKnownCost ? searchCalls * this.costPerQuery + (inputTokens * this.inputCostPerMillion + outputTokens * this.outputCostPerMillion) / 1_000_000 : null;
+    return { results, cost, costStatus: cost == null ? "unknown" : "actual" };
+  }
+  async healthCheck() { return { ok: Boolean(this.apiKey), configured: Boolean(this.apiKey), model: this.model }; }
+}
+
 class BraveSearchProvider extends WebSearchProvider {
   constructor({ apiKey, fetchImpl = global.fetch, timeoutMs = 8000, costPerQuery = null, maxQueryCost = 0.05 } = {}) { super(); this.id = "brave"; this.apiKey = apiKey; this.fetch = fetchImpl; this.timeoutMs = timeoutMs; this.costPerQuery = costPerQuery; this.maxQueryCost = maxQueryCost; }
   supports() { return Boolean(this.apiKey); }
@@ -22,4 +51,4 @@ class BraveSearchProvider extends WebSearchProvider {
   async healthCheck() { return { ok: Boolean(this.apiKey), configured: Boolean(this.apiKey) }; }
 }
 
-module.exports = { WebSearchProvider, BraveSearchProvider };
+module.exports = { WebSearchProvider, OpenAIWebSearchProvider, BraveSearchProvider };

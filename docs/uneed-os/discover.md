@@ -9,7 +9,7 @@ DISCOVER dá ao UNEED OS acesso controlado a informação empresarial pública. 
 `research-company@1.1.0` executa um plano limitado através do Tool Executor:
 
 1. `read_crm`: allow-list de nome, website, localização, contacto profissional, Instagram, origem, observações e nomes de serviços. Exclui NIF, IBAN, pagamentos e valores.
-2. `search_web`: pesquisa normalizada através de `WebSearchProvider`. O adapter inicial é Brave Search, usando endpoint e header documentados oficialmente: [Brave Web Search API](https://api-dashboard.search.brave.com/app/documentation/web-search/get-started).
+2. `search_web`: pesquisa normalizada através de `WebSearchProvider`. O provider ativo é OpenAI Web Search através da Responses API; o adapter Brave Search permanece no código como alternativa.
 3. `inspect_website`: sinais factuais leves da homepage.
 4. `fetch_public_page`: páginas diretamente relevantes, depth 1.
 5. `discover_social_profiles`: apenas links públicos encontrados em website, pesquisa ou CRM.
@@ -34,7 +34,7 @@ O fetch usa `UNEED-Discover/0.1 (+https://uneed.pt)`, não executa JavaScript, n
 
 Defaults: 2 pesquisas permitidas pelo contrato (o plano atual usa no máximo 1), 3 páginas, depth 1, 8 s por search/fetch, 750 KB por página, 3 redirects e cache de 15 minutos. A mesma URL não é obtida duas vezes dentro do TTL.
 
-Search reserva um teto antes da chamada (`BRAVE_SEARCH_MAX_QUERY_COST`, 0,05 por omissão). Se ultrapassar o budget, não chama o provider. Custo conhecido e desconhecido permanecem distintos. A Mission agrega `toolEstimatedCost`, `toolCost`, AI cost, calls e tokens. Configure `BRAVE_SEARCH_COST_PER_QUERY` com a tarifa contratada atual; em branco, o custo real fica `unknown`, mas o teto continua a proteger o budget.
+Search reserva um teto antes da chamada (`OPENAI_WEB_SEARCH_MAX_QUERY_COST`, 0,05 por omissão). Se ultrapassar o budget, não chama o provider. Custo conhecido e desconhecido permanecem distintos. A Mission agrega `toolEstimatedCost`, `toolCost`, AI cost, calls e tokens. Configure `OPENAI_WEB_SEARCH_COST_PER_QUERY`, `UNEED_AI_INPUT_COST_PER_MILLION` e `UNEED_AI_OUTPUT_COST_PER_MILLION` com as tarifas atuais; se alguma estiver em branco, o custo real fica `unknown`, mas o teto continua a proteger o budget.
 
 ## Skills v1.1
 
@@ -46,14 +46,14 @@ Models são selecionados por capacidades e routes FAST/SMART/DEEP. Nenhuma Skill
 
 ## Teste manual com 5–10 Leads
 
-1. Configure `BRAVE_SEARCH_API_KEY` no worker; opcionalmente a tarifa por query.
+1. Confirme `OPENAI_API_KEY` no worker; opcionalmente configure o modelo e as tarifas de pesquisa/tokens.
 2. Abra um Lead real e confirme nome, website/localização quando conhecidos.
 3. Clique **Investigar empresa** para avaliar só o Research Pack, ou **Executar análise completa** para chegar ao Francisco Gate.
 4. Pode fechar/reabrir o browser; consulte Centro de Comando.
 5. Para cada Lead registe: o que já sabia; novos factos corretos; fontes válidas; falsos positivos; unknowns corretos/em falta; conflitos; recomendação; qualidade da mensagem; rating 1–5.
 6. Não use os primeiros testes para contactar automaticamente. Corrija dados CRM incorretos e execute nova Mission; o histórico anterior é preservado.
 
-Smoke externo opcional: `BRAVE_SEARCH_API_KEY=... npm run smoke:discover -- "Empresa" "https://empresa.pt"`. Nunca corre na suite automática.
+Smoke externo opcional: `OPENAI_API_KEY=... npm run smoke:discover -- "Empresa" "https://empresa.pt"`. Nunca corre na suite automática.
 
 ## Limitações
 

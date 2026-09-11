@@ -171,7 +171,7 @@ Detalhes operacionais: [runtime](docs/uneed-os/runtime.md) e [deployment](docs/u
 
 DISCOVER é a primeira camada funcional externa e reutiliza integralmente Mission Engine, runner, checkpoints, Gateway, providers, Tool Executor, audit, budgets e Gate. `research-company@1.1.0` recebe dados mínimos de CRM e coordena `read_crm`, `search_web`, `inspect_website`, `fetch_public_page` e `discover_social_profiles`. HTTP/search nunca vivem dentro da Skill.
 
-Search usa a interface `WebSearchProvider`; Brave é o primeiro adapter configurável. Fetch público resolve/valida DNS, fixa o IP público na conexão, revalida redirects e impõe protocolos, timeout, tamanho, depth/pages e cache. Outputs convergem em `CompanyResearchPack@1.0.0`, que separa facts, observations, inferences, recommendations, unknowns, conflicts e evidence com freshness.
+Search usa a interface `WebSearchProvider`; OpenAI Web Search é o provider ativo e Brave permanece como adapter alternativo. Fetch público resolve/valida DNS, fixa o IP público na conexão, revalida redirects e impõe protocolos, timeout, tamanho, depth/pages e cache. Outputs convergem em `CompanyResearchPack@1.0.0`, que separa facts, observations, inferences, recommendations, unknowns, conflicts e evidence com freshness.
 
 `qualify-lead@1.1.0` consome o pack e usa breakdown versionado; `prepare-outreach@1.1.0` usa policy de copy separada e evidence IDs. As versões 1.0.0 permanecem disponíveis para histórico. A action externa continua inexistente: o approval step apenas regista revisão humana.
 

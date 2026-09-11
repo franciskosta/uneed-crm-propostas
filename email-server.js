@@ -428,7 +428,7 @@ async function handleApi(request, response) {
 
   if (url.pathname === "/api/health") {
     let database = "file"; try { if (pgPool) { await query("select 1"); database = "postgresql"; } } catch { sendJson(response, 503, { ok: false, application: "ok", database: "error" }); return; }
-    sendJson(response, 200, { ok: true, application: "ok", database, runner: embeddedRunner ? "embedded" : "external", aiConfigured: Boolean(process.env.OPENAI_API_KEY), searchConfigured: Boolean(process.env.BRAVE_SEARCH_API_KEY) }); return;
+    sendJson(response, 200, { ok: true, application: "ok", database, runner: embeddedRunner ? "embedded" : "external", aiConfigured: Boolean(process.env.OPENAI_API_KEY), searchConfigured: Boolean(process.env.OPENAI_API_KEY) }); return;
   }
 
   if (url.pathname === "/api/auth/me") {

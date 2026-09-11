@@ -167,4 +167,4 @@ Localmente, sem PostgreSQL, os dados do servidor ficam em `.local/server-data.js
 
 Antes de alterar IA ou automações, ler [`UNEED_OS_ARCHITECTURE.md`](UNEED_OS_ARCHITECTURE.md). Reutilizar Skills, Tools, entidades e serviços existentes; manter providers atrás do AI Gateway; aplicar logs, limites, permissões e testes; e atualizar a documentação quando uma decisão arquitetural mudar.
 
-O módulo DISCOVER e o teste manual estão documentados em [`docs/uneed-os/discover.md`](docs/uneed-os/discover.md). A pesquisa web real requer `BRAVE_SEARCH_API_KEY` apenas no backend/worker.
+O módulo DISCOVER e o teste manual estão documentados em [`docs/uneed-os/discover.md`](docs/uneed-os/discover.md). A pesquisa web ativa usa OpenAI Web Search com a `OPENAI_API_KEY` apenas no backend/worker; o adapter Brave permanece disponível como alternativa.

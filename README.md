@@ -162,3 +162,9 @@ Nota: o login inicial é criado automaticamente com `ADMIN_EMAIL` e `ADMIN_PASSW
 ## Nota sobre dados
 
 Localmente, sem PostgreSQL, os dados do servidor ficam em `.local/server-data.json` e também há cópia no `localStorage` do browser. Em produção com `DATABASE_URL`, os dados ficam no PostgreSQL.
+
+## Desenvolvimento do UNEED OS
+
+Antes de alterar IA ou automações, ler [`UNEED_OS_ARCHITECTURE.md`](UNEED_OS_ARCHITECTURE.md). Reutilizar Skills, Tools, entidades e serviços existentes; manter providers atrás do AI Gateway; aplicar logs, limites, permissões e testes; e atualizar a documentação quando uma decisão arquitetural mudar.
+
+O módulo DISCOVER e o teste manual estão documentados em [`docs/uneed-os/discover.md`](docs/uneed-os/discover.md). A pesquisa web real requer `BRAVE_SEARCH_API_KEY` apenas no backend/worker.

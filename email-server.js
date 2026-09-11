@@ -2,6 +2,9 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { MissionRepository } = require("./uneed-os/repository");
+const { createMissionEngine } = require("./uneed-os/runtime");
+const { MissionRunner } = require("./uneed-os/runner");
 
 const root = __dirname;
 const port = Number(process.env.PORT || 8090);
@@ -9,7 +12,7 @@ const host = process.env.HOST || (process.env.RAILWAY_ENVIRONMENT ? "0.0.0.0" : 
 const isProduction = process.env.NODE_ENV === "production" || Boolean(process.env.RAILWAY_ENVIRONMENT);
 const sessionCookie = "uneed_session";
 const dataDir = path.join(root, ".local");
-const dataFile = path.join(dataDir, "server-data.json");
+const dataFile = process.env.UNEED_DATA_FILE || path.join(dataDir, "server-data.json");
 const defaultEmailFrom = "UNEED <geral@uneed.pt>";
 
 const mimeTypes = {
@@ -21,6 +24,10 @@ const mimeTypes = {
 };
 
 let pgPool = null;
+let missionRepository = null;
+let missionEngine = null;
+let embeddedRunner = null;
+const createRateLimits = new Map();
 if (process.env.DATABASE_URL) {
   try {
     const { Pool } = require("pg");
@@ -34,7 +41,7 @@ if (process.env.DATABASE_URL) {
 }
 
 function emptyData() {
-  return { users: [], sessions: [], appState: null, reminders: [] };
+  return { users: [], sessions: [], appState: null, reminders: [], missions: [] };
 }
 
 function ensureFileStore() {
@@ -95,6 +102,23 @@ async function initDb() {
       created_at timestamptz not null default now()
     )
   `);
+  await query(`
+    create table if not exists missions (
+      id text primary key,
+      user_id text not null references users(id) on delete cascade,
+      type text not null,
+      objective text not null,
+      priority text not null default 'normal',
+      autonomy_level text not null,
+      status text not null,
+      target_type text not null,
+      target_id text not null,
+      data jsonb not null,
+      updated_at timestamptz not null default now()
+    )
+  `);
+  await query("create index if not exists missions_user_status_idx on missions(user_id, status, updated_at desc)");
+  await query(fs.readFileSync(path.join(root, "migrations/001_uneed_os_runtime_v011.sql"), "utf8"));
   await ensureAdminUser();
 }
 
@@ -165,6 +189,13 @@ async function getUserByEmail(email) {
 }
 
 async function getSessionUser(request) {
+  const authorization = String(request.headers.authorization || "");
+  if (authorization.startsWith("Bearer ") && process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY) {
+    try { const authResponse = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, { headers: { Authorization: authorization, apikey: process.env.SUPABASE_ANON_KEY }, signal: AbortSignal.timeout(5000) });
+      if (authResponse.ok) { const user = await authResponse.json(); return { id: user.id, email: user.email, name: user.user_metadata?.name || user.email }; }
+    } catch { return null; }
+    return null;
+  }
   const token = parseCookies(request)[sessionCookie];
   if (!token) return null;
   const tokenHash = hashToken(token);
@@ -257,7 +288,7 @@ function readBody(request) {
 }
 
 function sendJson(response, status, payload) {
-  response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+  response.writeHead(status, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
   response.end(JSON.stringify(payload));
 }
 
@@ -395,6 +426,11 @@ async function requireUser(request, response) {
 async function handleApi(request, response) {
   const url = new URL(request.url, `http://${request.headers.host}`);
 
+  if (url.pathname === "/api/health") {
+    let database = "file"; try { if (pgPool) { await query("select 1"); database = "postgresql"; } } catch { sendJson(response, 503, { ok: false, application: "ok", database: "error" }); return; }
+    sendJson(response, 200, { ok: true, application: "ok", database, runner: embeddedRunner ? "embedded" : "external", aiConfigured: Boolean(process.env.OPENAI_API_KEY), searchConfigured: Boolean(process.env.BRAVE_SEARCH_API_KEY) }); return;
+  }
+
   if (url.pathname === "/api/auth/me") {
     const user = await getSessionUser(request);
     sendJson(response, 200, { ok: true, user: user ? { email: user.email, name: user.name } : null });
@@ -475,6 +511,38 @@ async function handleApi(request, response) {
     return;
   }
 
+  const missionMatch = url.pathname.match(/^\/api\/missions\/([^/]+)(?:\/(decision|cancel|retry))?$/);
+
+  if (url.pathname === "/api/missions" && request.method === "GET") {
+    sendJson(response, 200, { ok: true, missions: await missionEngine.repository.list(user.id) });
+    return;
+  }
+
+  if (url.pathname === "/api/missions" && request.method === "POST") {
+    const payload = JSON.parse(await readBody(request));
+    const timestamps = (createRateLimits.get(user.id) || []).filter((time) => Date.now() - time < 60000); if (timestamps.length >= Number(process.env.MISSION_CREATE_RATE_LIMIT || 5)) { sendJson(response, 429, { ok: false, error: "rate_limit" }); return; } timestamps.push(Date.now()); createRateLimits.set(user.id, timestamps);
+    const created = await missionEngine.create({ ...payload, requestedBy: user.id });
+    sendJson(response, created.duplicate ? 200 : 202, { ok: true, mission: created.mission, duplicate: created.duplicate });
+    return;
+  }
+
+  if (missionMatch && !missionMatch[2] && request.method === "GET") {
+    const mission = await missionEngine.repository.get(missionMatch[1], user.id);
+    sendJson(response, mission ? 200 : 404, mission ? { ok: true, mission } : { ok: false, error: "not_found" });
+    return;
+  }
+
+  if (missionMatch?.[2] === "decision" && request.method === "POST") {
+    const payload = JSON.parse(await readBody(request));
+    const mission = await missionEngine.decide(missionMatch[1], { approved: payload.approved, note: payload.note || "", decidedBy: user.id });
+    sendJson(response, 200, { ok: true, mission });
+    return;
+  }
+
+  if (missionMatch?.[2] === "cancel" && request.method === "POST") { sendJson(response, 200, { ok: true, mission: await missionEngine.cancel(missionMatch[1], user.id) }); return; }
+  if (missionMatch?.[2] === "retry" && request.method === "POST") { sendJson(response, 200, { ok: true, mission: await missionEngine.retry(missionMatch[1], user.id) }); return; }
+  if (url.pathname === "/api/missions-stats" && request.method === "GET") { sendJson(response, 200, { ok: true, stats: await missionRepository.stats(user.id) }); return; }
+
   sendJson(response, 404, { ok: false, error: "not_found" });
 }
 
@@ -541,8 +609,18 @@ async function serveStatic(request, response) {
 }
 
 const server = http.createServer((request, response) => {
+  request.requestId = request.headers["x-request-id"] || crypto.randomUUID();
+  response.setHeader("X-Request-Id", request.requestId);
+  const allowedOrigin = process.env.FRONTEND_ORIGIN;
+  if (allowedOrigin && request.headers.origin === allowedOrigin) {
+    response.setHeader("Access-Control-Allow-Origin", allowedOrigin);
+    response.setHeader("Vary", "Origin");
+    response.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+    response.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, OPTIONS");
+  }
+  if (request.method === "OPTIONS") { response.writeHead(204); response.end(); return; }
   if (request.url.startsWith("/api/")) {
-    handleApi(request, response).catch((error) => sendJson(response, 500, { ok: false, error: error.message }));
+    handleApi(request, response).catch((error) => { console.error(JSON.stringify({ level: "error", message: "api_request_failed", request_id: request.requestId, code: error.code || error.message })); sendJson(response, 500, { ok: false, error: error.code || "internal_error", requestId: request.requestId }); });
     return;
   }
   serveStatic(request, response).catch((error) => {
@@ -552,6 +630,10 @@ const server = http.createServer((request, response) => {
 });
 
 initDb().then(() => {
+  missionRepository = new MissionRepository({ query: pgPool ? query : null, pool: pgPool, readStore: readFileStore, writeStore: writeFileStore });
+  missionEngine = createMissionEngine(missionRepository);
+  const useEmbeddedRunner = process.env.MISSION_RUNNER_EMBEDDED === "true" || !pgPool;
+  if (useEmbeddedRunner) { embeddedRunner = new MissionRunner({ engine: missionEngine, repository: missionRepository, workerId: `api-${process.pid}`, concurrency: Number(process.env.MISSION_WORKER_CONCURRENCY || 1) }); embeddedRunner.recoverStale().then(() => setInterval(() => embeddedRunner.tick().catch((error) => console.error(JSON.stringify({ level: "error", message: "embedded_runner_tick", code: error.code || error.message }))), Number(process.env.MISSION_POLL_MS || 1500))); }
   server.listen(port, host, () => {
     console.log(`UNEED CRM em http://${host === "0.0.0.0" ? "127.0.0.1" : host}:${port}`);
     console.log("Railway: configurar DATABASE_URL, ADMIN_EMAIL, ADMIN_PASSWORD, RESEND_API_KEY e EMAIL_FROM.");

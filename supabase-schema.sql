@@ -34,9 +34,44 @@ create table if not exists public.support_tickets (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.missions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  type text not null,
+  objective text not null,
+  status text not null check (status in ('draft','queued','running','waiting_approval','completed','failed','cancelled')),
+  priority text not null default 'normal',
+  target_type text not null,
+  target_id text not null,
+  autonomy_level text not null check (autonomy_level in ('OBSERVE','SUGGEST','PREPARE','EXECUTE','AUTONOMOUS')),
+  data jsonb not null,
+  worker_id text,
+  claimed_at timestamptz,
+  heartbeat_at timestamptz,
+  attempt integer not null default 0,
+  max_attempts integer not null default 3,
+  next_run_at timestamptz,
+  cancel_requested_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.missions add column if not exists worker_id text;
+alter table public.missions add column if not exists claimed_at timestamptz;
+alter table public.missions add column if not exists heartbeat_at timestamptz;
+alter table public.missions add column if not exists attempt integer not null default 0;
+alter table public.missions add column if not exists max_attempts integer not null default 3;
+alter table public.missions add column if not exists next_run_at timestamptz;
+alter table public.missions add column if not exists cancel_requested_at timestamptz;
+
+create index if not exists missions_user_status_idx on public.missions(user_id, status, updated_at desc);
+create index if not exists missions_queue_idx on public.missions(status, next_run_at, updated_at);
+create unique index if not exists missions_one_active_target_idx on public.missions(user_id, type, target_type, target_id) where status in ('queued','running','waiting_approval');
+
 alter table public.crm_state enable row level security;
 alter table public.email_reminders enable row level security;
 alter table public.support_tickets enable row level security;
+alter table public.missions enable row level security;
 
 drop policy if exists "crm_state_select_own" on public.crm_state;
 drop policy if exists "crm_state_insert_own" on public.crm_state;
@@ -47,6 +82,9 @@ drop policy if exists "email_reminders_update_own" on public.email_reminders;
 drop policy if exists "support_tickets_public_insert" on public.support_tickets;
 drop policy if exists "support_tickets_admin_select" on public.support_tickets;
 drop policy if exists "support_tickets_admin_update" on public.support_tickets;
+drop policy if exists "missions_select_own" on public.missions;
+drop policy if exists "missions_insert_own" on public.missions;
+drop policy if exists "missions_update_own" on public.missions;
 
 create policy "crm_state_select_own"
 on public.crm_state for select
@@ -102,3 +140,11 @@ on public.support_tickets for update
 to authenticated
 using (true)
 with check (true);
+
+create policy "missions_select_own"
+on public.missions for select
+to authenticated
+using ((select auth.uid()) = user_id);
+
+-- Mission mutations are backend-only. The service role bypasses RLS;
+-- authenticated browser clients can only read their own Missions.

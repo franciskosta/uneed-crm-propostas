@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>UNEED Propostas CRM</title>
     <link rel="icon" href="./assets/favicon.ico" />
-    <link rel="stylesheet" href="./styles.css?v=20260821-4" />
+    <link rel="stylesheet" href="./styles.css?v=20260911-1" />
     <script>
       (function redirectRecoveryLinks() {
         const params = new URLSearchParams(window.location.search);
@@ -55,6 +55,7 @@
         </div>
 
         <nav class="nav-tabs" aria-label="Secções">
+          <button class="nav-tab" data-view="command">Centro de Comando</button>
           <button class="nav-tab is-active" data-view="dashboard">Dashboard</button>
           <button class="nav-tab" data-view="performance">Performance</button>
           <button class="nav-tab" data-view="proposal">Proposta</button>
@@ -151,6 +152,20 @@
               <div class="achievement-list" id="achievements"></div>
             </section>
           </div>
+        </section>
+
+        <section class="view" id="view-command">
+          <div class="command-hero panel">
+            <div><p class="eyebrow">UNEED OS · Hoje</p><h2>O que precisa da minha atenção?</h2><p>Missões de IA controladas, resultados claros e decisões humanas.</p></div>
+            <button class="button primary" id="refreshMissionsBtn" type="button">Atualizar</button>
+          </div>
+          <div class="metric-grid mission-metrics">
+            <article class="metric-card"><span>A executar</span><strong id="missionRunningCount">0</strong></article>
+            <article class="metric-card attention"><span>Requer Francisco</span><strong id="missionApprovalCount">0</strong></article>
+            <article class="metric-card"><span>Concluídas</span><strong id="missionCompletedCount">0</strong></article>
+            <article class="metric-card"><span>Falhas</span><strong id="missionFailedCount">0</strong></article>
+          </div>
+          <section class="panel"><div class="panel-heading"><h2>AI Missions</h2></div><div class="mission-list" id="missionList"><div class="empty">A carregar missões…</div></div></section>
         </section>
 
         <section class="view" id="view-performance">
@@ -610,6 +625,13 @@
                 <div class="activity-list" id="activityList"></div>
               </section>
 
+              <section class="ai-actions-box proposal-management">
+                <div class="panel-heading compact"><div><p class="eyebrow">UNEED OS</p><h3>AI Actions</h3></div></div>
+                <p>Investiga os dados disponíveis, qualifica a oportunidade e prepara uma abordagem. Nada será enviado.</p>
+                <div class="quick-actions"><button class="button ghost" id="runResearchBtn" type="button">Investigar empresa</button><button class="button accent" id="runFullAnalysisBtn" type="button">Executar análise completa</button><button class="button ghost" id="viewLeadMissionsBtn" type="button">Ver missões</button></div>
+                <div id="leadMissionResult"></div>
+              </section>
+
               <div class="form-actions">
                 <button class="button primary" type="submit">Guardar proposta</button>
                 <button class="button accent" id="printProposalBtn" type="button">Gerar PDF</button>
@@ -1039,9 +1061,16 @@
       </div>
     </div>
 
+    <div class="modal" id="missionModal" aria-hidden="true">
+      <div class="modal-card mission-modal-card" role="dialog" aria-modal="true" aria-labelledby="missionModalTitle">
+        <div class="panel-heading"><strong id="missionModalTitle">Resultado da missão</strong><button class="icon-button" id="closeMissionModal" type="button">×</button></div>
+        <div id="missionModalBody"></div>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="./supabase-config.js"></script>
     <script src="./pricing.js"></script>
-    <script src="./app.js?v=20260901-3"></script>
+    <script src="./app.js?v=20260911-1"></script>
   </body>
 </html>

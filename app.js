@@ -262,6 +262,9 @@ let catalogCategoryFilter = "";
 let activeMockupProspectId = null;
 let mockupLogoDataUrl = "";
 let mockupLogoPromise = Promise.resolve("");
+let missions = [];
+let missionRequestPending = false;
+let missionPollTimer = null;
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -1551,6 +1554,101 @@ function renderActivities(proposal) {
       )
       .join("") || `<div class="empty">Ainda sem histórico comercial.</div>`;
 }
+
+async function missionApi(path = "", options = {}) {
+  const client = getSupabaseClient();
+  const accessToken = client ? (await client.auth.getSession()).data.session?.access_token : null;
+  const apiBase = String(window.UNEED_SUPABASE?.apiUrl || "").replace(/\/$/, "");
+  const response = await fetch(`${apiBase}/api/missions${path}`, { headers: { "Content-Type": "application/json", Accept: "application/json", ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}), ...(options.headers || {}) }, ...options });
+  const payload = await response.json().catch(() => ({ ok: false, error: "invalid_response" }));
+  if (!response.ok) throw new Error(response.status === 401 && supabaseConfigured() ? "As missões requerem o backend UNEED OS; este deploy Supabase está apenas em modo frontend." : payload.error || "mission_request_failed");
+  return payload;
+}
+
+function formatConfidence(value) { return value == null ? "—" : `${Math.round(Number(value) * 100)}%`; }
+function safeExternalUrl(value) { try { const url = new URL(value); return ["http:", "https:"].includes(url.protocol) ? url.href : ""; } catch { return ""; } }
+
+function renderMissionResult(mission, compact = false) {
+  if (!mission) return "";
+  const result = mission.result || {};
+  const qualification = result.qualification || {};
+  const research = result.research || {};
+  const outreach = result.outreach || {};
+  const isResearchPack = research.schemaVersion;
+  const error = mission.error?.message || mission.error?.code;
+  const currentStep = (mission.steps || []).find((step) => ["pending", "running", "approved"].includes(step.status));
+  const progress = mission.status === "queued" && mission.approval?.approved ? "A retomar após aprovação…" : mission.status === "queued" ? "Análise em fila…" : currentStep?.status === "running" ? `${currentStep.skillId === "research-company" ? "A pesquisar" : currentStep.skillId === "qualify-lead" ? "A qualificar" : "A preparar abordagem"}…` : mission.status === "waiting_approval" ? "A aguardar decisão…" : "";
+  return `<article class="mission-result ${compact ? "compact" : ""}">
+    <div class="mission-result-head"><span class="mission-status status-${escapeAttr(mission.status)}">${escapeHtml(mission.status.replaceAll("_", " "))}</span><span>${new Date(mission.updatedAt).toLocaleString("pt-PT")}</span></div>
+    ${error ? `<p class="mission-error">${escapeHtml(error)} (${escapeHtml(mission.error.code || "")})</p>` : ""}
+    ${progress ? `<p class="mission-progress">${escapeHtml(progress)}</p>` : ""}
+    ${mission.result ? `<div class="mission-score"><div><span>${qualification.score == null ? "Research Confidence" : "Opportunity Score"}</span><strong>${qualification.score == null ? escapeHtml(research.confidence || "—") : `${escapeHtml(qualification.score)}/100`}</strong></div>${qualification.score != null ? `<div><span>Confidence</span><strong>${formatConfidence(mission.confidence)}</strong></div>` : ""}</div>
+    <h4>Business Summary</h4><p>${escapeHtml(research.businessSummary || "Sem resumo")}</p>
+    <h4>Dados confirmados</h4><ul>${(research.facts || []).map((item) => `<li>${escapeHtml(item.statement || item)}</li>`).join("") || "<li>Sem factos adicionais.</li>"}</ul>
+    ${isResearchPack ? `<h4>Presença digital</h4><p>Website: ${research.digitalPresence?.website ? `<a href="${escapeAttr(safeExternalUrl(research.digitalPresence.website))}" target="_blank" rel="noopener noreferrer">${escapeHtml(research.digitalPresence.website)}</a>` : "não confirmado"} · Redes: ${(research.digitalPresence?.socialProfiles || []).map((item) => escapeHtml(item.platform)).join(", ") || "não confirmadas"}</p>
+    <h4>O que encontrámos</h4><ul>${(research.observations || []).map((item) => `<li>${escapeHtml(item.statement)}</li>`).join("") || "<li>Sem observações adicionais.</li>"}</ul>
+    <h4>Oportunidades possíveis</h4><ul>${(research.opportunities || []).map((item) => `<li>${escapeHtml(item.recommendation)}</li>`).join("") || "<li>Por validar.</li>"}</ul>
+    <h4>Não confirmado</h4><ul>${(research.unknowns || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+    <h4>Fontes</h4><ul class="source-list">${(research.evidence || []).map((item) => { const source = safeExternalUrl(item.sourceUrl); return `<li>${source ? `<a href="${escapeAttr(source)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.sourceTitle || source)}</a>` : escapeHtml(item.sourceTitle || "CRM")} — ${escapeHtml(item.fact)}</li>`; }).join("") || "<li>Sem fontes externas confirmadas.</li>"}</ul>` : ""}
+    <h4>Análise da IA</h4><p>${escapeHtml(qualification.reasoningSummary || "—")}</p>
+    <h4>Problemas potenciais</h4><ul>${(qualification.problemsDetected || []).map((item) => `<li>${escapeHtml(item)}</li>`).join("") || "<li>Não identificados.</li>"}</ul>
+    <h4>Solução recomendada</h4><p>${escapeHtml(qualification.recommendedService || "—")}</p>
+    <h4>Abordagem sugerida</h4><p>${escapeHtml(outreach.suggestedApproach || "—")}</p>
+    <h4>Mensagem preparada</h4><blockquote>${escapeHtml(outreach.preparedMessage || "—")}</blockquote>
+    ${!isResearchPack ? `<h4>Fontes / evidência</h4><p>${escapeHtml((research.sources || []).join(", ") || "—")}</p>` : ""}
+    <div class="mission-meta">Custo real total: ${mission.costStatus === "unknown" || mission.toolCostStatus === "unknown" ? "desconhecido" : `€${(Number(mission.actualCost || 0) + Number(mission.toolCost || 0)).toFixed(4)}`} · Estimado: €${(Number(mission.estimatedCost || 0) + Number(mission.toolEstimatedCost || 0)).toFixed(4)} · ${mission.callCount || 0} chamadas IA · ${mission.inputTokens || 0}/${mission.outputTokens || 0} tokens · ${mission.events?.length || 0} eventos</div>` : ""}
+    ${mission.status === "waiting_approval" ? `<div class="approval-box"><strong>Requer Francisco</strong><p>${escapeHtml(result.actionProposal?.reason || "É necessária aprovação humana.")}</p><p>Impacto: ${escapeHtml(result.actionProposal?.impact || "—")}</p><div class="quick-actions"><button class="button primary" data-mission-decision="approve" data-mission-id="${escapeAttr(mission.id)}">Aprovar</button><button class="button ghost" data-mission-decision="reject" data-mission-id="${escapeAttr(mission.id)}">Rejeitar</button></div></div>` : ""}
+    ${["queued","running","waiting_approval"].includes(mission.status) ? `<button class="button ghost" data-mission-action="cancel" data-mission-id="${escapeAttr(mission.id)}">Cancelar Mission</button>` : ""}
+    ${mission.status === "failed" ? `<button class="button ghost" data-mission-action="retry" data-mission-id="${escapeAttr(mission.id)}">Tentar novamente</button>` : ""}
+    ${!compact ? `<details><summary>Mission Timeline</summary><div class="mission-timeline">${(mission.events || []).map((item) => `<div><time>${new Date(item.createdAt).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}</time><span>${escapeHtml(item.summary)}</span></div>`).join("")}</div></details><details><summary>Research debug</summary><pre>${escapeHtml(JSON.stringify({ discover: mission.metadata?.discover, tools: (mission.events || []).filter((item) => item.type === "tool.executed").map((item) => item.details) }, null, 2))}</pre></details>` : ""}
+  </article>`;
+}
+
+function renderMissions() {
+  const counts = (status) => missions.filter((item) => status.includes(item.status)).length;
+  qs("#missionRunningCount").textContent = counts(["draft", "queued", "running"]);
+  qs("#missionApprovalCount").textContent = counts(["waiting_approval"]);
+  qs("#missionCompletedCount").textContent = counts(["completed"]);
+  qs("#missionFailedCount").textContent = counts(["failed"]);
+  qs("#missionList").innerHTML = missions.map((mission) => `<button class="mission-row" data-open-mission="${escapeAttr(mission.id)}"><span><strong>${escapeHtml(mission.objective)}</strong><small>${escapeHtml(mission.targetType)} · ${escapeHtml(mission.targetId)}</small></span><span class="mission-status status-${escapeAttr(mission.status)}">${escapeHtml(mission.status.replaceAll("_", " "))}</span></button>`).join("") || `<div class="empty">Ainda não existem missões.</div>`;
+  const proposal = getActiveProposal();
+  const latest = proposal && missions.find((item) => item.targetId === proposal.id);
+  qs("#leadMissionResult").innerHTML = latest ? renderMissionResult(latest, true) : "";
+  const hasActive = missions.some((item) => ["queued", "running"].includes(item.status));
+  if (hasActive && !missionPollTimer) missionPollTimer = setInterval(() => loadMissions({ quiet: true }), 2000);
+  if (!hasActive && missionPollTimer) { clearInterval(missionPollTimer); missionPollTimer = null; }
+}
+
+async function loadMissions({ quiet = false } = {}) {
+  try { missions = (await missionApi()).missions || []; renderMissions(); }
+  catch (error) { if (!quiet) showSuccessModal(error.message); qs("#missionList").innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`; }
+}
+
+async function startLeadMission(type = "qualify_existing_lead") {
+  if (missionRequestPending) return;
+  const lead = readForm();
+  if (!lead.companyName && !lead.clientName) { showSuccessModal("Adiciona o nome do cliente ou da empresa antes de executar a análise."); return; }
+  const trigger = type === "research_company" ? qs("#runResearchBtn") : qs("#runFullAnalysisBtn"); missionRequestPending = true; trigger.disabled = true; const originalLabel = trigger.textContent; trigger.textContent = "A iniciar…";
+  try {
+    const researchLead = { id: lead.id, clientName: lead.clientName, companyName: lead.companyName, clientEmail: lead.clientEmail, clientPhone: lead.clientPhone, leadSource: lead.leadSource, sampleUrl: lead.sampleUrl, website: lead.website, location: lead.location, instagram: lead.instagram, internalNotes: lead.internalNotes, services: (lead.services || []).filter((item) => item.selected !== false).map((item) => ({ name: item.name, selected: true })) };
+    const created = await missionApi("", { method: "POST", body: JSON.stringify({ type, objective: `${type === "research_company" ? "Investigar" : "Qualificar"} ${lead.companyName || lead.clientName}`, targetId: lead.id, targetType: "lead", autonomyLevel: type === "research_company" ? "OBSERVE" : "PREPARE", maxCost: 1, input: { lead: researchLead } }) });
+    missions = [created.mission, ...missions.filter((item) => item.id !== created.mission.id)]; renderMissions(); openMission(created.mission.id);
+    showSuccessModal(created.duplicate ? "Já existe uma análise ativa para este Lead." : "Análise iniciada. Podes fechar esta página; a Mission continuará no runner.");
+  } catch (error) { showSuccessModal(error.message); await loadMissions({ quiet: true }); }
+  finally { missionRequestPending = false; trigger.disabled = false; trigger.textContent = originalLabel; }
+}
+
+function openMission(id) {
+  const mission = missions.find((item) => item.id === id); if (!mission) return;
+  qs("#missionModalBody").innerHTML = renderMissionResult(mission); qs("#missionModal").classList.add("is-open"); qs("#missionModal").setAttribute("aria-hidden", "false");
+}
+
+async function decideMission(id, approved) {
+  try { const payload = await missionApi(`/${id}/decision`, { method: "POST", body: JSON.stringify({ approved }) }); missions = missions.map((item) => item.id === id ? payload.mission : item); renderMissions(); openMission(id); }
+  catch (error) { showSuccessModal(error.message); }
+}
+
+async function actOnMission(id, action) { try { const payload = await missionApi(`/${id}/${action}`, { method: "POST" }); missions = missions.map((item) => item.id === id ? payload.mission : item); renderMissions(); openMission(id); } catch (error) { showSuccessModal(error.message); } }
 
 function addActivity(type, note) {
   const proposal = readForm();
@@ -3632,6 +3730,7 @@ function renderAll() {
   renderClients();
   renderHistory();
   renderSettings();
+  renderMissions();
 }
 
 function switchView(view) {
@@ -3723,6 +3822,14 @@ function bindEvents() {
     event.preventDefault();
     upsertActiveProposal();
   });
+  qs("#runResearchBtn").addEventListener("click", () => startLeadMission("research_company"));
+  qs("#runFullAnalysisBtn").addEventListener("click", () => startLeadMission("qualify_existing_lead"));
+  qs("#viewLeadMissionsBtn").addEventListener("click", () => { switchView("command"); renderMissions(); });
+  qs("#refreshMissionsBtn").addEventListener("click", () => loadMissions());
+  qs("#missionList").addEventListener("click", (event) => { const row = event.target.closest("[data-open-mission]"); if (row) openMission(row.dataset.openMission); });
+  qs("#leadMissionResult").addEventListener("click", (event) => { const decision = event.target.closest("[data-mission-decision]"); const action = event.target.closest("[data-mission-action]"); if (decision) decideMission(decision.dataset.missionId, decision.dataset.missionDecision === "approve"); else if (action) actOnMission(action.dataset.missionId, action.dataset.missionAction); });
+  qs("#closeMissionModal").addEventListener("click", () => { qs("#missionModal").classList.remove("is-open"); qs("#missionModal").setAttribute("aria-hidden", "true"); });
+  qs("#missionModal").addEventListener("click", (event) => { const decision = event.target.closest("[data-mission-decision]"); const action = event.target.closest("[data-mission-action]"); if (decision) decideMission(decision.dataset.missionId, decision.dataset.missionDecision === "approve"); else if (action) actOnMission(action.dataset.missionId, action.dataset.missionAction); else if (event.target.id === "missionModal") qs("#closeMissionModal").click(); });
 
   qs("#closeSuccessModal").addEventListener("click", closeSuccessModal);
   qs("#successModal").addEventListener("click", (event) => {
@@ -4451,4 +4558,5 @@ bindEvents();
 qs("#prospectNiche").innerHTML = prospectNiches.map((item) => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.label)}</option>`).join("");
 loadPortugalMunicipalities();
 renderAll();
+loadMissions({ quiet: true });
 loadServerState();

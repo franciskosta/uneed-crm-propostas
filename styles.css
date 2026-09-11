@@ -3350,3 +3350,36 @@ textarea {
     break-inside: avoid;
   }
 }
+.command-hero { display:flex; align-items:center; justify-content:space-between; gap:24px; margin-bottom:20px; }
+.command-hero h2 { margin:4px 0; }
+.metric-card.attention { border-color:#f0c66a; background:#fffaf0; }
+.mission-list { display:grid; gap:10px; }
+.mission-row { width:100%; border:1px solid #e5e7ee; background:#fff; border-radius:12px; padding:14px 16px; display:flex; align-items:center; justify-content:space-between; gap:16px; text-align:left; cursor:pointer; color:inherit; }
+.mission-row:hover { border-color:#9fa5c8; box-shadow:0 5px 18px rgba(24,29,73,.07); }
+.mission-row span:first-child { display:grid; gap:3px; }
+.mission-row small { color:#70758c; }
+.mission-status { display:inline-flex; width:max-content; border-radius:999px; padding:5px 9px; background:#eef0f7; color:#41465e; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+.status-waiting_approval { background:#fff0c7; color:#755100; }
+.status-completed { background:#dcf7e7; color:#17643a; }
+.status-failed { background:#fee2e2; color:#991b1b; }
+.status-running { background:#e0ecff; color:#204f9e; }
+.ai-actions-box { margin-top:24px; padding:18px; border:1px solid #dfe2ef; border-radius:14px; background:linear-gradient(135deg,#f8f9ff,#fff); }
+.ai-actions-box > p { color:#62677d; margin-top:4px; }
+.mission-modal-card { width:min(780px,calc(100vw - 32px)); max-height:88vh; overflow:auto; text-align:left; }
+.mission-result { display:grid; gap:10px; }
+.mission-result.compact { margin-top:16px; padding-top:16px; border-top:1px solid #e5e7ee; max-height:440px; overflow:auto; }
+.mission-result h4 { margin:8px 0 0; }
+.mission-result p,.mission-result ul,.mission-result blockquote { margin:0; line-height:1.55; }
+.mission-result blockquote { padding:12px 14px; background:#f4f5fa; border-left:3px solid #181d49; border-radius:6px; }
+.mission-result-head,.mission-score { display:flex; justify-content:space-between; gap:16px; align-items:center; }
+.mission-result-head > span:last-child,.mission-meta { color:#74798f; font-size:12px; }
+.mission-score { padding:14px; background:#181d49; color:#fff; border-radius:12px; justify-content:flex-start; }
+.mission-score > div { min-width:140px; display:grid; gap:4px; }
+.mission-score span { font-size:11px; opacity:.75; text-transform:uppercase; }
+.mission-score strong { font-size:22px; }
+.approval-box { padding:16px; background:#fff8e5; border:1px solid #f2cf75; border-radius:12px; }
+.mission-timeline { display:grid; gap:8px; margin-top:10px; }
+.mission-timeline div { display:grid; grid-template-columns:64px 1fr; gap:10px; }
+.mission-timeline time { color:#777c91; font-size:12px; }
+.mission-error { color:#991b1b; }
+@media (max-width:700px) { .command-hero,.mission-row,.mission-result-head { align-items:flex-start; flex-direction:column; } .mission-score { flex-wrap:wrap; } }

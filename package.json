@@ -7,7 +7,10 @@
   },
   "scripts": {
     "start": "node email-server.js",
-    "build": "node build-vercel.js"
+    "worker": "node mission-worker.js",
+    "smoke:discover": "node scripts/smoke-discover.js",
+    "build": "node build-vercel.js",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "pg": "^8.13.1"

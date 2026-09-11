@@ -1,0 +1,2 @@
+const { runtime, authenticate, json, error } = require("../_mission-runtime");
+module.exports = async function handler(req, res) { try { const user = await authenticate(req); if (!user) return json(res, 401, { ok: false, error: "unauthorized" }); if (req.method !== "GET") return json(res, 405, { ok: false, error: "method_not_allowed" }); const mission = await runtime().repository.get(req.query.id, user.id); return json(res, mission ? 200 : 404, mission ? { ok: true, mission } : { ok: false, error: "not_found" }); } catch (raw) { return error(res, raw); } };

@@ -1,13 +1,13 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "functions": {
+    "api/mission-worker.js": { "maxDuration": 60 },
+    "api/missions/**/*.js": { "maxDuration": 60 }
+  },
   "rewrites": [
     {
-      "source": "/suporte",
-      "destination": "/suporte.html"
-    },
-    {
-      "source": "/((?!api/|assets/|styles.css|app.js|pricing.js|suporte.js|supabase-config.js|portugal-municipalities.json|login.html|suporte.html|favicon.ico).*)",
+      "source": "/((?!assets/|styles.css|app.js|pricing.js|supabase-config.js|login.html|favicon.ico).*)",
       "destination": "/index.html"
     }
   ]

@@ -1,5 +1,4 @@
-const OUTREACH_POLICY = Object.freeze({ id: "uneed-outreach", version: "1.0.0", rules: ["linguagem humana, curta e cordial", "usar apenas factos ou observações seguras", "sem crítica agressiva ou linguagem de IA", "solução relevante do catálogo", "CTA simples"] });
-const SCORING = Object.freeze({ version: "1.0.0", weights: { digitalGap: 30, businessFit: 30, reachable: 20, likelyNeed: 20 } });
+const { OUTREACH_POLICY, SCORING_CONFIG: SCORING } = require("../lead-intelligence");
 
 const versions = {
   "research-company": [

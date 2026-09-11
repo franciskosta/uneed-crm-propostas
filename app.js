@@ -1648,8 +1648,40 @@ function renderMissions() {
 }
 
 async function loadMissions({ quiet = false } = {}) {
-  try { missions = (await missionApi()).missions || []; renderMissions(); }
+  try { missions = (await missionApi()).missions || []; reconcileLeadFactoryMissions(); renderMissions(); }
   catch (error) { if (!quiet) showSuccessModal(error.message); qs("#missionList").innerHTML = `<div class="empty">${escapeHtml(error.message)}</div>`; }
+}
+
+function appendFactoryActivity(prospect, mission, summary) {
+  state.activities ||= [];
+  const legacyRef = `lead-factory:${prospect.id}:mission:${mission.id}`;
+  if (state.activities.some((item) => item.legacyRef === legacyRef)) return;
+  state.activities.push({ id: crypto.randomUUID(), companyId: prospect.companyId || null, leadId: prospect.leadId || null, opportunityId: null, proposalId: null, type: "lead_factory", summary, channel: prospect.primaryChannel || null, occurredAt: mission.updatedAt || new Date().toISOString(), legacyRef, createdAt: new Date().toISOString() });
+}
+
+function reconcileLeadFactoryMissions() {
+  let changed = false;
+  for (const prospect of state.instagramProspects || []) {
+    if (!prospect.latestResearchMissionId) continue;
+    const mission = missions.find((item) => item.id === prospect.latestResearchMissionId);
+    if (!mission) continue;
+    if (["queued", "running"].includes(mission.status) && prospect.readiness !== "researching") { prospect.readiness = "researching"; changed = true; }
+    if (mission.status === "failed" && prospect.readiness !== "needs_review") { prospect.readiness = "needs_review"; prospect.warnings = [...new Set([...(prospect.warnings || []), mission.error?.message || "Investigação não concluída"])]; appendFactoryActivity(prospect, mission, "Investigação falhou; Lead requer revisão humana"); changed = true; }
+    if (!mission.result || !["waiting_approval", "completed"].includes(mission.status) || (prospect.researchHistory || []).some((item) => item.missionId === mission.id)) continue;
+    const research = mission.result.research || {}; const qualification = mission.result.qualification || {}; const outreach = mission.result.outreach || {};
+    prospect.researchHistory ||= [];
+    prospect.researchHistory.push({ missionId: mission.id, researchedAt: research.researchedAt || mission.updatedAt, researchPack: research, commercialIntelligence: { qualification, outreach }, costs: { actual: mission.actualCost ?? null, estimated: mission.estimatedCost ?? null, toolActual: mission.toolCost ?? null, toolEstimated: mission.toolEstimatedCost ?? null } });
+    prospect.researchPack = research; prospect.commercialIntelligence = { qualification, outreach }; prospect.lastResearchedAt = research.researchedAt || mission.updatedAt; prospect.score = prospect.commercialScore = Number(qualification.score ?? prospect.commercialScore ?? prospect.score ?? 0); prospect.scoreBreakdown = qualification.breakdown || prospect.scoreBreakdown; prospect.scoreVersion = qualification.scoreVersion || prospect.scoreVersion; prospect.confidence = qualification.confidence ?? prospect.confidence; prospect.opportunity = qualification.potentialNeeds?.[0]?.recommendation || qualification.potentialNeeds?.[0] || prospect.mainOpportunity || prospect.opportunity; prospect.mainOpportunity = prospect.opportunity; prospect.recommendedService = qualification.recommendedService || prospect.recommendedService; prospect.message = outreach.preparedMessage || prospect.initialMessage || prospect.message; prospect.initialMessage = prospect.message; prospect.followUp1 = outreach.followUp1 || prospect.followUp1; prospect.followUp2 = outreach.followUp2 || prospect.followUp2; prospect.recommendedFollowUpDelayDays = outreach.recommendedFollowUpDelayDays || prospect.recommendedFollowUpDelayDays; prospect.officialWebsite = research.digitalPresence?.website || prospect.officialWebsite || null; if (prospect.officialWebsite) { prospect.website = prospect.officialWebsite; prospect.hasWebsite = true; } prospect.warnings = research.warnings || []; prospect.unknowns = research.unknowns || []; prospect.sources = research.evidence || []; prospect.readiness = prospect.commercialScore >= Number(prospect.minimumScore || 0) ? "ready_for_contact" : "needs_review"; prospect.nextAction = prospect.readiness === "ready_for_contact" ? `Contactar por ${prospect.primaryChannel || "canal recomendado"}` : "Rever qualificação"; prospect.updatedAt = new Date().toISOString();
+    const lead = state.leads?.find((item) => item.id === prospect.leadId); if (lead) Object.assign(lead, { score: prospect.commercialScore, readiness: prospect.readiness, latestResearchMissionId: mission.id, updatedAt: prospect.updatedAt });
+    appendFactoryActivity(prospect, mission, `Research, qualificação e mensagem preparados; readiness ${prospect.readiness}`); changed = true;
+  }
+  if (changed) saveState();
+}
+
+async function queueLeadFactoryEnrichment(prospects, status) {
+  const queue = [...prospects]; let started = 0; let failed = 0;
+  const worker = async () => { while (queue.length) { const prospect = queue.shift(); const context = window.UNEED_COMMERCIAL_CORE?.companyContext(state, prospect.leadId); if (!context) { prospect.readiness = "needs_review"; failed += 1; continue; } try { const created = await missionApi("", { method: "POST", body: JSON.stringify({ type: "qualify_existing_lead", objective: `Preparar lead ${context.company.name}`, targetId: context.lead.id, targetType: "lead", autonomyLevel: "PREPARE", maxCost: Number(prospect.maxCostPerLead || 1), maxAttempts: 5, input: { ...context, leadFactoryBatchId: prospect.leadFactoryBatchId, intelligenceSeed: { name: prospect.name, niche: prospect.niche, municipality: prospect.municipality, district: prospect.district, phone: prospect.phone, instagramUrl: prospect.instagramUrl, website: prospect.officialWebsite || prospect.website, hasBooking: prospect.hasBooking, hasCta: prospect.hasCta, notes: prospect.notes }, services: (state.catalog || []).map((item) => ({ name: item.name, selected: item.active !== false })) } }) }); prospect.latestResearchMissionId = created.mission.id; prospect.readiness = "researching"; started += 1; status.textContent = `Lead Factory: ${started}/${prospects.length} investigações colocadas em fila…`; } catch (error) { prospect.readiness = "needs_review"; prospect.warnings = [...new Set([...(prospect.warnings || []), error.message])]; failed += 1; } } };
+  await Promise.all(Array.from({ length: Math.min(2, prospects.length) }, () => worker())); saveState(); await loadMissions({ quiet: true }); return { started, failed };
 }
 
 async function createCommercialMission({ type = "research_company", objective, targetType, targetId, input, trigger }) {
@@ -1664,7 +1696,8 @@ async function createCommercialMission({ type = "research_company", objective, t
     renderMissions();
     openMission(created.mission.id);
     showSuccessModal(created.duplicate ? "Já existe uma análise ativa para esta entidade." : "Análise iniciada. Podes fechar esta página; a Mission continuará no runner.");
-  } catch (error) { showSuccessModal(error.message); await loadMissions({ quiet: true }); }
+    return created.mission;
+  } catch (error) { showSuccessModal(error.message); await loadMissions({ quiet: true }); return null; }
   finally { missionRequestPending = false; if (trigger) { trigger.disabled = false; trigger.textContent = originalLabel; } }
 }
 
@@ -1684,7 +1717,8 @@ async function startInstagramResearch(prospectId, trigger) {
   const prospect = state.instagramProspects.find((item) => item.id === prospectId);
   const context = prospect && window.UNEED_COMMERCIAL_CORE?.companyContext(state, prospect.leadId);
   if (!context) { showSuccessModal("Não foi possível resolver a Company deste Lead."); return; }
-  await createCommercialMission({ type: "research_company", objective: `Investigar ${context.company.name}`, targetType: "company", targetId: context.company.id, input: context, trigger });
+  const mission = await createCommercialMission({ type: "research_company", objective: `Investigar ${context.company.name}`, targetType: "company", targetId: context.company.id, input: context, trigger });
+  if (mission) { prospect.latestResearchMissionId = mission.id; prospect.readiness = "researching"; saveState(); renderInstagramProspecting(); }
 }
 
 function openMission(id) {
@@ -2100,8 +2134,8 @@ function prospectWhatsappFollowupMessage(prospect) {
 }
 
 function renderProspectWhatsappFollowup(prospect) {
-  const message = prospectWhatsappFollowupMessage(prospect);
-  return `<details class="prospect-message"><summary>Follow-up WhatsApp</summary><div class="prospect-message-paragraphs"><div class="prospect-message-paragraph"><p>${escapeHtml(message).replace(/\n/g, "<br>")}</p><button class="prospect-copy-button" data-copy-prospect-followup="${escapeAttr(prospect.id)}" type="button" aria-label="Copiar follow-up para WhatsApp">Copiar</button></div></div></details>`;
+  const first = prospect.followUp1 || prospectWhatsappFollowupMessage(prospect); const second = prospect.followUp2 || "";
+  return `<details class="prospect-message"><summary>Follow-ups preparados</summary><div class="prospect-message-paragraphs"><div class="prospect-message-paragraph"><p>${escapeHtml(first).replace(/\n/g, "<br>")}</p><button class="prospect-copy-button" data-copy-prospect-followup="${escapeAttr(prospect.id)}" data-followup-index="1" type="button" aria-label="Copiar primeiro follow-up">Copiar</button></div>${second ? `<div class="prospect-message-paragraph"><p>${escapeHtml(second).replace(/\n/g, "<br>")}</p><button class="prospect-copy-button" data-copy-prospect-followup="${escapeAttr(prospect.id)}" data-followup-index="2" type="button" aria-label="Copiar segundo follow-up">Copiar</button></div>` : ""}${prospect.recommendedFollowUpDelayDays ? `<small>Intervalo recomendado: ${escapeHtml(prospect.recommendedFollowUpDelayDays)} dias. Sem envio automático.</small>` : ""}</div></details>`;
 }
 
 function prospectSignalLabel(prospect) {
@@ -2123,6 +2157,7 @@ function defaultMockupOffer(prospect) {
 }
 
 function defaultMockupBrief(prospect) {
+  if (prospect.mockupPrompt) return prospect.mockupPrompt;
   const details = [];
   details.push(prospect.hasWebsite ? "O objetivo é tornar o website mais claro e orientado à conversão." : "Criar uma presença online profissional e imediata.");
   if (!prospect.hasBooking) details.push("Dar destaque a marcações online simples.");
@@ -2690,13 +2725,14 @@ async function generateProspects() {
       const { data } = await client.auth.getSession();
       if (data.session?.access_token) headers.Authorization = `Bearer ${data.session.access_token}`;
     }
-    const response = await fetch("/api/prospect/search", { method: "POST", headers, body: JSON.stringify({ niche, district, municipalities, radiusKm: Number(qs("#prospectRadius").value), limit: Number(qs("#prospectLimit").value), minScore: Number(qs("#prospectMinScore").value), knownKeys: knownProspectKeys() }) });
+    const minimumScore = Number(qs("#prospectMinScore").value); const batchId = crypto.randomUUID();
+    const response = await fetch("/api/prospect/search", { method: "POST", headers, body: JSON.stringify({ niche, district, municipalities, radiusKm: Number(qs("#prospectRadius").value), limit: Number(qs("#prospectLimit").value), minScore: minimumScore, knownKeys: knownProspectKeys(), catalog: (state.catalog || []).map((item) => ({ name: item.name, active: item.active !== false })) }) });
     const payload = await response.json();
     if (!response.ok) throw new Error(payload.error || "Não foi possível concluir a pesquisa");
     const added = [];
     for (const lead of payload.results || []) {
       if (normalizedProspectKeys(lead).some((key) => knownProspectKeys().includes(key))) continue;
-      added.push({ ...emptyInstagramProspect(), ...lead, message: formalizeProspectMessage(lead.message), id: crypto.randomUUID(), status: "Por fazer", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
+      added.push({ ...emptyInstagramProspect(), ...lead, message: formalizeProspectMessage(lead.message), id: crypto.randomUUID(), status: "Por fazer", source: "automated_lead_factory", discoverySource: lead.discoverySource || "google_places", leadFactoryBatchId: batchId, minimumScore, readiness: "researching", researchHistory: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() });
     }
     state.instagramProspects.unshift(...added);
     state.prospectStats.searches += 1;
@@ -2706,8 +2742,10 @@ async function generateProspects() {
     saveState();
     updateMunicipalityFilter();
     renderInstagramProspecting();
-    status.dataset.tone = "success";
-    status.textContent = `${added.length} adicionados ao Kanban · ${payload.duplicates || 0} repetidos evitados · ${payload.rejected || 0} rejeitados pelo score.`;
+    status.textContent = `Encontrados ${added.length} candidatos. A criar Companies/Leads e iniciar DISCOVER…`;
+    const enrichment = await queueLeadFactoryEnrichment(added, status);
+    status.dataset.tone = enrichment.failed ? "progress" : "success";
+    status.textContent = `${enrichment.started} Leads em preparação · ${payload.duplicates || 0} repetidos evitados · ${payload.rejected || 0} rejeitados pelo score${enrichment.failed ? ` · ${enrichment.failed} precisam de revisão` : ""}.`;
   } catch (error) {
     status.dataset.tone = "error";
     status.textContent = error.message;
@@ -2781,7 +2819,11 @@ function renderInstagramProspecting() {
                     ${whatsapp ? `<a class="prospect-link whatsapp-link" href="${escapeAttr(whatsapp)}" target="_blank" rel="noopener">Enviar follow-up WhatsApp</a>` : ""}
                     ${prospect.niche ? `<span class="card-meta">Nicho: ${escapeHtml(prospect.niche)}</span>` : `<span class="card-meta">Nicho por classificar</span>`}
                     <span class="card-meta prospect-signals">${escapeHtml(prospectSignalLabel(prospect))}</span>
-                    ${prospect.score ? `<span class="prospect-score-line">Score ${escapeHtml(prospect.score)} · ${escapeHtml(prospect.district || "")} / ${escapeHtml(prospect.municipality || "")}</span>` : ""}
+                    <span class="prospect-readiness readiness-${escapeAttr(prospect.readiness || "not_researched")}">${escapeHtml((prospect.readiness || "not_researched").replaceAll("_", " "))}</span>
+                    ${prospect.score ? `<span class="prospect-score-line">Score ${escapeHtml(prospect.score)} · Confiança ${escapeHtml(prospect.confidence || "—")} · ${escapeHtml(prospect.district || "")} / ${escapeHtml(prospect.municipality || "")}</span>` : ""}
+                    ${prospect.mainOpportunity ? `<span class="card-meta"><strong>Oportunidade:</strong> ${escapeHtml(prospect.mainOpportunity)}</span>` : ""}
+                    ${prospect.recommendedService ? `<span class="card-meta"><strong>Solução:</strong> ${escapeHtml(prospect.recommendedService)}</span>` : ""}
+                    ${prospect.primaryChannel ? `<span class="card-meta"><strong>Canal:</strong> ${escapeHtml(prospect.primaryChannel)}${prospect.fallbackChannel ? ` · alternativa ${escapeHtml(prospect.fallbackChannel)}` : ""}</span>` : ""}
                     ${safeExternalUrl(prospect.website) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.website))}" target="_blank" rel="noopener">Abrir website</a>` : ""}
                     ${safeExternalUrl(prospect.mapsUrl) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.mapsUrl))}" target="_blank" rel="noopener">Google Maps</a>` : ""}
                     ${prospect.message ? renderProspectMessage(prospect) : ""}
@@ -2802,7 +2844,7 @@ function renderInstagramProspecting() {
                       ${instagramProspectStatuses.map((item) => `<option ${item === prospect.status ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
                     </select>
                     <div class="deal-actions">
-                      <button class="button ghost mini" data-instagram-research="${escapeAttr(prospect.id)}" type="button">Investigar empresa</button>
+                      <button class="button ghost mini" data-instagram-research="${escapeAttr(prospect.id)}" type="button">${prospect.researchHistory?.length ? "Atualizar análise" : prospect.readiness === "researching" ? "Ver investigação" : "Investigar empresa"}</button>
                       <button class="button primary mini" data-instagram-mockup="${escapeAttr(prospect.id)}" type="button">${prospect.mockupImage ? "Refazer mockup" : "Criar mockup"}</button>
                       <button class="button ghost mini" data-instagram-edit="${escapeAttr(prospect.id)}" type="button">Editar</button>
                       <button class="button danger mini" data-instagram-delete="${escapeAttr(prospect.id)}" type="button">Apagar</button>
@@ -4106,7 +4148,7 @@ function bindEvents() {
       event.preventDefault();
       event.stopPropagation();
       const prospect = state.instagramProspects.find((item) => item.id === copyFollowupButton.dataset.copyProspectFollowup);
-      const message = prospect ? prospectWhatsappFollowupMessage(prospect) : "";
+      const message = prospect ? (copyFollowupButton.dataset.followupIndex === "2" ? prospect.followUp2 : prospect.followUp1) || prospectWhatsappFollowupMessage(prospect) : "";
       if (message) {
         navigator.clipboard?.writeText(message).then(() => {
           copyFollowupButton.textContent = "Copiado";
@@ -4119,7 +4161,10 @@ function bindEvents() {
     if (researchButton) {
       event.preventDefault();
       event.stopPropagation();
-      startInstagramResearch(researchButton.dataset.instagramResearch, researchButton);
+      const prospect = state.instagramProspects.find((item) => item.id === researchButton.dataset.instagramResearch);
+      const existingMission = prospect?.latestResearchMissionId && missions.find((item) => item.id === prospect.latestResearchMissionId);
+      if (existingMission) openMission(existingMission.id);
+      else startInstagramResearch(researchButton.dataset.instagramResearch, researchButton);
       return;
     }
     const deleteButton = event.target.closest("[data-instagram-delete]");

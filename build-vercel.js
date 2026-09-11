@@ -11,6 +11,7 @@ const files = [
   "app.js",
   "pricing.js",
   "commercial-core.js",
+  "lead-intelligence.js",
   "suporte.js",
   "portugal-municipalities.json",
 ];

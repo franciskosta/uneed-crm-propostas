@@ -265,6 +265,7 @@ let mockupLogoPromise = Promise.resolve("");
 let missions = [];
 let missionRequestPending = false;
 let missionPollTimer = null;
+let activeMissionModalId = null;
 
 function loadState() {
   const saved = localStorage.getItem(STORAGE_KEY);
@@ -1594,12 +1595,17 @@ function renderMissionResult(mission, compact = false) {
   const outreach = result.outreach || {};
   const isResearchPack = research.schemaVersion;
   const error = mission.error?.message || mission.error?.code;
+  const lastError = !error && mission.lastError?.message;
   const currentStep = (mission.steps || []).find((step) => ["pending", "running", "approved"].includes(step.status));
   const progress = mission.status === "queued" && mission.approval?.approved ? "A retomar após aprovação…" : mission.status === "queued" ? "Análise em fila…" : currentStep?.status === "running" ? `${currentStep.skillId === "research-company" ? "A pesquisar" : currentStep.skillId === "qualify-lead" ? "A qualificar" : "A preparar abordagem"}…` : mission.status === "waiting_approval" ? "A aguardar decisão…" : "";
+  const completedSteps = (mission.steps || []).filter((step) => step.status === "completed").length;
+  const totalSteps = Math.max((mission.steps || []).filter((step) => step.skillId).length, 1);
+  const progressPercent = mission.status === "completed" ? 100 : Math.min(95, Math.round((completedSteps / totalSteps) * 100) + (mission.status === "running" ? 20 : 5));
   return `<article class="mission-result ${compact ? "compact" : ""}">
     <div class="mission-result-head"><span class="mission-status status-${escapeAttr(mission.status)}">${escapeHtml(mission.status.replaceAll("_", " "))}</span><span>${new Date(mission.updatedAt).toLocaleString("pt-PT")}</span></div>
     ${error ? `<p class="mission-error">${escapeHtml(error)} (${escapeHtml(mission.error.code || "")})</p>` : ""}
-    ${progress ? `<p class="mission-progress">${escapeHtml(progress)}</p>` : ""}
+    ${lastError ? `<p class="mission-warning">A tentativa anterior não terminou: ${escapeHtml(lastError)} A repetir automaticamente.</p>` : ""}
+    ${progress ? `<div class="mission-live"><div><strong>${escapeHtml(progress)}</strong><span>Tentativa ${escapeHtml(mission.attempt || 0)} de ${escapeHtml(mission.maxAttempts || 3)} · ${escapeHtml(mission.events?.length || 0)} eventos</span></div><div class="mission-progress-track"><span style="width:${progressPercent}%"></span></div><small>Atualização automática a cada 2 segundos</small></div>` : ""}
     ${mission.result ? `<div class="mission-score"><div><span>${qualification.score == null ? "Research Confidence" : "Opportunity Score"}</span><strong>${qualification.score == null ? escapeHtml(research.confidence || "—") : `${escapeHtml(qualification.score)}/100`}</strong></div>${qualification.score != null ? `<div><span>Confidence</span><strong>${formatConfidence(mission.confidence)}</strong></div>` : ""}</div>
     <h4>Business Summary</h4><p>${escapeHtml(research.businessSummary || "Sem resumo")}</p>
     <h4>Dados confirmados</h4><ul>${(research.facts || []).map((item) => `<li>${escapeHtml(item.statement || item)}</li>`).join("") || "<li>Sem factos adicionais.</li>"}</ul>
@@ -1635,6 +1641,10 @@ function renderMissions() {
   const hasActive = missions.some((item) => ["queued", "running"].includes(item.status));
   if (hasActive && !missionPollTimer) missionPollTimer = setInterval(() => loadMissions({ quiet: true }), 2000);
   if (!hasActive && missionPollTimer) { clearInterval(missionPollTimer); missionPollTimer = null; }
+  if (activeMissionModalId && qs("#missionModal")?.classList.contains("is-open")) {
+    const activeMission = missions.find((item) => item.id === activeMissionModalId);
+    if (activeMission) qs("#missionModalBody").innerHTML = renderMissionResult(activeMission);
+  }
 }
 
 async function loadMissions({ quiet = false } = {}) {
@@ -1679,6 +1689,7 @@ async function startInstagramResearch(prospectId, trigger) {
 
 function openMission(id) {
   const mission = missions.find((item) => item.id === id); if (!mission) return;
+  activeMissionModalId = id;
   qs("#missionModalBody").innerHTML = renderMissionResult(mission); qs("#missionModal").classList.add("is-open"); qs("#missionModal").setAttribute("aria-hidden", "false");
 }
 
@@ -3875,7 +3886,7 @@ function bindEvents() {
   qs("#refreshMissionsBtn").addEventListener("click", () => loadMissions());
   qs("#missionList").addEventListener("click", (event) => { const row = event.target.closest("[data-open-mission]"); if (row) openMission(row.dataset.openMission); });
   qs("#leadMissionResult").addEventListener("click", (event) => { const decision = event.target.closest("[data-mission-decision]"); const action = event.target.closest("[data-mission-action]"); if (decision) decideMission(decision.dataset.missionId, decision.dataset.missionDecision === "approve"); else if (action) actOnMission(action.dataset.missionId, action.dataset.missionAction); });
-  qs("#closeMissionModal").addEventListener("click", () => { qs("#missionModal").classList.remove("is-open"); qs("#missionModal").setAttribute("aria-hidden", "true"); });
+  qs("#closeMissionModal").addEventListener("click", () => { activeMissionModalId = null; qs("#missionModal").classList.remove("is-open"); qs("#missionModal").setAttribute("aria-hidden", "true"); });
   qs("#missionModal").addEventListener("click", (event) => { const decision = event.target.closest("[data-mission-decision]"); const action = event.target.closest("[data-mission-action]"); if (decision) decideMission(decision.dataset.missionId, decision.dataset.missionDecision === "approve"); else if (action) actOnMission(action.dataset.missionId, action.dataset.missionAction); else if (event.target.id === "missionModal") qs("#closeMissionModal").click(); });
 
   qs("#closeSuccessModal").addEventListener("click", closeSuccessModal);

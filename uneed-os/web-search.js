@@ -7,7 +7,7 @@ class WebSearchProvider {
 }
 
 class OpenAIWebSearchProvider extends WebSearchProvider {
-  constructor({ apiKey, model = "gpt-5-mini", fetchImpl = global.fetch, timeoutMs = 45000, costPerQuery = null, inputCostPerMillion = null, outputCostPerMillion = null, maxQueryCost = 0.05 } = {}) {
+  constructor({ apiKey, model = "gpt-5-mini", fetchImpl = global.fetch, timeoutMs = 32000, costPerQuery = null, inputCostPerMillion = null, outputCostPerMillion = null, maxQueryCost = 0.05 } = {}) {
     super(); this.id = "openai"; this.apiKey = apiKey; this.model = model; this.fetch = fetchImpl; this.timeoutMs = timeoutMs; this.costPerQuery = costPerQuery; this.inputCostPerMillion = inputCostPerMillion; this.outputCostPerMillion = outputCostPerMillion; this.maxQueryCost = maxQueryCost;
   }
   supports() { return Boolean(this.apiKey); }
@@ -19,7 +19,7 @@ class OpenAIWebSearchProvider extends WebSearchProvider {
     const scope = allowedDomains.length ? ` Limita a pesquisa a: ${allowedDomains.join(", ")}.` : "";
     let response;
     try {
-      response = await this.fetch("https://api.openai.com/v1/responses", { method: "POST", signal: AbortSignal.timeout(this.timeoutMs), headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: this.model, tools: [{ type: "web_search" }], tool_choice: "required", max_tool_calls: 1, include: ["web_search_call.action.sources"], input: `Pesquisa web: ${cleanQuery}.${scope} Devolve uma síntese factual e concisa baseada em, no máximo, ${limit} fontes relevantes.` }) });
+      response = await this.fetch("https://api.openai.com/v1/responses", { method: "POST", signal: AbortSignal.timeout(this.timeoutMs), headers: { Authorization: `Bearer ${this.apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: this.model, reasoning: { effort: "low" }, text: { verbosity: "low" }, max_output_tokens: 600, store: false, tools: [{ type: "web_search" }], tool_choice: "required", max_tool_calls: 1, include: ["web_search_call.action.sources"], input: `Pesquisa web: ${cleanQuery}.${scope} Devolve uma síntese factual e concisa baseada em, no máximo, ${limit} fontes relevantes.` }) });
     } catch (error) { if (["AbortError","TimeoutError"].includes(error.name)) throw new RuntimeError("AI_TIMEOUT", "Pesquisa web excedeu o timeout."); throw new RuntimeError("AI_UNAVAILABLE", "Pesquisa web indisponível."); }
     if (response.status === 429) throw new RuntimeError("AI_RATE_LIMIT", "Limite do provider de pesquisa atingido."); if (response.status >= 500) throw new RuntimeError("AI_UNAVAILABLE", "Provider de pesquisa indisponível."); if (!response.ok) throw new RuntimeError([401,403].includes(response.status) ? "AI_AUTH_ERROR" : "AI_BAD_RESPONSE", "Pesquisa web recusada.");
     const data = await response.json(); const output = Array.isArray(data.output) ? data.output : []; const messages = output.filter((item) => item.type === "message").flatMap((item) => item.content || []).filter((item) => item.type === "output_text");

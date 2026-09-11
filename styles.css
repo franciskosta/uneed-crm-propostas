@@ -3379,6 +3379,11 @@ textarea {
 .mission-progress-track { height:7px; overflow:hidden; border-radius:999px; background:#e1e4ef; }
 .mission-progress-track span { display:block; height:100%; min-width:7%; border-radius:inherit; background:linear-gradient(90deg,#181d49,#df1746); transition:width .35s ease; animation:missionPulse 1.4s ease-in-out infinite alternate; }
 .mission-warning { padding:10px 12px; border-radius:8px; background:#fff7df; color:#765b0a; }
+.mission-commercial-summary { margin:14px 0; padding:16px; border:1px solid #e2e5ef; border-radius:12px; background:#f8f9fd; }
+.mission-commercial-summary h4 { margin:12px 0 4px; }
+.mission-commercial-summary h4:first-child { margin-top:0; }
+.mission-commercial-summary p { margin:0; }
+.mission-score small { display:block; max-width:420px; margin-top:3px; opacity:.78; font-size:11px; }
 .prospect-readiness { display:inline-flex; width:max-content; padding:4px 8px; border-radius:999px; background:#eef0f7; color:#555b73; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
 .prospect-readiness.readiness-researching { background:#fff1c9; color:#745500; }
 .prospect-readiness.readiness-ready_for_contact { background:#dff7ea; color:#12623a; }

@@ -1,4 +1,4 @@
-const { OUTREACH_POLICY, SCORING_CONFIG: SCORING } = require("../lead-intelligence");
+const { OUTREACH_POLICY, SCORING_CONFIG: SCORING, SERVICE_CATALOG } = require("../lead-intelligence");
 
 const versions = {
   "research-company": [
@@ -7,11 +7,11 @@ const versions = {
   ],
   "qualify-lead": [
     { id: "qualify-lead", name: "Qualificar oportunidade", version: "1.0.0", status: "historical", requiredCapabilities: ["structured_reasoning","structured_output"], allowedTools: ["read_crm"], instructions: "Avalia usando dados CRM." },
-    { id: "qualify-lead", name: "Qualificar oportunidade", version: "1.1.0", status: "active", requiredCapabilities: ["structured_reasoning","structured_output"], allowedTools: ["read_crm"], config: { scoring: SCORING }, instructions: "Consome o CompanyResearchPack. Explica cada parcela do score; não trates inferências como factos e recomenda apenas itens do catálogo recebido." },
+    { id: "qualify-lead", name: "Qualificar oportunidade", version: "1.1.0", status: "active", requiredCapabilities: ["structured_reasoning","structured_output"], allowedTools: ["read_crm"], config: { scoring: SCORING, serviceCatalog: SERVICE_CATALOG }, instructions: "Consome o CompanyResearchPack. Prioriza decisão comercial sobre sinais técnicos. Separa confirmedGaps, improvementOpportunities e unknowns. Explica cada parcela do score; não trates inferências como factos. Recomenda apenas serviceId existente no catálogo oficial da configuração, nunca nomes livres." },
   ],
   "prepare-outreach": [
     { id: "prepare-outreach", name: "Preparar abordagem", version: "1.0.0", status: "historical", requiredCapabilities: ["structured_output"], allowedTools: ["read_crm"], instructions: "Prepara mensagem sem enviar." },
-    { id: "prepare-outreach", name: "Preparar abordagem", version: "1.1.0", status: "active", requiredCapabilities: ["structured_output"], allowedTools: ["read_crm"], config: { outreachPolicy: OUTREACH_POLICY }, instructions: `Segue a política ${OUTREACH_POLICY.id}@${OUTREACH_POLICY.version}: ${OUTREACH_POLICY.rules.join("; ")}. Nunca envia a mensagem.` },
+    { id: "prepare-outreach", name: "Preparar abordagem", version: "1.1.0", status: "active", requiredCapabilities: ["structured_output"], allowedTools: ["read_crm"], config: { outreachPolicy: OUTREACH_POLICY, serviceCatalog: SERVICE_CATALOG }, instructions: `Segue a política ${OUTREACH_POLICY.id}@${OUTREACH_POLICY.version}: ${OUTREACH_POLICY.rules.join("; ")}. Usa apenas produto e condições do catálogo oficial da configuração. Nunca inventa produtos, preços ou problemas. Nunca envia a mensagem.` },
   ],
 };
 

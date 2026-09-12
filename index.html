@@ -717,13 +717,13 @@
               <button class="button accent" id="prospectGenerateBtn" type="submit">Procurar e adicionar</button>
             </div>
             <div class="prospect-generator-grid">
-              <label>Nicho<select id="prospectNiche"></select></label>
-              <label>Estratégia<select id="prospectStrategy"><option value="uneed_presence" selected>Uneed Presença</option><option value="high_ticket" disabled>High Ticket — inteligência em configuração</option></select></label>
-              <label>Distrito / Região<select id="prospectDistrict"></select></label>
+              <label><span id="prospectNicheLabel">Nicho</span><select id="prospectNiche"></select></label>
+              <label>Estratégia<select id="prospectStrategy"><option value="uneed_presence" selected>Uneed Presença</option><option value="high_ticket">High Ticket</option></select></label>
+              <label><span id="prospectRegionLabel">Distrito / Região</span><select id="prospectDistrict"></select></label>
               <label>Município<select id="prospectMunicipality"></select></label>
               <label>Raio<select id="prospectRadius"><option value="5">5 km</option><option value="10" selected>10 km</option><option value="20">20 km</option></select></label>
               <label>Máximo<input id="prospectLimit" type="number" min="1" max="60" value="20" /></label>
-              <label>Score mínimo<select id="prospectMinScore"><option>60</option><option selected>70</option><option>80</option><option>90</option></select></label>
+              <label><span id="prospectScoreLabel">Score mínimo</span><select id="prospectMinScore"><option>40</option><option>55</option><option>60</option><option selected>70</option><option>80</option><option>90</option></select></label>
             </div>
             <div class="prospect-run-status" id="prospectRunStatus" hidden></div>
           </form>

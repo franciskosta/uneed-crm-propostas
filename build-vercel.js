@@ -13,6 +13,7 @@ const files = [
   "commercial-core.js",
   "acquisition-strategies.js",
   "lead-intelligence.js",
+  "high-ticket-intelligence.js",
   "suporte.js",
   "portugal-municipalities.json",
 ];

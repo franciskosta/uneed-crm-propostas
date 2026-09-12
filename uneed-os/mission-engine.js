@@ -50,7 +50,7 @@ class MissionEngine {
       for (const trace of discovery.trace) mission.events.push(event("tool.executed", `${trace.toolId} executada`, { stepId: step.id, tool: trace.toolId, query: trace.input.query, url: trace.input.url, results: trace.resultCount, durationMs: trace.durationMs, cached: trace.cached, estimatedCost: trace.estimatedCost, cost: trace.cost }));
       mission.metadata.discover = { partial: discovery.partial, warnings: discovery.pack.warnings, searches: discovery.trace.filter((item) => item.toolId === "search_web").length, pagesFetched: discovery.trace.filter((item) => ["inspect_website","fetch_public_page"].includes(item.toolId)).length, durationMs: discovery.durationMs }; remainingBudget -= Number(discovery.toolCost ?? discovery.toolEstimatedCost ?? 0);
     }
-    const response = await this.gateway.execute({ task: skill.id, capabilitiesRequired: skill.requiredCapabilities, quality: skill.id === "qualify-lead" && !mission.input?.leadFactoryBatchId ? "SMART" : "FAST", budget: remainingBudget, allowFallback: true, context, instructions: skill.instructions, outputSchema: { type: "object", required: OUTPUT_FIELDS[skill.id] } });
+    const response = await this.gateway.execute({ task: skill.id, capabilitiesRequired: skill.requiredCapabilities, quality: skill.id === "qualify-lead" && !mission.input?.leadFactoryBatchId && context.acquisitionStrategy !== "high_ticket" ? "SMART" : "FAST", budget: remainingBudget, allowFallback: true, context, instructions: skill.instructions, outputSchema: { type: "object", required: OUTPUT_FIELDS[skill.id] } });
     if (!validateSkillOutput(skill.id, response.output, skill.version)) throw new RuntimeError("AI_BAD_RESPONSE", `Output inválido para ${skill.id}@${skill.version}.`);
     mission.estimatedCost += Number(response.estimatedCost || 0); mission.callCount += Number(response.usage?.calls || 1); mission.inputTokens += Number(response.usage?.inputTokens || 0); mission.outputTokens += Number(response.usage?.outputTokens || 0);
     if (response.cost == null) mission.costStatus = "unknown"; else mission.actualCost += Number(response.cost);
@@ -60,7 +60,7 @@ class MissionEngine {
   }
   buildResult(mission) {
     const outputs = Object.fromEntries(mission.steps.filter((step) => step.skillId && step.output).map((step) => [resultKey(step.skillId), step.output]));
-    return mission.type === "research_company" ? outputs : { ...outputs, actionProposal: { type: "send_external_message", requiresApproval: true, reason: "Uma mensagem externa exige decisão humana.", impact: "Inicia contacto comercial com o lead.", expectedResult: "Validar interesse numa conversa." } };
+    const highTicket = mission.input?.acquisitionStrategy === "high_ticket"; return mission.type === "research_company" ? outputs : { ...outputs, actionProposal: { type: "send_external_message", requiresApproval: true, reviewLevel: highTicket ? "strict" : "normal", reason: highTicket ? "Revisão estrita: validar fit, evidência, hipótese, decisor e mensagem antes do convite." : "Uma mensagem externa exige decisão humana.", impact: highTicket ? "Pode iniciar um convite para o Diagnóstico Digital; não cria proposta nem recomenda solução." : "Inicia contacto comercial com o lead.", expectedResult: highTicket ? "Validar interesse no Diagnóstico Digital Uneed." : "Validar interesse numa conversa." } };
   }
   async assertCanContinue(mission, workerId, deadline) {
     if (Date.now() > deadline) throw new RuntimeError("AI_TIMEOUT", "Timeout global da execução atingido.");

@@ -11,11 +11,11 @@ test("Presença is the runnable default strategy with Quest eligibility", () => 
   assert.equal(strategy.requiredHumanReview, "normal");
 });
 
-test("High Ticket exists structurally but cannot run generation", () => {
+test("High Ticket is runnable with strict review and without an invented service", () => {
   assert.equal(getStrategy("high_ticket").questEligible, false);
   assert.equal(getStrategy("high_ticket").serviceId, null);
   assert.equal(getStrategy("high_ticket").requiredHumanReview, "strict");
-  assert.throws(() => assertRunnable("high_ticket"), /inteligência ainda em configuração/);
+  assert.equal(assertRunnable("high_ticket").qualificationProfile, "high_ticket_v1");
 });
 
 test("Lead Intelligence carries explicit strategy and policy versions without inventing a High Ticket service", () => {

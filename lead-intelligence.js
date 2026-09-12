@@ -18,7 +18,7 @@
   });
   const DIRECTORY_HOSTS = ["racius.com", "racius.pt", "einforma.pt", "infoempresas.com.pt", "portugalio.com", "guiadeempresas.pt", "tripadvisor.", "yelp.", "facebook.com", "instagram.com", "linkedin.com", "linktr.ee", "beacons.ai", "fresha.com", "google.com"];
   const clean = (value) => String(value || "").trim();
-  function formatStructuredValue(value) { if (value == null) return ""; if (["string", "number", "boolean"].includes(typeof value)) return String(value); if (Array.isArray(value)) return value.map(formatStructuredValue).filter(Boolean).join(" · "); return value.label || value.statement || value.recommendation || value.fact || value.reason || value.basis || value.evidence || Object.entries(value).map(([key, item]) => `${key}: ${formatStructuredValue(item)}`).join(" · "); }
+  function formatStructuredValue(value) { if (value == null) return ""; if (["string", "number", "boolean"].includes(typeof value)) return String(value); if (Array.isArray(value)) return value.map(formatStructuredValue).filter(Boolean).join(" · "); return value.label || value.statement || value.hypothesis || value.recommendation || value.fact || value.reason || value.role || value.basis || value.evidence || Object.entries(value).map(([key, item]) => `${key}: ${formatStructuredValue(item)}`).join(" · "); }
   const safeUrl = (value) => { try { const parsed = new URL(clean(value)); return ["http:", "https:"].includes(parsed.protocol) ? parsed.href : ""; } catch { return ""; } };
   const host = (value) => { try { return new URL(safeUrl(value)).hostname.replace(/^www\./, "").toLowerCase(); } catch { return ""; } };
   function classifyUrl(value) {

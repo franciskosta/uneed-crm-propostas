@@ -2675,8 +2675,8 @@ function normalizedProspectKeys(prospect) {
   return [prospect.placeId && `place:${prospect.placeId}`, domain && `domain:${domain}`, instagram && `instagram:${instagram}`, phone && `phone:${phone}`, namePlace !== "|" && `name:${namePlace}`].filter(Boolean);
 }
 
-function knownProspectKeys() {
-  return [...new Set([...(state.instagramProspects || []).flatMap(normalizedProspectKeys), ...(state.prospectRejectedKeys || [])])];
+function knownProspectKeys({ includeRejected = true } = {}) {
+  return [...new Set([...(state.instagramProspects || []).flatMap(normalizedProspectKeys), ...(includeRejected ? state.prospectRejectedKeys || [] : [])])];
 }
 
 async function loadPortugalMunicipalities() {
@@ -2746,7 +2746,7 @@ async function generateProspects() {
       if (data.session?.access_token) headers.Authorization = `Bearer ${data.session.access_token}`;
     }
     const minimumScore = Number(qs("#prospectMinScore").value); const batchId = crypto.randomUUID();
-    const response = await fetch("/api/prospect/search", { method: "POST", headers, body: JSON.stringify({ niche, district, municipalities, radiusKm: Number(qs("#prospectRadius").value), limit: Number(qs("#prospectLimit").value), minScore: minimumScore, knownKeys: knownProspectKeys(), acquisitionStrategy }) });
+    const response = await fetch("/api/prospect/search", { method: "POST", headers, body: JSON.stringify({ niche, district, municipalities, radiusKm: Number(qs("#prospectRadius").value), limit: Number(qs("#prospectLimit").value), minScore: minimumScore, knownKeys: knownProspectKeys({ includeRejected: acquisitionStrategy !== "high_ticket" }), acquisitionStrategy }) });
     const rawPayload = await response.text(); let payload; try { payload = JSON.parse(rawPayload); } catch { throw new Error(response.status === 504 || /timed out|error occurred/i.test(rawPayload) ? "A pesquisa demorou demasiado. Tenta um município específico, máximo 1–3 e Fit mínimo 55." : "O servidor devolveu uma resposta inválida. Tenta novamente dentro de momentos."); }
     if (!response.ok) throw new Error(payload.error || "Não foi possível concluir a pesquisa");
     const added = [];
@@ -2758,7 +2758,7 @@ async function generateProspects() {
     state.prospectStats.searches += 1;
     state.prospectStats.duplicatesSkipped += Number(payload.duplicates || 0);
     state.prospectStats.rejected += Number(payload.rejected || 0);
-    state.prospectRejectedKeys = [...new Set([...(state.prospectRejectedKeys || []), ...(payload.rejectedKeys || [])])].slice(-20000);
+    if (acquisitionStrategy !== "high_ticket") state.prospectRejectedKeys = [...new Set([...(state.prospectRejectedKeys || []), ...(payload.rejectedKeys || [])])].slice(-20000);
     saveState();
     updateMunicipalityFilter();
     renderInstagramProspecting();

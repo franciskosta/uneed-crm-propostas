@@ -2746,7 +2746,7 @@ async function generateProspects() {
     }
     const minimumScore = Number(qs("#prospectMinScore").value); const batchId = crypto.randomUUID();
     const response = await fetch("/api/prospect/search", { method: "POST", headers, body: JSON.stringify({ niche, district, municipalities, radiusKm: Number(qs("#prospectRadius").value), limit: Number(qs("#prospectLimit").value), minScore: minimumScore, knownKeys: knownProspectKeys(), acquisitionStrategy }) });
-    const payload = await response.json();
+    const rawPayload = await response.text(); let payload; try { payload = JSON.parse(rawPayload); } catch { throw new Error(response.status === 504 || /timed out|error occurred/i.test(rawPayload) ? "A pesquisa demorou demasiado. Tenta um município específico, máximo 1–3 e Fit mínimo 55." : "O servidor devolveu uma resposta inválida. Tenta novamente dentro de momentos."); }
     if (!response.ok) throw new Error(payload.error || "Não foi possível concluir a pesquisa");
     const added = [];
     for (const lead of payload.results || []) {
@@ -2764,7 +2764,7 @@ async function generateProspects() {
     status.textContent = `Encontrados ${added.length} candidatos. A criar Companies/Leads e iniciar DISCOVER…`;
     const enrichment = await queueLeadFactoryEnrichment(added, status);
     status.dataset.tone = enrichment.failed ? "progress" : "success";
-    status.textContent = `${enrichment.started} Leads em preparação · ${payload.duplicates || 0} repetidos evitados · ${payload.rejected || 0} rejeitados pelo score${enrichment.failed ? ` · ${enrichment.failed} precisam de revisão` : ""}.`;
+    status.textContent = `${enrichment.started} Leads em preparação · ${payload.duplicates || 0} repetidos evitados · ${payload.rejected || 0} rejeitados pelo score${payload.partial ? ` · pesquisa limitada após analisar ${payload.inspected || 0} candidatos` : ""}${enrichment.failed ? ` · ${enrichment.failed} precisam de revisão` : ""}.`;
   } catch (error) {
     status.dataset.tone = "error";
     status.textContent = error.message;

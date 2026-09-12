@@ -1584,6 +1584,16 @@ async function missionApi(path = "", options = {}) {
   return payload;
 }
 
+async function missionActionApi(id, action, input = {}) {
+  const client = getSupabaseClient();
+  const accessToken = client ? (await client.auth.getSession()).data.session?.access_token : null;
+  const apiBase = String(window.UNEED_SUPABASE?.apiUrl || "").replace(/\/$/, "");
+  const response = await fetch(`${apiBase}/api/mission-action`, { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json", ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) }, body: JSON.stringify({ id, action, ...input }) });
+  const payload = await response.json().catch(() => ({ ok: false, error: `invalid_response_${response.status}` }));
+  if (!response.ok || !payload.ok) throw new Error(payload.error || `mission_action_failed_${response.status}`);
+  return payload;
+}
+
 function formatConfidence(value) { if (value == null) return "—"; if (["low", "medium", "high"].includes(String(value))) return ({ low: "Baixa", medium: "Média", high: "Alta" })[value]; const numeric = Number(value); return Number.isFinite(numeric) ? `${Math.round(numeric * 100)}%` : "—"; }
 function safeExternalUrl(value) { try { const url = new URL(value); return ["http:", "https:"].includes(url.protocol) ? url.href : ""; } catch { return ""; } }
 function structuredText(value) { return window.UNEED_LEAD_INTELLIGENCE?.formatStructuredValue(value) || (value == null ? "" : String(value)); }
@@ -1731,11 +1741,11 @@ async function decideMission(id, approved, trigger) {
   const container = trigger?.closest(".approval-box"); const buttons = container ? [...container.querySelectorAll("[data-mission-decision]")] : [];
   buttons.forEach((button) => { button.disabled = true; });
   const feedback = container?.querySelector(".mission-decision-feedback"); if (feedback) feedback.textContent = approved ? "A registar aprovação…" : "A registar rejeição…";
-  try { const payload = await missionApi(`/${id}/decision`, { method: "POST", body: JSON.stringify({ approved }) }); missions = missions.map((item) => item.id === id ? payload.mission : item); renderMissions(); openMission(id); }
+  try { const payload = await missionActionApi(id, "decision", { approved }); missions = missions.map((item) => item.id === id ? payload.mission : item); renderMissions(); openMission(id); }
   catch (error) { buttons.forEach((button) => { button.disabled = false; }); if (feedback) feedback.textContent = `Não foi possível concluir: ${error.message}`; else showSuccessModal(error.message); }
 }
 
-async function actOnMission(id, action) { try { const payload = await missionApi(`/${id}/${action}`, { method: "POST" }); missions = missions.map((item) => item.id === id ? payload.mission : item); renderMissions(); openMission(id); } catch (error) { showSuccessModal(error.message); } }
+async function actOnMission(id, action) { try { const payload = await missionActionApi(id, action); missions = missions.map((item) => item.id === id ? payload.mission : item); renderMissions(); openMission(id); } catch (error) { showSuccessModal(error.message); } }
 
 function addActivity(type, note) {
   const proposal = readForm();

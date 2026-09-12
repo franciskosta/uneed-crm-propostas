@@ -13,6 +13,6 @@ test("approval controls remain stable while a Mission waits for Francisco", () =
 
 test("approval interaction displays progress and sends the decision", () => {
   assert.match(source, /A registar aprovação/);
-  assert.match(source, /missionApi\(`\/\$\{id\}\/decision`/);
-  assert.match(source, /JSON\.stringify\(\{ approved \}\)/);
+  assert.match(source, /missionActionApi\(id, "decision", \{ approved \}\)/);
+  assert.match(source, /\/api\/mission-action/);
 });

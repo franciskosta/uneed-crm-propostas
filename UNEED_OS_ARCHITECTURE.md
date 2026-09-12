@@ -16,6 +16,8 @@ O UNEED OS é a evolução incremental do CRM existente, não um CRM paralelo. F
 6. Lead Intelligence é única e versionada: score, canal, mensagem, follow-up e recomendação partilham a mesma Policy.
 7. Uma fonte externa só é website oficial quando a sua classificação o permite; diretórios, redes sociais e plataformas de marcação permanecem evidências externas.
 8. Automação prepara e recomenda; contacto, aprovação e alteração do estado comercial continuam sob controlo humano.
+9. One factory, many strategies. A Lead Factory é partilhada; cada Acquisition Strategy define políticas de pesquisa, qualificação, mensagem e execução.
+10. Strategy is explicit. Cada Lead comercial automático transporta uma estratégia explícita, nunca inferida pela localização na UI ou por campos arbitrários.
 
 Dados, regras, workflows, Skills, Tools e conhecimento UNEED são ativos permanentes. Providers, modelos, interfaces e frameworks são substituíveis.
 

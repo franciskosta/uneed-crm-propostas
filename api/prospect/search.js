@@ -1,4 +1,5 @@
 const { buildLeadIntelligence, classifyUrl } = require("../../lead-intelligence");
+const { assertRunnable } = require("../../acquisition-strategies");
 
 const GOOGLE_ENDPOINT = "https://places.googleapis.com/v1/places:searchText";
 function send(res, status, payload) { res.status(status).setHeader("Cache-Control", "no-store").json(payload); }
@@ -10,6 +11,7 @@ async function googleSearch(body) { const response = await fetch(GOOGLE_ENDPOINT
 
 async function discover(params) {
   if (!process.env.GOOGLE_PLACES_API_KEY) throw new Error("Falta configurar GOOGLE_PLACES_API_KEY na Vercel");
+  const strategy = assertRunnable(params.acquisitionStrategy);
   const seen = new Set((params.knownKeys || []).slice(0, 20000)); const results = []; const rejectedKeys = []; let duplicates = 0; let rejected = 0; const target = Math.max(1, Math.min(Number(params.limit) || 20, 60));
   for (const municipality of (params.municipalities || []).slice(0, 308)) {
     if (results.length >= target) break;
@@ -25,7 +27,7 @@ async function discover(params) {
         const candidate = { placeId: place.id, name: place.displayName?.text || "Sem nome", niche: params.niche?.label || "", district: params.district || "", municipality, address: place.formattedAddress || "", phone: place.nationalPhoneNumber || "", website: classification.official ? classification.url : "", instagramUrl: extractInstagramUrl(rawWebsite), mapsUrl: place.googleMapsUri || "", rating: place.rating || null, reviewCount: place.userRatingCount || 0, externalReferences: classification.official || !classification.url ? [] : [{ url: classification.url, type: classification.type }] };
         const keys = keysFor({ ...candidate, website: candidate.website || rawWebsite }); if (keys.some((key) => seen.has(key))) { duplicates += 1; continue; } keys.forEach((key) => seen.add(key));
         const website = await inspectWebsite(candidate.website); if (!candidate.instagramUrl && website.instagramUrl) candidate.instagramUrl = website.instagramUrl;
-        const intelligence = buildLeadIntelligence({ ...candidate, hasBooking: website.hasBooking, hasCta: website.hasCta, confidence: website.exists ? 70 : 55 }, params.catalog || []);
+        const intelligence = buildLeadIntelligence({ ...candidate, strategyId: strategy.id, hasBooking: website.hasBooking, hasCta: website.hasCta, confidence: website.exists ? 70 : 55 });
         if (intelligence.commercialScore < Number(params.minScore || 0)) { rejected += 1; rejectedKeys.push(...keys); continue; }
         results.push({ ...candidate, ...intelligence, score: intelligence.commercialScore, confidence: intelligence.confidence, opportunity: intelligence.mainOpportunity, notes: intelligence.whyThisLead, message: intelligence.initialMessage, hasWebsite: Boolean(intelligence.officialWebsite), hasBooking: website.hasBooking, hasWhatsappTree: website.hasWhatsapp, source: "automated_lead_factory", discoverySource: "google_places" });
         if (results.length >= target) break;
@@ -33,7 +35,7 @@ async function discover(params) {
       pageToken = data.nextPageToken || ""; if (!pageToken) break;
     }
   }
-  return { results, duplicates, rejected, rejectedKeys: [...new Set(rejectedKeys)], policyVersion: "lead-intelligence-v0.1" };
+  return { results, duplicates, rejected, rejectedKeys: [...new Set(rejectedKeys)], policyVersion: "lead-intelligence-v0.1", acquisitionStrategy: strategy.id, serviceId: strategy.serviceId };
 }
 
 module.exports = async function handler(req, res) { if (req.method !== "POST") return send(res, 405, { ok: false, error: "method_not_allowed" }); try { if (!(await authenticate(req))) return send(res, 401, { ok: false, error: "Sessão inválida ou expirada" }); const params = typeof req.body === "string" ? JSON.parse(req.body) : req.body; if (!params?.niche || !params.district || !Array.isArray(params.municipalities) || !params.municipalities.length) return send(res, 400, { ok: false, error: "Seleciona nicho, distrito e pelo menos um município" }); return send(res, 200, { ok: true, ...(await discover(params)) }); } catch (error) { return send(res, 500, { ok: false, error: error.message || "Falha na prospeção" }); } };

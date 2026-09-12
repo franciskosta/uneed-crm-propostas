@@ -3388,6 +3388,7 @@ textarea {
 .prospect-readiness.readiness-researching { background:#fff1c9; color:#745500; }
 .prospect-readiness.readiness-ready_for_contact { background:#dff7ea; color:#12623a; }
 .prospect-readiness.readiness-needs_review { background:#ffe3e8; color:#9b1937; }
+.prospect-strategy { display:inline-flex; width:max-content; margin-left:6px; padding:4px 8px; border-radius:999px; background:#181d49; color:#fff; font-size:10px; font-weight:800; letter-spacing:.05em; }
 @keyframes missionPulse { from { opacity:.65; } to { opacity:1; } }
 .mission-score { padding:14px; background:#181d49; color:#fff; border-radius:12px; justify-content:flex-start; }
 .mission-score > div { min-width:140px; display:grid; gap:4px; }

@@ -1621,7 +1621,7 @@ function renderMissionResult(mission, compact = false) {
     <h4>Fontes</h4><ul class="source-list">${(research.evidence || []).map((item) => { const source = safeExternalUrl(item.sourceUrl); return `<li>${source ? `<a href="${escapeAttr(source)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.sourceTitle || source)}</a>` : escapeHtml(item.sourceTitle || "CRM")} — ${escapeHtml(item.fact)}</li>`; }).join("") || "<li>Sem fontes externas confirmadas.</li>"}</ul>` : ""}
     ${!isResearchPack ? `<h4>Fontes / evidência</h4><p>${escapeHtml((research.sources || []).join(", ") || "—")}</p>` : ""}
     <div class="mission-meta">Custo real total: ${mission.costStatus === "unknown" || mission.toolCostStatus === "unknown" ? "desconhecido" : `€${(Number(mission.actualCost || 0) + Number(mission.toolCost || 0)).toFixed(4)}`} · Estimado: €${(Number(mission.estimatedCost || 0) + Number(mission.toolEstimatedCost || 0)).toFixed(4)} · ${mission.callCount || 0} chamadas IA · ${mission.inputTokens || 0}/${mission.outputTokens || 0} tokens · ${mission.events?.length || 0} eventos</div>` : ""}
-    ${mission.status === "waiting_approval" ? `<div class="approval-box"><strong>Requer Francisco</strong><p>${escapeHtml(result.actionProposal?.reason || "É necessária aprovação humana.")}</p><p>Impacto: ${escapeHtml(result.actionProposal?.impact || "—")}</p><div class="quick-actions"><button class="button primary" data-mission-decision="approve" data-mission-id="${escapeAttr(mission.id)}">Aprovar</button><button class="button ghost" data-mission-decision="reject" data-mission-id="${escapeAttr(mission.id)}">Rejeitar</button></div></div>` : ""}
+    ${mission.status === "waiting_approval" ? `<div class="approval-box"><strong>Requer Francisco</strong><p>${escapeHtml(result.actionProposal?.reason || "É necessária aprovação humana.")}</p><p>Impacto: ${escapeHtml(result.actionProposal?.impact || "—")}</p><div class="quick-actions"><button class="button primary" type="button" data-mission-decision="approve" data-mission-id="${escapeAttr(mission.id)}">Aprovar</button><button class="button ghost" type="button" data-mission-decision="reject" data-mission-id="${escapeAttr(mission.id)}">Rejeitar</button></div><p class="mission-decision-feedback" aria-live="polite"></p></div>` : ""}
     ${["queued","running","waiting_approval"].includes(mission.status) ? `<button class="button ghost" data-mission-action="cancel" data-mission-id="${escapeAttr(mission.id)}">Cancelar Mission</button>` : ""}
     ${mission.status === "failed" ? `<button class="button ghost" data-mission-action="retry" data-mission-id="${escapeAttr(mission.id)}">Tentar novamente</button>` : ""}
     ${!compact ? `<details><summary>Mission Timeline</summary><div class="mission-timeline">${(mission.events || []).map((item) => `<div><time>${new Date(item.createdAt).toLocaleTimeString("pt-PT", { hour: "2-digit", minute: "2-digit" })}</time><span>${escapeHtml(item.summary)}</span></div>`).join("")}</div></details><details><summary>Research debug</summary><pre>${escapeHtml(JSON.stringify({ discover: mission.metadata?.discover, tools: (mission.events || []).filter((item) => item.type === "tool.executed").map((item) => item.details) }, null, 2))}</pre></details>` : ""}
@@ -1643,7 +1643,7 @@ function renderMissions() {
   if (!hasActive && missionPollTimer) { clearInterval(missionPollTimer); missionPollTimer = null; }
   if (activeMissionModalId && qs("#missionModal")?.classList.contains("is-open")) {
     const activeMission = missions.find((item) => item.id === activeMissionModalId);
-    if (activeMission) qs("#missionModalBody").innerHTML = renderMissionResult(activeMission);
+    if (activeMission && activeMission.status !== "waiting_approval") qs("#missionModalBody").innerHTML = renderMissionResult(activeMission);
   }
 }
 
@@ -1727,9 +1727,12 @@ function openMission(id) {
   qs("#missionModalBody").innerHTML = renderMissionResult(mission); qs("#missionModal").classList.add("is-open"); qs("#missionModal").setAttribute("aria-hidden", "false");
 }
 
-async function decideMission(id, approved) {
+async function decideMission(id, approved, trigger) {
+  const container = trigger?.closest(".approval-box"); const buttons = container ? [...container.querySelectorAll("[data-mission-decision]")] : [];
+  buttons.forEach((button) => { button.disabled = true; });
+  const feedback = container?.querySelector(".mission-decision-feedback"); if (feedback) feedback.textContent = approved ? "A registar aprovação…" : "A registar rejeição…";
   try { const payload = await missionApi(`/${id}/decision`, { method: "POST", body: JSON.stringify({ approved }) }); missions = missions.map((item) => item.id === id ? payload.mission : item); renderMissions(); openMission(id); }
-  catch (error) { showSuccessModal(error.message); }
+  catch (error) { buttons.forEach((button) => { button.disabled = false; }); if (feedback) feedback.textContent = `Não foi possível concluir: ${error.message}`; else showSuccessModal(error.message); }
 }
 
 async function actOnMission(id, action) { try { const payload = await missionApi(`/${id}/${action}`, { method: "POST" }); missions = missions.map((item) => item.id === id ? payload.mission : item); renderMissions(); openMission(id); } catch (error) { showSuccessModal(error.message); } }
@@ -3928,9 +3931,9 @@ function bindEvents() {
   qs("#viewLeadMissionsBtn").addEventListener("click", () => { switchView("command"); renderMissions(); });
   qs("#refreshMissionsBtn").addEventListener("click", () => loadMissions());
   qs("#missionList").addEventListener("click", (event) => { const row = event.target.closest("[data-open-mission]"); if (row) openMission(row.dataset.openMission); });
-  qs("#leadMissionResult").addEventListener("click", (event) => { const decision = event.target.closest("[data-mission-decision]"); const action = event.target.closest("[data-mission-action]"); if (decision) decideMission(decision.dataset.missionId, decision.dataset.missionDecision === "approve"); else if (action) actOnMission(action.dataset.missionId, action.dataset.missionAction); });
+  qs("#leadMissionResult").addEventListener("click", (event) => { const decision = event.target.closest("[data-mission-decision]"); const action = event.target.closest("[data-mission-action]"); if (decision) { event.preventDefault(); decideMission(decision.dataset.missionId, decision.dataset.missionDecision === "approve", decision); } else if (action) actOnMission(action.dataset.missionId, action.dataset.missionAction); });
   qs("#closeMissionModal").addEventListener("click", () => { activeMissionModalId = null; qs("#missionModal").classList.remove("is-open"); qs("#missionModal").setAttribute("aria-hidden", "true"); });
-  qs("#missionModal").addEventListener("click", (event) => { const decision = event.target.closest("[data-mission-decision]"); const action = event.target.closest("[data-mission-action]"); if (decision) decideMission(decision.dataset.missionId, decision.dataset.missionDecision === "approve"); else if (action) actOnMission(action.dataset.missionId, action.dataset.missionAction); else if (event.target.id === "missionModal") qs("#closeMissionModal").click(); });
+  qs("#missionModal").addEventListener("click", (event) => { const decision = event.target.closest("[data-mission-decision]"); const action = event.target.closest("[data-mission-action]"); if (decision) { event.preventDefault(); event.stopPropagation(); decideMission(decision.dataset.missionId, decision.dataset.missionDecision === "approve", decision); } else if (action) actOnMission(action.dataset.missionId, action.dataset.missionAction); else if (event.target.id === "missionModal") qs("#closeMissionModal").click(); });
 
   qs("#closeSuccessModal").addEventListener("click", closeSuccessModal);
   qs("#successModal").addEventListener("click", (event) => {

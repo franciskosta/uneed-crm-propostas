@@ -3394,6 +3394,7 @@ textarea {
 .mission-score span { font-size:11px; opacity:.75; text-transform:uppercase; }
 .mission-score strong { font-size:22px; }
 .approval-box { padding:16px; background:#fff8e5; border:1px solid #f2cf75; border-radius:12px; }
+.mission-decision-feedback { min-height:20px; margin-top:10px !important; color:#555b73; font-size:13px; font-weight:700; }
 .mission-timeline { display:grid; gap:8px; margin-top:10px; }
 .mission-timeline div { display:grid; grid-template-columns:64px 1fr; gap:10px; }
 .mission-timeline time { color:#777c91; font-size:12px; }

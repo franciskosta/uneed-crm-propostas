@@ -37,7 +37,7 @@ class DiscoverSocialProfilesTool extends Tool {
   constructor() { super({ id: "discover_social_profiles" }); }
   async execute({ websiteLinks = [], searchResults = [], crm = {} }) { const candidates = [...websiteLinks.map((item) => ({ url: item.url, source: "website", confidence: "high" })), ...searchResults.map((item) => ({ url: item.url, source: "search", confidence: "medium" })), ...(crm.instagram ? [{ url: crm.instagram, source: "crm", confidence: "high" }] : [])]; const platforms = [["instagram",/instagram\.com\/([^/?#]+)/i],["facebook",/facebook\.com\/([^/?#]+)/i],["linkedin",/linkedin\.com\/(?:company\/)?([^/?#]+)/i],["youtube",/youtube\.com\/(?:@|channel\/|c\/)?([^/?#]+)/i],["tiktok",/tiktok\.com\/@?([^/?#]+)/i]]; const profiles = [];
     for (const candidate of candidates) for (const [platform, pattern] of platforms) { const match = candidate.url?.match(pattern); if (match) profiles.push({ platform, url: normalizeUrl(candidate.url, candidate.url), handle: match[1] || null, source: candidate.source, confidence: candidate.confidence }); }
-    return { profiles: [...new Map(profiles.map((item) => [`${item.platform}:${item.url}`, item])).values()], cost: 0, costStatus: "actual" };
+    return { profiles: [...new Map(profiles.map((item) => [`${item.platform}:${String(item.handle || item.url).toLowerCase().replace(/\/$/, "")}`, item])).values()], cost: 0, costStatus: "actual" };
   }
 }
 

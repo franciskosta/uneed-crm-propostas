@@ -49,6 +49,8 @@ test("insufficient evidence never produces a generic outreach message", () => {
   assert.equal(result.opportunityHypotheses.length, 0);
 });
 
+test("High Ticket explanation and message quote readable evidence rather than generic categories", () => { const pack = fixture(["locations"]); pack.evidence[0].fact = "Multi-localização: O grupo apresenta unidades em Belém, Parque das Nações e Odivelas."; pack.highTicketSignals.locations[0].statement = pack.evidence[0].fact; pack.evidence.push({ id: "ev-contact", fact: "Website oficial e contacto telefónico confirmados.", sourceUrl: "https://empresa.pt", confidence: "high" }); const result = buildHighTicketIntelligence({ name: "Hospital do Gato" }, pack); assert.match(result.opportunityHypotheses[0].rationale, /Belém, Parque das Nações e Odivelas/); assert.match(result.outreachStrategy.preparedMessage, /Multi-localização/); assert.doesNotMatch(result.outreachStrategy.preparedMessage, /Sinal público de locations/); });
+
 test("a researched but clearly unsuitable company can be rejected with a reason", () => {
   const pack = fixture([]); pack.evidence = [{ id: "generic", sourceUrl: "https://micro.pt", fact: "Website respondeu com HTTP 200.", confidence: "high" }, { id: "https", sourceUrl: "https://micro.pt", fact: "Website usa HTTPS.", confidence: "high" }];
   const result = buildHighTicketIntelligence({ name: "Micro Empresa" }, pack);

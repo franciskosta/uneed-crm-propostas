@@ -2852,14 +2852,16 @@ function renderInstagramProspecting() {
               .map((prospect) => {
                 const whatsapp = whatsappHref(prospect.phone, prospectWhatsappFollowupMessage(prospect));
                 return `
-                  <article class="deal-card prospect-card" data-instagram-open="${escapeAttr(prospect.id)}" draggable="true">
-                    <div class="deal-summary">
+                  <details class="deal-card prospect-card prospect-card-collapsible" data-instagram-open="${escapeAttr(prospect.id)}" draggable="true">
+                    <summary class="deal-summary">
                       <span>
                         <strong>${escapeHtml(prospect.name || "Contacto sem nome")}</strong>
                         <span class="card-meta">${escapeHtml(prospect.phone || "Sem telefone")}</span>
+                        <span class="card-meta">${escapeHtml(prospect.acquisitionStrategy === "high_ticket" ? "HIGH TICKET" : "PRESENÇA")}${prospect.score ? ` · Score ${escapeHtml(prospect.score)}` : ""}</span>
                       </span>
                       <span class="prospect-score">${prospect.hasWebsite ? "Site" : "Sem site"}</span>
-                    </div>
+                      <span class="prospect-card-chevron" aria-hidden="true">⌄</span>
+                    </summary>
                     <div class="deal-card-body">
                     ${safeExternalUrl(prospect.instagramUrl) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.instagramUrl))}" target="_blank" rel="noopener">Contactar pelo Instagram</a>` : `<span class="card-meta">Instagram não encontrado · usar telefone</span>`}
                     ${whatsapp ? `<a class="prospect-link whatsapp-link" href="${escapeAttr(whatsapp)}" target="_blank" rel="noopener">Enviar follow-up WhatsApp</a>` : ""}
@@ -2897,7 +2899,7 @@ function renderInstagramProspecting() {
                       <button class="button danger mini" data-instagram-delete="${escapeAttr(prospect.id)}" type="button">Apagar</button>
                     </div>
                   </div>
-                </article>
+                </details>
               `;
               })
               .join("") || `<div class="empty">Sem contactos.</div>`

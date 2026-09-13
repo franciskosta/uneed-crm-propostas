@@ -17,6 +17,8 @@ test("deleting a Kanban lead also hides its Missions from Command Center", () =>
 
 test("mockup action prepares a reusable ChatGPT image prompt instead of rendering locally", () => { assert.match(source, /generatedMockupPrompt: prompt/); assert.match(source, /Entrega apenas a imagem final do mockup/); assert.match(source, /copyMockupPromptBtn/); });
 
+test("prospecting cards are collapsed by default and expose details on demand", () => { assert.match(source, /<details class="deal-card prospect-card prospect-card-collapsible"/); assert.match(source, /<summary class="deal-summary">/); assert.match(source, /prospect-card-chevron/); assert.doesNotMatch(source, /<details class="deal-card prospect-card prospect-card-collapsible"[^>]* open/); });
+
 test("approval controls remain stable while a Mission waits for Francisco", () => {
   assert.match(source, /activeMission\.status !== "waiting_approval"/);
   assert.match(source, /type="button" data-mission-decision="approve"/);

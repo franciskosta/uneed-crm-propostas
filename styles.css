@@ -2507,6 +2507,13 @@ textarea {
   border-color: rgba(24, 29, 73, 0.14);
 }
 
+.prospect-card-collapsible { padding:0; overflow:hidden; }
+.prospect-card-collapsible > .deal-summary { grid-template-columns:minmax(0,1fr) auto auto; padding:13px; cursor:pointer; }
+.prospect-card-collapsible > .deal-summary::-webkit-details-marker { display:none; }
+.prospect-card-collapsible > .deal-card-body { margin:0 13px 13px; }
+.prospect-card-chevron { align-self:center; color:var(--muted); font-size:20px; transition:transform .18s ease; }
+.prospect-card-collapsible[open] .prospect-card-chevron { transform:rotate(180deg); }
+
 .prospect-score {
   border-radius: 999px;
   padding: 5px 8px;

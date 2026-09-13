@@ -9,6 +9,8 @@ test("Mission UI has isolated renderers for Presence and High Ticket", () => { c
 
 test("High Ticket renderer hides internal categories, confidence and evidence IDs", () => { const highTicketRenderer = source.slice(source.indexOf("function renderHighTicketIntelligence"), source.indexOf("function renderMissionResult")); const impactFormatter = source.slice(source.indexOf("function renderHighTicketImpact"), source.indexOf("function renderPresenceIntelligence")); assert.match(highTicketRenderer, /item\?\.statement/); assert.match(impactFormatter, /item\?\.impact/); assert.doesNotMatch(`${impactFormatter}${highTicketRenderer}`, /evidenceIds|item\?\.category|item\?\.confidence/); });
 
+test("legacy generic High Ticket research is rerun with the contextual quality version", () => { assert.match(source, /function isLegacyHighTicketResearch/); assert.match(source, /high-ticket-context-v0\.2/); assert.match(source, /!isLegacyHighTicketResearch\(existingMission\)/); });
+
 test("approval controls remain stable while a Mission waits for Francisco", () => {
   assert.match(source, /activeMission\.status !== "waiting_approval"/);
   assert.match(source, /type="button" data-mission-decision="approve"/);

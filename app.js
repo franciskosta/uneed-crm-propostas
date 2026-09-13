@@ -1671,6 +1671,7 @@ function appendFactoryActivity(prospect, mission, summary) {
 }
 
 function isHighTicketContaminated(mission) { if (!mission?.result) return false; return /uneed_presence|Uneed Presença|39\s*€|sem fidelização|simulação personalizada|pedidos de marcação integrados|ready_for_contact/i.test(JSON.stringify(mission.result)); }
+function isLegacyHighTicketResearch(mission) { if (mission?.input?.acquisitionStrategy !== "high_ticket" || !mission?.result) return false; return mission.input.researchQualityVersion !== "high-ticket-context-v0.2" || /Sinal público de (?:scale|catalogue|locations|operations|growth|b2b|manual|integrationGaps):/i.test(JSON.stringify(mission.result)); }
 
 function reconcileLeadFactoryMissions() {
   let changed = false;
@@ -1695,7 +1696,7 @@ function reconcileLeadFactoryMissions() {
 
 async function queueLeadFactoryEnrichment(prospects, status) {
   const queue = [...prospects]; let started = 0; let failed = 0;
-  const worker = async () => { while (queue.length) { const prospect = queue.shift(); const context = window.UNEED_COMMERCIAL_CORE?.companyContext(state, prospect.leadId); if (!context) { prospect.readiness = "needs_review"; failed += 1; continue; } try { const created = await missionApi("", { method: "POST", body: JSON.stringify({ type: "qualify_existing_lead", objective: `Preparar lead ${context.company.name}`, targetId: context.lead.id, targetType: "lead", autonomyLevel: "PREPARE", maxCost: Number(prospect.maxCostPerLead || 1), maxAttempts: 5, input: { ...context, leadFactoryBatchId: prospect.leadFactoryBatchId, acquisitionStrategy: prospect.acquisitionStrategy, serviceId: prospect.serviceId, intelligenceSeed: { name: prospect.name, niche: prospect.niche, municipality: prospect.municipality, district: prospect.district, phone: prospect.phone, instagramUrl: prospect.instagramUrl, website: prospect.officialWebsite || prospect.website, hasBooking: prospect.hasBooking, hasCta: prospect.hasCta, notes: prospect.notes, strategyId: prospect.acquisitionStrategy }, services: (state.catalog || []).map((item) => ({ name: item.name, selected: item.active !== false })) } }) }); prospect.latestResearchMissionId = created.mission.id; prospect.readiness = "researching"; started += 1; status.textContent = `Lead Factory: ${started}/${prospects.length} investigações colocadas em fila…`; } catch (error) { prospect.readiness = "needs_review"; prospect.warnings = [...new Set([...(prospect.warnings || []), error.message])]; failed += 1; } } };
+  const worker = async () => { while (queue.length) { const prospect = queue.shift(); const context = window.UNEED_COMMERCIAL_CORE?.companyContext(state, prospect.leadId); if (!context) { prospect.readiness = "needs_review"; failed += 1; continue; } try { const created = await missionApi("", { method: "POST", body: JSON.stringify({ type: "qualify_existing_lead", objective: `Preparar lead ${context.company.name}`, targetId: context.lead.id, targetType: "lead", autonomyLevel: "PREPARE", maxCost: Number(prospect.maxCostPerLead || 1), maxAttempts: 5, input: { ...context, leadFactoryBatchId: prospect.leadFactoryBatchId, acquisitionStrategy: prospect.acquisitionStrategy, researchQualityVersion: prospect.acquisitionStrategy === "high_ticket" ? "high-ticket-context-v0.2" : null, serviceId: prospect.serviceId, intelligenceSeed: { name: prospect.name, niche: prospect.niche, municipality: prospect.municipality, district: prospect.district, phone: prospect.phone, instagramUrl: prospect.instagramUrl, website: prospect.officialWebsite || prospect.website, hasBooking: prospect.hasBooking, hasCta: prospect.hasCta, notes: prospect.notes, strategyId: prospect.acquisitionStrategy }, services: (state.catalog || []).map((item) => ({ name: item.name, selected: item.active !== false })) } }) }); prospect.latestResearchMissionId = created.mission.id; prospect.readiness = "researching"; started += 1; status.textContent = `Lead Factory: ${started}/${prospects.length} investigações colocadas em fila…`; } catch (error) { prospect.readiness = "needs_review"; prospect.warnings = [...new Set([...(prospect.warnings || []), error.message])]; failed += 1; } } };
   await Promise.all(Array.from({ length: Math.min(2, prospects.length) }, () => worker())); saveState(); await loadMissions({ quiet: true }); return { started, failed };
 }
 
@@ -1732,7 +1733,7 @@ async function startInstagramResearch(prospectId, trigger) {
   const prospect = state.instagramProspects.find((item) => item.id === prospectId);
   const context = prospect && window.UNEED_COMMERCIAL_CORE?.companyContext(state, prospect.leadId);
   if (!context) { showSuccessModal("Não foi possível resolver a Company deste Lead."); return; }
-  const highTicket = prospect.acquisitionStrategy === "high_ticket"; const mission = await createCommercialMission({ type: highTicket ? "qualify_existing_lead" : "research_company", objective: `${highTicket ? "Reanalisar High Ticket" : "Investigar"} ${context.company.name}`, targetType: highTicket ? "lead" : "company", targetId: highTicket ? context.lead.id : context.company.id, input: { ...context, acquisitionStrategy: prospect.acquisitionStrategy || context.lead?.acquisitionStrategy || "uneed_presence", serviceId: highTicket ? null : prospect.serviceId }, trigger });
+  const highTicket = prospect.acquisitionStrategy === "high_ticket"; const mission = await createCommercialMission({ type: highTicket ? "qualify_existing_lead" : "research_company", objective: `${highTicket ? "Reanalisar High Ticket" : "Investigar"} ${context.company.name}`, targetType: highTicket ? "lead" : "company", targetId: highTicket ? context.lead.id : context.company.id, input: { ...context, acquisitionStrategy: prospect.acquisitionStrategy || context.lead?.acquisitionStrategy || "uneed_presence", researchQualityVersion: highTicket ? "high-ticket-context-v0.2" : null, serviceId: highTicket ? null : prospect.serviceId }, trigger });
   if (mission) { prospect.latestResearchMissionId = mission.id; prospect.readiness = "researching"; saveState(); renderInstagramProspecting(); }
 }
 
@@ -4186,7 +4187,7 @@ function bindEvents() {
       event.stopPropagation();
       const prospect = state.instagramProspects.find((item) => item.id === researchButton.dataset.instagramResearch);
       const existingMission = prospect?.latestResearchMissionId && missions.find((item) => item.id === prospect.latestResearchMissionId);
-      if (existingMission && !isHighTicketContaminated(existingMission)) openMission(existingMission.id);
+      if (existingMission && !isHighTicketContaminated(existingMission) && !isLegacyHighTicketResearch(existingMission)) openMission(existingMission.id);
       else startInstagramResearch(researchButton.dataset.instagramResearch, researchButton);
       return;
     }

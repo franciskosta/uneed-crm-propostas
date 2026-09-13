@@ -5,6 +5,8 @@ const path = require("node:path");
 
 const source = fs.readFileSync(path.join(__dirname, "..", "app.js"), "utf8");
 
+test("Mission UI has isolated renderers for Presence and High Ticket", () => { const highTicketRenderer = source.slice(source.indexOf("function renderHighTicketIntelligence"), source.indexOf("function renderMissionResult")); assert.match(source, /function renderPresenceIntelligence/); assert.match(highTicketRenderer, /High Ticket|Diagnóstico Digital|Hipóteses de oportunidade|Perguntas para validar/); assert.doesNotMatch(highTicketRenderer, /Uneed Presença|39€|sem fidelização|simulação personalizada|ready_for_contact/); });
+
 test("approval controls remain stable while a Mission waits for Francisco", () => {
   assert.match(source, /activeMission\.status !== "waiting_approval"/);
   assert.match(source, /type="button" data-mission-decision="approve"/);

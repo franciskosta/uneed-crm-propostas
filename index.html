@@ -1033,11 +1033,11 @@
         <div class="modal-heading">
           <div>
             <p class="eyebrow">Abordagem personalizada</p>
-            <strong id="mockupModalTitle">Criar mockup personalizado</strong>
+            <strong id="mockupModalTitle">Preparar prompt de mockup</strong>
           </div>
           <button class="icon-button" id="closeMockupModal" type="button" aria-label="Fechar">×</button>
         </div>
-        <p>Cria uma imagem premium com portátil e telemóvel, aplicando o logotipo do cliente em alto contraste no modelo visual.</p>
+        <p>Prepara um prompt completo para gerar o mockup com IA no ChatGPT. Depois copia o texto e anexa o logotipo do cliente na conversa.</p>
         <div class="mockup-form-grid">
           <label>
             Nome/marca do cliente
@@ -1048,25 +1048,27 @@
             <input id="mockupOffer" placeholder="Ex: Marcar consulta online" />
           </label>
           <label>
-            Logotipo do cliente
-            <input id="mockupLogoInput" type="file" accept="image/*" />
-          </label>
-          <label>
             Área de negócio
             <input id="mockupNiche" placeholder="Ex: estética, clínica, restauração..." />
           </label>
+          <p class="full field-hint">Se existir logotipo, anexa-o diretamente no ChatGPT juntamente com o prompt.</p>
           <label class="full">
             Detalhes a destacar
             <textarea id="mockupBrief" rows="4" placeholder="Ex: quer mais marcações, precisa de WhatsApp visível, não tem sistema de reservas..."></textarea>
           </label>
         </div>
+        <label class="mockup-prompt-output" id="mockupPromptWrap" hidden>
+          Prompt pronto para o ChatGPT
+          <textarea id="mockupPromptOutput" rows="12" readonly></textarea>
+        </label>
         <div class="mockup-preview-large" id="mockupPreviewWrap" hidden>
           <img id="mockupPreviewImage" alt="Mockup gerado" />
         </div>
         <p class="mockup-status" id="mockupStatus" role="status" hidden></p>
         <div class="modal-actions">
           <button class="button ghost" id="cancelMockupBtn" type="button">Cancelar</button>
-          <button class="button primary" id="generateMockupBtn" type="button">Gerar mockup</button>
+          <button class="button ghost" id="copyMockupPromptBtn" type="button" hidden>Copiar prompt</button>
+          <button class="button primary" id="generateMockupBtn" type="button">Preparar prompt</button>
         </div>
       </div>
     </div>

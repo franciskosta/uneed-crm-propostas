@@ -11,6 +11,12 @@ test("High Ticket renderer hides internal categories, confidence and evidence ID
 
 test("legacy generic High Ticket research is rerun with the contextual quality version", () => { assert.match(source, /function isLegacyHighTicketResearch/); assert.match(source, /high-ticket-context-v0\.2/); assert.match(source, /!isLegacyHighTicketResearch\(existingMission\)/); });
 
+test("prospecting Kanban separates pending Presence and High Ticket leads", () => { assert.match(source, /Por fazer · Presença/); assert.match(source, /Por fazer · High Ticket/); assert.match(source, /data-instagram-drop-strategy/); });
+
+test("deleting a Kanban lead also hides its Missions from Command Center", () => { assert.match(source, /state\.deletedMissionTargetIds/); assert.match(source, /visibleMissions = missions\.filter/); assert.match(source, /missions = missions\.filter\(\(item\) => item\.targetId !== leadId\)/); });
+
+test("mockup action prepares a reusable ChatGPT image prompt instead of rendering locally", () => { assert.match(source, /generatedMockupPrompt: prompt/); assert.match(source, /Entrega apenas a imagem final do mockup/); assert.match(source, /copyMockupPromptBtn/); });
+
 test("approval controls remain stable while a Mission waits for Francisco", () => {
   assert.match(source, /activeMission\.status !== "waiting_approval"/);
   assert.match(source, /type="button" data-mission-decision="approve"/);

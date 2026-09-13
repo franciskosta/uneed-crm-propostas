@@ -2743,6 +2743,9 @@ textarea {
   grid-column: 1 / -1;
 }
 
+.mockup-prompt-output { display:grid; gap:8px; margin-top:16px; font-weight:800; }
+.mockup-prompt-output textarea { width:100%; resize:vertical; line-height:1.45; font-weight:500; }
+
 .mockup-preview-large {
   margin-top: 16px;
   padding: 10px;

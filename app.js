@@ -489,6 +489,7 @@ function migrateBrandDefaults() {
     if (!("updatedAt" in contract)) contract.updatedAt = contract.createdAt;
   });
   state.instagramProspects ||= [];
+  state.deletedMissionTargetIds ||= [];
   state.prospectStats ||= { duplicatesSkipped: 0, rejected: 0, searches: 0 };
   state.prospectRejectedKeys ||= [];
   state.instagramProspects.forEach((prospect) => {
@@ -501,6 +502,7 @@ function migrateBrandDefaults() {
     if (!("mockupBrief" in prospect)) prospect.mockupBrief = "";
     if (!("mockupOffer" in prospect)) prospect.mockupOffer = "";
     if (!("mockupGeneratedAt" in prospect)) prospect.mockupGeneratedAt = "";
+    if (!("generatedMockupPrompt" in prospect)) prospect.generatedMockupPrompt = "";
     if (!("createdAt" in prospect)) prospect.createdAt = new Date().toISOString();
     if (!("updatedAt" in prospect)) prospect.updatedAt = prospect.createdAt;
     if (prospect.message) prospect.message = formalizeProspectMessage(prospect.message);
@@ -1640,16 +1642,17 @@ function renderMissionResult(mission, compact = false) {
 }
 
 function renderMissions() {
-  const counts = (status) => missions.filter((item) => status.includes(item.status)).length;
+  const visibleMissions = missions.filter((item) => !state.deletedMissionTargetIds?.includes(item.targetId));
+  const counts = (status) => visibleMissions.filter((item) => status.includes(item.status)).length;
   qs("#missionRunningCount").textContent = counts(["draft", "queued", "running"]);
   qs("#missionApprovalCount").textContent = counts(["waiting_approval"]);
   qs("#missionCompletedCount").textContent = counts(["completed"]);
   qs("#missionFailedCount").textContent = counts(["failed"]);
-  qs("#missionList").innerHTML = missions.map((mission) => `<button class="mission-row" data-open-mission="${escapeAttr(mission.id)}"><span><strong>${escapeHtml(mission.objective)}</strong><small>${escapeHtml(mission.targetType)} · ${escapeHtml(mission.targetId)}</small></span><span class="mission-status status-${escapeAttr(mission.status)}">${escapeHtml(mission.status.replaceAll("_", " "))}</span></button>`).join("") || `<div class="empty">Ainda não existem missões.</div>`;
+  qs("#missionList").innerHTML = visibleMissions.map((mission) => `<button class="mission-row" data-open-mission="${escapeAttr(mission.id)}"><span><strong>${escapeHtml(mission.objective)}</strong><small>${escapeHtml(mission.targetType)} · ${escapeHtml(mission.targetId)}</small></span><span class="mission-status status-${escapeAttr(mission.status)}">${escapeHtml(mission.status.replaceAll("_", " "))}</span></button>`).join("") || `<div class="empty">Ainda não existem missões.</div>`;
   const proposal = getActiveProposal();
   const latest = proposal && missions.find((item) => item.targetId === proposal.id);
   qs("#leadMissionResult").innerHTML = latest ? renderMissionResult(latest, true) : "";
-  const hasActive = missions.some((item) => ["queued", "running"].includes(item.status));
+  const hasActive = visibleMissions.some((item) => ["queued", "running"].includes(item.status));
   if (hasActive && !missionPollTimer) missionPollTimer = setInterval(() => loadMissions({ quiet: true }), 2000);
   if (!hasActive && missionPollTimer) { clearInterval(missionPollTimer); missionPollTimer = null; }
   if (activeMissionModalId && qs("#missionModal")?.classList.contains("is-open")) {
@@ -2196,7 +2199,6 @@ function openMockupModal(id) {
   qs("#mockupOffer").value = prospect.mockupOffer || defaultMockupOffer(prospect);
   qs("#mockupNiche").value = prospect.niche || "";
   qs("#mockupBrief").value = prospect.mockupBrief || defaultMockupBrief(prospect);
-  qs("#mockupLogoInput").value = "";
   const previewWrap = qs("#mockupPreviewWrap");
   const previewImage = qs("#mockupPreviewImage");
   if (prospect.mockupImage) {
@@ -2206,6 +2208,10 @@ function openMockupModal(id) {
     previewImage.removeAttribute("src");
     previewWrap.hidden = true;
   }
+  const generatedPrompt = prospect.generatedMockupPrompt || "";
+  qs("#mockupPromptOutput").value = generatedPrompt;
+  qs("#mockupPromptWrap").hidden = !generatedPrompt;
+  qs("#copyMockupPromptBtn").hidden = !generatedPrompt;
   qs("#mockupModal").classList.add("is-open");
   qs("#mockupModal").setAttribute("aria-hidden", "false");
 }
@@ -2610,39 +2616,56 @@ async function generateMockupForActive() {
   const prospect = state.instagramProspects.find((item) => item.id === activeMockupProspectId);
   if (!prospect) return;
   const button = qs("#generateMockupBtn");
-  const acquisitionStrategy = qs("#prospectStrategy")?.value || "uneed_presence";
-  try { window.UNEED_ACQUISITION_STRATEGIES?.assertRunnable(acquisitionStrategy); } catch (error) { status.hidden = false; status.dataset.tone = "error"; status.textContent = error.message; return; }
+  const acquisitionStrategy = prospect.acquisitionStrategy || "uneed_presence";
+  try { window.UNEED_ACQUISITION_STRATEGIES?.assertRunnable(acquisitionStrategy); } catch (error) { setMockupStatus(error.message); return; }
   button.disabled = true;
-  button.textContent = "A criar mockup...";
-  setMockupStatus("A aplicar o logotipo no modelo premium...", "ok");
+  button.textContent = "A preparar prompt...";
+  setMockupStatus("A organizar contexto, objetivo e direção visual...", "ok");
   try {
-    mockupLogoDataUrl = await mockupLogoPromise;
     const fields = {
       name: qs("#mockupLeadName").value.trim(),
       offer: qs("#mockupOffer").value.trim(),
       niche: qs("#mockupNiche").value.trim(),
       brief: qs("#mockupBrief").value.trim(),
     };
-    const image = await createProspectMockupImage(prospect, mockupLogoDataUrl, fields);
+    const prompt = `Cria um mockup visual premium e realista para apresentar uma proposta de presença digital a ${fields.name || prospect.name || "esta empresa"}.
+
+Contexto do negócio:
+- Área: ${fields.niche || prospect.niche || "não especificada"}
+- Website atual: ${prospect.website || "não confirmado"}
+- Objetivo/CTA principal: ${fields.offer || defaultMockupOffer(prospect)}
+- Informação comercial relevante: ${fields.brief || defaultMockupBrief(prospect)}
+
+Direção visual:
+- Mostrar uma proposta de website responsivo num portátil e num telemóvel, numa composição editorial premium.
+- Criar uma interface credível, específica para este negócio e orientada ao objetivo indicado.
+- Usar hierarquia clara, tipografia contemporânea, bom contraste e espaço visual equilibrado.
+- Evitar texto ilegível, elementos genéricos, marcas inventadas, preços ou promessas não fornecidas.
+- Se eu anexar um logotipo, preservá-lo sem alterar proporções, cores ou lettering.
+- Usar português de Portugal no texto visível.
+- Formato horizontal 3:2, alta resolução, adequado para apresentação comercial.
+
+Entrega apenas a imagem final do mockup, sem explicações adicionais.`;
     Object.assign(prospect, {
       name: fields.name || prospect.name,
       niche: fields.niche || prospect.niche,
-      mockupImage: image,
+      generatedMockupPrompt: prompt,
       mockupOffer: fields.offer,
       mockupBrief: fields.brief,
       mockupGeneratedAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
     saveState();
-    qs("#mockupPreviewImage").src = image;
-    qs("#mockupPreviewWrap").hidden = false;
+    qs("#mockupPromptOutput").value = prompt;
+    qs("#mockupPromptWrap").hidden = false;
+    qs("#copyMockupPromptBtn").hidden = false;
     renderInstagramProspecting();
-    setMockupStatus("Mockup criado e guardado no lead.", "ok");
+    setMockupStatus("Prompt preparado e guardado no lead. Copia-o para o ChatGPT e anexa o logotipo, se existir.", "ok");
   } catch (error) {
     setMockupStatus(error.message || "Não foi possível criar o mockup.");
   } finally {
     button.disabled = false;
-    button.textContent = "Gerar mockup";
+    button.textContent = "Preparar prompt";
   }
 }
 
@@ -2817,12 +2840,13 @@ function renderInstagramProspecting() {
   qs("#prospectMetricDuplicates").textContent = state.prospectStats?.duplicatesSkipped || 0;
   qs("#instagramConversionMetric").textContent = `${Math.round(((demos + active) / conversionBase) * 100)}%`;
 
-  board.innerHTML = instagramProspectStatuses
-    .map((status) => {
-      const cards = prospects.filter((prospect) => prospect.status === status);
+  const kanbanColumns = [{ status: "Por fazer", strategy: "uneed_presence", label: "Por fazer · Presença" }, { status: "Por fazer", strategy: "high_ticket", label: "Por fazer · High Ticket" }, ...instagramProspectStatuses.slice(1).map((status) => ({ status, strategy: null, label: status }))];
+  board.innerHTML = kanbanColumns
+    .map(({ status, strategy, label }) => {
+      const cards = prospects.filter((prospect) => prospect.status === status && (!strategy || (strategy === "high_ticket" ? prospect.acquisitionStrategy === "high_ticket" : prospect.acquisitionStrategy !== "high_ticket")));
       return `
-        <section class="kanban-column prospect-column" data-instagram-drop-status="${escapeAttr(status)}">
-          <h2>${escapeHtml(status)}<span>${cards.length}</span></h2>
+        <section class="kanban-column prospect-column" data-instagram-drop-status="${escapeAttr(status)}" ${strategy ? `data-instagram-drop-strategy="${escapeAttr(strategy)}"` : ""}>
+          <h2>${escapeHtml(label)}<span>${cards.length}</span></h2>
           ${
             cards
               .map((prospect) => {
@@ -2868,7 +2892,7 @@ function renderInstagramProspecting() {
                     </select>
                     <div class="deal-actions">
                       <button class="button ghost mini" data-instagram-research="${escapeAttr(prospect.id)}" type="button">${prospect.researchHistory?.length ? "Atualizar análise" : prospect.readiness === "researching" ? "Ver investigação" : "Investigar empresa"}</button>
-                      ${prospect.acquisitionStrategy === "high_ticket" ? "" : `<button class="button primary mini" data-instagram-mockup="${escapeAttr(prospect.id)}" type="button">${prospect.mockupImage ? "Refazer mockup" : "Criar mockup"}</button>`}
+                      ${prospect.acquisitionStrategy === "high_ticket" ? "" : `<button class="button primary mini" data-instagram-mockup="${escapeAttr(prospect.id)}" type="button">${prospect.generatedMockupPrompt ? "Refazer prompt" : "Criar mockup"}</button>`}
                       <button class="button ghost mini" data-instagram-edit="${escapeAttr(prospect.id)}" type="button">Editar</button>
                       <button class="button danger mini" data-instagram-delete="${escapeAttr(prospect.id)}" type="button">Apagar</button>
                     </div>
@@ -2958,10 +2982,12 @@ function updateInstagramProspect(id, patch) {
 }
 
 function deleteInstagramProspect(id) {
+  const prospect = state.instagramProspects.find((item) => item.id === id); const leadId = prospect?.leadId || null;
   state.instagramProspects = state.instagramProspects.filter((item) => item.id !== id);
+  if (leadId) { state.deletedMissionTargetIds = [...new Set([...(state.deletedMissionTargetIds || []), leadId])]; missions = missions.filter((item) => item.targetId !== leadId); }
   if (qs("#instagramProspectId")?.value === id) clearInstagramProspectForm();
   saveState();
-  renderInstagramProspecting();
+  renderInstagramProspecting(); renderMissions();
 }
 
 function renderTickets() {
@@ -3963,19 +3989,8 @@ function bindEvents() {
   qs("#mockupModal")?.addEventListener("click", (event) => {
     if (event.target.id === "mockupModal") closeMockupModal();
   });
-  qs("#mockupLogoInput")?.addEventListener("change", async (event) => {
-    const file = event.target.files?.[0];
-    setMockupStatus(file ? "A preparar o logotipo..." : "");
-    mockupLogoPromise = file ? prepareMockupLogo(file) : Promise.resolve("");
-    try {
-      mockupLogoDataUrl = await mockupLogoPromise;
-      setMockupStatus(file ? "Logotipo pronto para gerar o mockup." : "", "ok");
-    } catch (error) {
-      mockupLogoDataUrl = "";
-      setMockupStatus(error.message || "Não foi possível preparar o logotipo.");
-    }
-  });
   qs("#generateMockupBtn")?.addEventListener("click", generateMockupForActive);
+  qs("#copyMockupPromptBtn")?.addEventListener("click", async () => { const prompt = qs("#mockupPromptOutput")?.value || ""; if (!prompt) return; try { await navigator.clipboard.writeText(prompt); setMockupStatus("Prompt copiado. Cola-o no ChatGPT e anexa o logotipo, se existir.", "ok"); } catch { qs("#mockupPromptOutput").focus(); qs("#mockupPromptOutput").select(); setMockupStatus("Selecionámos o prompt. Usa copiar e cola-o no ChatGPT.", "ok"); } });
 
   qs("#proposalForm").addEventListener("input", () => {
     const proposal = readForm();
@@ -4235,7 +4250,8 @@ function bindEvents() {
     const column = event.target.closest("[data-instagram-drop-status]");
     if (!column) return;
     event.preventDefault();
-    updateInstagramProspect(event.dataTransfer.getData("text/plain"), { status: column.dataset.instagramDropStatus });
+    const strategy = column.dataset.instagramDropStrategy;
+    updateInstagramProspect(event.dataTransfer.getData("text/plain"), { status: column.dataset.instagramDropStatus, ...(strategy ? { acquisitionStrategy: strategy, strategyId: strategy, serviceId: strategy === "uneed_presence" ? "uneed_presence" : null } : {}) });
   });
 
   qs("#nextActions").addEventListener("click", (event) => {

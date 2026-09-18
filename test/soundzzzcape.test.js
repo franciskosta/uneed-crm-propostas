@@ -7,7 +7,7 @@ const handler = require('../api/soundzzzcape/[...route]');
 
 async function request(method='GET', route='status') {
   const res={setHeader(){},status(code){this.code=code;return this;},json(body){this.body=body;return this;}};
-  await handler({method,headers:{},query:{route:route.split('/')}},res);
+  await handler({method,url:'/api/soundzzzcape/'+route,headers:{},query:{}},res);
   return res;
 }
 

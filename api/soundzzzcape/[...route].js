@@ -27,7 +27,10 @@ module.exports = async function handler(req, res) {
     const emails = String(process.env.SOUNDZZZCAPE_OWNER_EMAILS || '').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);
     const verifiedOwner = Boolean(user.email_confirmed_at) && emails.includes(String(user.email || '').toLowerCase());
     if (!allowed.includes(user.id) && !verifiedOwner) return res.status(403).json({ok:false,error:'soundzzzcape_access_not_configured'});
-    const path = '/' + (Array.isArray(req.query.route) ? req.query.route.join('/') : String(req.query.route || ''));
+    const pathname = new URL(req.url || '/', 'https://crm.uneed.pt').pathname;
+    const path = pathname.startsWith('/api/soundzzzcape/')
+      ? pathname.slice('/api/soundzzzcape'.length)
+      : '/' + (Array.isArray(req.query.route) ? req.query.route.join('/') : String(req.query.route || ''));
     if (!(req.method === 'GET' && readRoutes.test(path)) && !(req.method === 'POST' && writeRoutes.test(path))) return res.status(405).json({ok:false,error:'operation_not_allowed'});
     const base = process.env.SOUNDZZZCAPE_API_URL;
     const token = process.env.SOUNDZZZCAPE_CONTROL_TOKEN;

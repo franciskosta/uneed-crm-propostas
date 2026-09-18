@@ -10,7 +10,7 @@
   },
   "rewrites": [
     {
-      "source": "/((?!assets/|styles.css|app.js|pricing.js|supabase-config.js|login.html|favicon.ico).*)",
+      "source": "/((?!api/|assets/|styles.css|app.js|pricing.js|supabase-config.js|login.html|favicon.ico).*)",
       "destination": "/index.html"
     }
   ]

@@ -381,6 +381,37 @@ async function syncSupabaseState() {
     .from("crm_state")
     .upsert({ user_id: userId, data: state, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
   setSyncStatus(error ? "Erro ao sincronizar Supabase" : "Guardado no Supabase", error ? "error" : "success");
+  if (!error) checkContactAlertEmails();
+}
+
+let contactAlertCheckRunning = false;
+async function checkContactAlertEmails() {
+  if (contactAlertCheckRunning || !(state.instagramProspects || []).some((p) => window.UNEED_CONTACT_ALERTS?.alertFor(p)?.due)) return;
+  const client = getSupabaseClient();
+  if (!client) return;
+  contactAlertCheckRunning = true;
+  try {
+    const token = (await client.auth.getSession()).data.session?.access_token;
+    if (!token) return;
+    const response = await fetch("/api/contact-alerts", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
+    const payload = await response.json();
+    const feedback = qs("#contactAlertEmailStatus");
+    if (feedback) feedback.textContent = !response.ok ? "Alertas visíveis; envio de email indisponível. Verificar configuração de notificações." : payload.pendingReview ? "Há um envio de email por confirmar; requer revisão." : payload.sent ? `Enviados ${payload.sent} avisos para geral@uneed.pt.` : "Avisos de email verificados.";
+  } catch { const feedback = qs("#contactAlertEmailStatus"); if (feedback) feedback.textContent = "Não foi possível verificar os emails de alerta. Nova tentativa automática."; }
+  finally { contactAlertCheckRunning = false; }
+}
+setInterval(() => {
+  for (const card of document.querySelectorAll("#instagramKanban [data-instagram-open]")) {
+    const prospect = state.instagramProspects?.find((item) => item.id === card.dataset.instagramOpen);
+    const flag = card.querySelector(".contact-alert-flag");
+    if (prospect && flag) flag.innerHTML = renderContactAlert(prospect);
+  }
+  checkContactAlertEmails();
+}, 60000);
+function renderContactAlert(prospect) {
+  const alert = window.UNEED_CONTACT_ALERTS?.alertFor(prospect);
+  if (!alert) return "";
+  return `<span class="contact-alert ${alert.due ? "is-due" : "is-upcoming"}">${alert.due ? "⚑ " : ""}${escapeHtml(alert.action)} ${alert.overdue ? "em atraso desde" : alert.due ? "hoje" : "a partir de"} ${alert.due && !alert.overdue ? "" : escapeHtml(alert.dueDate.split("-").reverse().join("/"))}</span>`;
 }
 
 async function loadSupabaseState() {
@@ -2878,6 +2909,7 @@ function renderInstagramProspecting() {
                         <strong>${escapeHtml(prospect.name || "Contacto sem nome")}</strong>
                         <span class="card-meta">${escapeHtml(prospect.phone || "Sem telefone")}</span>
                         <span class="card-meta prospect-contact-summary">${escapeHtml(prospectContactSummary(prospect))}</span>
+                        <span class="contact-alert-flag" aria-live="polite">${renderContactAlert(prospect)}</span>
                         <span class="card-meta">${escapeHtml(prospect.acquisitionStrategy === "high_ticket" ? "HIGH TICKET" : "PRESENÇA")}${prospect.score ? ` · Score ${escapeHtml(prospect.score)}` : ""}</span>
                       </span>
                       <span class="prospect-score">${prospect.hasWebsite ? "Site" : "Sem site"}</span>

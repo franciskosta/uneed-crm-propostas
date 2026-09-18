@@ -1,7 +1,9 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "crons": [{ "path": "/api/contact-alerts", "schedule": "0 8 * * *" }],
   "functions": {
+    "api/contact-alerts.js": { "maxDuration": 60 },
     "api/prospect/search.js": { "maxDuration": 60 },
     "api/mission-worker.js": { "maxDuration": 60 },
     "api/missions/**/*.js": { "maxDuration": 60 }

@@ -9,6 +9,7 @@ const files = [
   "suporte.html",
   "styles.css",
   "app.js",
+  "contact-alerts.js",
   "pricing.js",
   "commercial-core.js",
   "acquisition-strategies.js",

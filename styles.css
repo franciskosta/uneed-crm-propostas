@@ -2506,6 +2506,9 @@ textarea {
 .prospect-card {
   border-color: rgba(24, 29, 73, 0.14);
 }
+.contact-alert { display:block; margin-top:6px; padding:5px 8px; border-radius:6px; font-size:12px; font-weight:700; }
+.contact-alert.is-due { background:#fff0db; color:#7b4000; border:1px solid #e9b466; }
+.contact-alert.is-upcoming { background:#f1f3fa; color:#4b526c; }
 .prospect-contact-summary { color:var(--brand); font-weight:700; line-height:1.5; }
 .prospect-card fieldset { min-width:0; border:1px solid var(--line); border-radius:8px; padding:10px; margin:8px 0; display:grid; gap:8px; }
 .prospect-card fieldset label { display:grid; gap:4px; }

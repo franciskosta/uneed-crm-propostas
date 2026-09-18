@@ -2506,6 +2506,10 @@ textarea {
 .prospect-card {
   border-color: rgba(24, 29, 73, 0.14);
 }
+.prospect-contact-summary { color:var(--brand); font-weight:700; line-height:1.5; }
+.prospect-card fieldset { min-width:0; border:1px solid var(--line); border-radius:8px; padding:10px; margin:8px 0; display:grid; gap:8px; }
+.prospect-card fieldset label { display:grid; gap:4px; }
+.prospect-card fieldset input, .prospect-card fieldset select { min-width:0; width:100%; }
 
 .prospect-card-collapsible { padding:0; overflow:hidden; }
 .prospect-card-collapsible > .deal-summary { grid-template-columns:minmax(0,1fr) auto auto; padding:13px; cursor:pointer; }

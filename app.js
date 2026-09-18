@@ -101,6 +101,23 @@ const instagramProspectStatuses = [
 ];
 
 const contractStatuses = ["Rascunho", "Enviado", "Aceite", "Recusado", "Cancelado"];
+const prospectStageLabels = { "Por fazer": "Lead", "Mensagem IG enviada": "1º contacto", "Follow up WhatsApp": "Follow up", "Break up por telefone ou WhatsApp": "Break up" };
+const prospectContactStages = ["Mensagem IG enviada", "Follow up WhatsApp", "Break up por telefone ou WhatsApp"];
+const prospectChannels = ["WhatsApp", "Telefone", "Instagram", "Email", "LinkedIn", "Presencial", "Outro"];
+const prospectLabel = (status) => prospectStageLabels[status] || status;
+
+function prospectContactSummary(prospect) {
+  const records = prospect.contactRecords || {};
+  const current = records[prospect.status];
+  const latest = current || Object.values(records).filter((item) => item.date).sort((a, b) => b.date.localeCompare(a.date))[0];
+  const contact = latest ? `${latest.date ? latest.date.split("-").reverse().join("/") : "Data por registar"} · ${latest.channel || "Canal por registar"}` : prospectContactStages.includes(prospect.status) ? "Contacto por registar" : "";
+  const demo = prospect.demonstration?.status || (prospect.status === "Pediu demonstração" ? "Solicitada" : "Não enviada");
+  return [contact, demo !== "Não enviada" ? `Demonstração: ${demo}${prospect.demonstration?.date ? ` · ${prospect.demonstration.date.split("-").reverse().join("/")}` : ""}` : ""].filter(Boolean).join(" · ");
+}
+
+function renderProspectContactRecords(prospect) {
+  return `<details class="prospect-message" ${prospectContactStages.includes(prospect.status) ? "open" : ""}><summary>Registos de contacto</summary>${prospectContactStages.map((stage) => { const record = prospect.contactRecords?.[stage] || {}; return `<fieldset><legend>${escapeHtml(prospectLabel(stage))}</legend><label>Data<input type="date" aria-label="Data de ${escapeAttr(prospectLabel(stage))}" data-contact-stage="${escapeAttr(stage)}" data-contact-field="date" value="${escapeAttr(record.date || "")}"></label><label>Canal<select data-contact-stage="${escapeAttr(stage)}" data-contact-field="channel"><option value="">Selecionar canal</option>${prospectChannels.map((channel) => `<option ${record.channel === channel ? "selected" : ""}>${channel}</option>`).join("")}</select></label></fieldset>`; }).join("")}</details><fieldset><legend>Demonstração / protótipo</legend><label>Estado<select data-demo-field="status">${["Não enviada", "Solicitada", "Enviada"].map((status) => `<option ${(prospect.demonstration?.status || (prospect.status === "Pediu demonstração" ? "Solicitada" : "Não enviada")) === status ? "selected" : ""}>${status}</option>`).join("")}</select></label><label>Data<input type="date" data-demo-field="date" value="${escapeAttr(prospect.demonstration?.date || "")}"></label></fieldset>`;
+}
 
 const defaultContractServiceOptions = [
   ["uneed_presenca", "UNEED Presença"],
@@ -1110,10 +1127,10 @@ function fillStatusSelects() {
   const instagramStatus = qs("#instagramStatus");
   const instagramStatusFilter = qs("#instagramStatusFilter");
   if (instagramStatus) {
-    instagramStatus.innerHTML = instagramProspectStatuses.map((status) => `<option>${status}</option>`).join("");
+    instagramStatus.innerHTML = instagramProspectStatuses.map((status) => `<option value="${escapeAttr(status)}">${prospectLabel(status)}</option>`).join("");
   }
   if (instagramStatusFilter) {
-    instagramStatusFilter.innerHTML = `<option value="">Todos os estados</option>${instagramProspectStatuses.map((status) => `<option>${status}</option>`).join("")}`;
+    instagramStatusFilter.innerHTML = `<option value="">Todos os estados</option>${instagramProspectStatuses.map((status) => `<option value="${escapeAttr(status)}">${prospectLabel(status)}</option>`).join("")}`;
   }
   const instagramNiche = qs("#instagramNiche");
   if (instagramNiche) {
@@ -2802,11 +2819,13 @@ async function generateProspects() {
 function renderInstagramProspecting() {
   const board = qs("#instagramKanban");
   if (!board) return;
+  const expandedProspects = new Set([...board.querySelectorAll("details[data-instagram-open][open]")].map((card) => card.dataset.instagramOpen));
   state.instagramProspects ||= [];
   updateNicheFilter();
 
   const term = (qs("#instagramSearchInput")?.value || "").trim().toLowerCase();
   const filter = qs("#instagramStatusFilter")?.value || "";
+  const typeFilter = qs("#prospectTypeFilter")?.value || "";
   const nicheFilter = qs("#prospectNicheFilter")?.value || "";
   const districtFilter = qs("#prospectDistrictFilter")?.value || "";
   const municipalityFilter = qs("#prospectMunicipalityFilter")?.value || "";
@@ -2824,7 +2843,8 @@ function renderInstagramProspecting() {
       prospectSignalLabel(prospect),
     ].join(" ").toLowerCase();
     const matchesNiche = !nicheFilter || (nicheFilter === "__none__" ? !prospect.niche : prospect.niche === nicheFilter);
-    return (!term || haystack.includes(term)) && (!filter || prospect.status === filter) && matchesNiche && (!districtFilter || prospect.district === districtFilter) && (!municipalityFilter || prospect.municipality === municipalityFilter);
+    const type = prospect.acquisitionStrategy || prospect.strategyId || "unclassified";
+    return (!typeFilter || type === typeFilter) && (!term || haystack.includes(term)) && (!filter || prospect.status === filter) && matchesNiche && (!districtFilter || prospect.district === districtFilter) && (!municipalityFilter || prospect.municipality === municipalityFilter);
   });
 
   const total = state.instagramProspects.length;
@@ -2840,7 +2860,7 @@ function renderInstagramProspecting() {
   qs("#prospectMetricDuplicates").textContent = state.prospectStats?.duplicatesSkipped || 0;
   qs("#instagramConversionMetric").textContent = `${Math.round(((demos + active) / conversionBase) * 100)}%`;
 
-  const kanbanColumns = [{ status: "Por fazer", strategy: "uneed_presence", label: "Por fazer · Presença" }, { status: "Por fazer", strategy: "high_ticket", label: "Por fazer · High Ticket" }, ...instagramProspectStatuses.slice(1).map((status) => ({ status, strategy: null, label: status }))];
+  const kanbanColumns = ["Por fazer", ...prospectContactStages, "Pediu demonstração", "Não deu cliente", "Cliente ativo"].map((status) => ({ status, strategy: null, label: prospectLabel(status) }));
   board.innerHTML = kanbanColumns
     .map(({ status, strategy, label }) => {
       const cards = prospects.filter((prospect) => prospect.status === status && (!strategy || (strategy === "high_ticket" ? prospect.acquisitionStrategy === "high_ticket" : prospect.acquisitionStrategy !== "high_ticket")));
@@ -2852,11 +2872,12 @@ function renderInstagramProspecting() {
               .map((prospect) => {
                 const whatsapp = whatsappHref(prospect.phone, prospectWhatsappFollowupMessage(prospect));
                 return `
-                  <details class="deal-card prospect-card prospect-card-collapsible" data-instagram-open="${escapeAttr(prospect.id)}" draggable="true">
+                  <details class="deal-card prospect-card prospect-card-collapsible" data-instagram-open="${escapeAttr(prospect.id)}" draggable="true" ${expandedProspects.has(prospect.id) ? "open" : ""}>
                     <summary class="deal-summary">
                       <span>
                         <strong>${escapeHtml(prospect.name || "Contacto sem nome")}</strong>
                         <span class="card-meta">${escapeHtml(prospect.phone || "Sem telefone")}</span>
+                        <span class="card-meta prospect-contact-summary">${escapeHtml(prospectContactSummary(prospect))}</span>
                         <span class="card-meta">${escapeHtml(prospect.acquisitionStrategy === "high_ticket" ? "HIGH TICKET" : "PRESENÇA")}${prospect.score ? ` · Score ${escapeHtml(prospect.score)}` : ""}</span>
                       </span>
                       <span class="prospect-score">${prospect.hasWebsite ? "Site" : "Sem site"}</span>
@@ -2890,8 +2911,9 @@ function renderInstagramProspecting() {
                         : ""
                     }
                     <select class="status-select" data-instagram-status-id="${escapeAttr(prospect.id)}">
-                      ${instagramProspectStatuses.map((item) => `<option ${item === prospect.status ? "selected" : ""}>${escapeHtml(item)}</option>`).join("")}
+                      ${instagramProspectStatuses.map((item) => `<option value="${escapeAttr(item)}" ${item === prospect.status ? "selected" : ""}>${escapeHtml(prospectLabel(item))}</option>`).join("")}
                     </select>
+                    ${renderProspectContactRecords(prospect)}
                     <div class="deal-actions">
                       <button class="button ghost mini" data-instagram-research="${escapeAttr(prospect.id)}" type="button">${prospect.researchHistory?.length ? "Atualizar análise" : prospect.readiness === "researching" ? "Ver investigação" : "Investigar empresa"}</button>
                       ${prospect.acquisitionStrategy === "high_ticket" ? "" : `<button class="button primary mini" data-instagram-mockup="${escapeAttr(prospect.id)}" type="button">${prospect.generatedMockupPrompt ? "Refazer prompt" : "Criar mockup"}</button>`}
@@ -2979,8 +3001,13 @@ function updateInstagramProspect(id, patch) {
   const prospect = state.instagramProspects.find((item) => item.id === id);
   if (!prospect) return;
   Object.assign(prospect, patch, { updatedAt: new Date().toISOString() });
+  if (patch.status === "Pediu demonstração" && !prospect.demonstration) prospect.demonstration = { status: "Solicitada", date: "", stage: patch.status };
   saveState();
   renderInstagramProspecting();
+  if (prospectContactStages.includes(patch.status)) {
+    const card = [...qs("#instagramKanban").querySelectorAll("[data-instagram-open]")].find((item) => item.dataset.instagramOpen === id);
+    if (card) { card.open = true; card.querySelector(`[data-contact-stage="${patch.status}"][data-contact-field="date"]`)?.focus(); }
+  }
 }
 
 function deleteInstagramProspect(id) {
@@ -4141,6 +4168,7 @@ function bindEvents() {
   qs("#clearInstagramProspectBtn").addEventListener("click", clearInstagramProspectForm);
   qs("#instagramSearchInput").addEventListener("input", renderInstagramProspecting);
   qs("#instagramStatusFilter").addEventListener("change", renderInstagramProspecting);
+  qs("#prospectTypeFilter").addEventListener("change", renderInstagramProspecting);
   qs("#prospectNicheFilter").addEventListener("change", renderInstagramProspecting);
   qs("#prospectGeneratorForm").addEventListener("submit", (event) => { event.preventDefault(); generateProspects(); });
   qs("#prospectStrategy").addEventListener("change", () => { const highTicket = qs("#prospectStrategy").value === "high_ticket"; qs("#prospectNicheLabel").textContent = highTicket ? "Setor" : "Nicho"; qs("#prospectRegionLabel").textContent = highTicket ? "Região" : "Distrito / Região"; qs("#prospectScoreLabel").textContent = highTicket ? "High Ticket Fit mínimo" : "Score mínimo"; qs("#prospectMinScore").value = highTicket ? "55" : "70"; });
@@ -4222,6 +4250,19 @@ function bindEvents() {
   });
 
   qs("#instagramKanban").addEventListener("change", (event) => {
+    const recordInput = event.target.closest("[data-contact-field], [data-demo-field]");
+    if (recordInput) {
+      const id = recordInput.closest("[data-instagram-open]").dataset.instagramOpen;
+      const prospect = state.instagramProspects.find((item) => item.id === id);
+      if (!prospect) return;
+      if (recordInput.dataset.contactField) {
+        const stage = recordInput.dataset.contactStage;
+        const records = { ...(prospect.contactRecords || {}), [stage]: { ...(prospect.contactRecords?.[stage] || {}), [recordInput.dataset.contactField]: recordInput.value } };
+        const latestDate = Object.values(records).map((item) => item.date).filter(Boolean).sort().at(-1) || null;
+        updateInstagramProspect(id, { contactRecords: records, lastContactAt: latestDate });
+      } else updateInstagramProspect(id, { demonstration: { ...(prospect.demonstration || {}), [recordInput.dataset.demoField]: recordInput.value, stage: prospect.status } });
+      return;
+    }
     const select = event.target.closest("[data-instagram-status-id]");
     if (!select) return;
     updateInstagramProspect(select.dataset.instagramStatusId, { status: select.value });
@@ -4252,8 +4293,7 @@ function bindEvents() {
     const column = event.target.closest("[data-instagram-drop-status]");
     if (!column) return;
     event.preventDefault();
-    const strategy = column.dataset.instagramDropStrategy;
-    updateInstagramProspect(event.dataTransfer.getData("text/plain"), { status: column.dataset.instagramDropStatus, ...(strategy ? { acquisitionStrategy: strategy, strategyId: strategy, serviceId: strategy === "uneed_presence" ? "uneed_presence" : null } : {}) });
+    updateInstagramProspect(event.dataTransfer.getData("text/plain"), { status: column.dataset.instagramDropStatus });
   });
 
   qs("#nextActions").addEventListener("click", (event) => {

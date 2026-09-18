@@ -56,6 +56,7 @@
 
         <nav class="nav-tabs" aria-label="Secções">
           <button class="nav-tab" data-view="command">Centro de Comando</button>
+          <button class="nav-tab" data-view="soundzzzcape">Soundzzzcape</button>
           <button class="nav-tab is-active" data-view="dashboard">Dashboard</button>
           <button class="nav-tab" data-view="performance">Performance</button>
           <button class="nav-tab" data-view="proposal">Proposta</button>
@@ -166,6 +167,34 @@
             <article class="metric-card"><span>Falhas</span><strong id="missionFailedCount">0</strong></article>
           </div>
           <section class="panel"><div class="panel-heading"><h2>AI Missions</h2></div><div class="mission-list" id="missionList"><div class="empty">A carregar missões…</div></div></section>
+        </section>
+
+        <section class="view" id="view-soundzzzcape">
+          <div class="soundzzzcape-hero panel">
+            <div><p class="eyebrow">UNEED OS · Channel Operations</p><h2>Soundzzzcape</h2><p>Immersive environments for sleep, focus and escape.</p></div>
+            <div class="soundzzzcape-controls">
+              <span class="agent-pill" id="szAgentHealth">A ligar…</span>
+              <button class="button ghost" id="szPauseBtn" type="button">Pause</button>
+              <button class="button ghost" id="szResumeBtn" type="button">Resume</button>
+              <button class="button primary" id="szRunBtn" type="button">Run next</button>
+              <button class="button ghost" id="szRefreshBtn" type="button">Atualizar</button>
+            </div>
+          </div>
+          <div class="soundzzzcape-level panel"><strong>AUTOPILOT</strong><span id="szAutopilotLevel">LEVEL 1 — SUPERVISED</span><small>LEVEL 2 e LEVEL 3 permanecem indisponíveis sem confirmação humana explícita.</small></div>
+          <nav class="soundzzzcape-tabs" aria-label="Áreas Soundzzzcape">
+            <button class="is-active" data-sz-tab="today">Hoje</button><button data-sz-tab="queue">Fila</button><button data-sz-tab="approvals">Aprovações</button><button data-sz-tab="performance">Performance</button><button data-sz-tab="bank">Content Bank</button><button data-sz-tab="costs">Costs</button><button data-sz-tab="channel">Channel</button><button data-sz-tab="system">System</button>
+          </nav>
+          <div class="soundzzzcape-status" id="szMessage" aria-live="polite"></div>
+          <section class="soundzzzcape-pane is-active" data-sz-pane="today"><div class="metric-grid" id="szTodayMetrics"></div><div class="soundzzzcape-grid" id="szToday"></div></section>
+          <section class="soundzzzcape-pane" data-sz-pane="queue"><div class="panel"><div class="panel-heading"><h2>Fila de produção</h2></div><div id="szQueue"></div></div></section>
+          <section class="soundzzzcape-pane" data-sz-pane="approvals"><div class="panel"><div class="panel-heading"><h2>Aprovações humanas</h2></div><div id="szApprovals"></div></div></section>
+          <section class="soundzzzcape-pane" data-sz-pane="performance"><div class="panel"><div class="panel-heading"><h2>Performance e checkpoints</h2></div><div id="szPerformance"></div></div></section>
+          <section class="soundzzzcape-pane" data-sz-pane="bank"><div class="panel"><div class="panel-heading"><h2>Content Bank</h2><input id="szBankSearch" type="search" placeholder="Pesquisar conceito" /></div><div id="szBank"></div></div></section>
+          <section class="soundzzzcape-pane" data-sz-pane="costs"><div class="metric-grid" id="szCosts"></div></section>
+          <section class="soundzzzcape-pane" data-sz-pane="channel">
+            <div class="panel"><div class="panel-heading"><div><h2>Channel Management</h2><small>CHANNEL CHANGES = HUMAN APPROVAL REQUIRED</small></div><button class="button ghost" id="szChannelRefreshBtn" type="button">Health check</button></div><div id="szChannel"></div></div>
+          </section>
+          <section class="soundzzzcape-pane" data-sz-pane="system"><div class="panel"><div class="panel-heading"><h2>System / Advanced</h2></div><div id="szSystem"></div></div></section>
         </section>
 
         <section class="view" id="view-performance">

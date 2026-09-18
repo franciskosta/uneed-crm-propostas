@@ -2,6 +2,23 @@
 
 Gerador local de propostas e mini CRM comercial para a UNEED.
 
+## Módulo Soundzzzcape
+
+Produção em `crm.uneed.pt`: a função `api/soundzzzcape/[...route].js` valida a sessão Supabase e uma allowlist explícita de IDs ou emails verificados. Configuração exclusivamente server-side na Vercel: `SOUNDZZZCAPE_API_URL`, `SOUNDZZZCAPE_CONTROL_TOKEN`, `SOUNDZZZCAPE_RELAY_CA`, `SOUNDZZZCAPE_OWNER_IDS`/`SOUNDZZZCAPE_OWNER_EMAILS`. Sem allowlist, o acesso é recusado. Nunca colocar estas variáveis em `VITE_*` ou no bundle.
+
+O worker fica no Mac, ligado por túnel SSH ao relay HTTPS no UNEED DEV. Tem de estar acordado e com o processo manual `scripts/start_control.py` ativo. Não há launchd nem scheduler instalado. `Run next` aceita um job assíncrono e avança uma etapa, não um ciclo inteiro; System mostra jobs/heartbeat. Nenhuma ação disponível publica vídeos ou altera a identidade do canal. Algumas etapas do motor ainda precisam de assets fornecidos; a integração não implica autonomia integral. CHANNEL apresenta sugestões BEFORE/AFTER; por agora a aplicação de alterações aprovadas é manual no YouTube Studio.
+
+O separador Soundzzzcape é um cliente do control plane operacional. Nunca lê diretamente SQLite, assets ou paths do agente. Iniciar primeiro a API local:
+
+```bash
+cd /Users/uneed/Documents/ChatGPT/SOUNDZZZCAPE
+.venv/bin/python run.py control-api --host 127.0.0.1 --port 8765
+```
+
+Depois iniciar o UNEED OS normalmente com `npm start`. `SOUNDZZZCAPE_API_URL` só precisa de ser alterado quando o agente corre noutro worker. Para ligações fora de localhost, configurar o mesmo `SOUNDZZZCAPE_CONTROL_TOKEN` server-side nos dois serviços; nunca expor o token no browser.
+
+O módulo mostra Hoje, Fila, Aprovações, Performance, Content Bank, Costs, Channel e System. Alterações ao canal são apenas sugestões com diff BEFORE/AFTER. Approve regista a decisão humana, mas não publica no YouTube.
+
 ## Como abrir
 
 Opção recomendada no Mac:

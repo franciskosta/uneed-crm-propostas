@@ -14,6 +14,7 @@ const sessionCookie = "uneed_session";
 const dataDir = path.join(root, ".local");
 const dataFile = process.env.UNEED_DATA_FILE || path.join(dataDir, "server-data.json");
 const defaultEmailFrom = "UNEED <geral@uneed.pt>";
+const soundzzzcapeApiUrl = String(process.env.SOUNDZZZCAPE_API_URL || "http://127.0.0.1:8765").replace(/\/$/, "");
 
 const mimeTypes = {
   ".html": "text/html; charset=utf-8",
@@ -292,6 +293,22 @@ function sendJson(response, status, payload) {
   response.end(JSON.stringify(payload));
 }
 
+async function proxySoundzzzcape(request, response, url) {
+  const suffix = url.pathname.replace(/^\/api\/soundzzzcape/, "") || "/status";
+  const target = `${soundzzzcapeApiUrl}/api${suffix}${url.search}`;
+  const headers = { Accept: "application/json", "Content-Type": "application/json" };
+  if (process.env.SOUNDZZZCAPE_CONTROL_TOKEN) headers.Authorization = `Bearer ${process.env.SOUNDZZZCAPE_CONTROL_TOKEN}`;
+  const options = { method: request.method, headers, signal: AbortSignal.timeout(Number(process.env.SOUNDZZZCAPE_API_TIMEOUT_MS || 30000)) };
+  if (request.method === "POST") options.body = await readBody(request);
+  try {
+    const upstream = await fetch(target, options);
+    const payload = await upstream.json();
+    sendJson(response, upstream.status, payload);
+  } catch (error) {
+    sendJson(response, 503, { ok: false, error: "soundzzzcape_agent_unavailable" });
+  }
+}
+
 function prospectKeys(lead) {
   let domain = "";
   try { domain = new URL(lead.website || "").hostname.replace(/^www\./, "").toLowerCase(); } catch {}
@@ -458,6 +475,17 @@ async function handleApi(request, response) {
 
   const user = await requireUser(request, response);
   if (!user) return;
+
+  if (url.pathname.startsWith("/api/soundzzzcape")) {
+    const owners = String(process.env.SOUNDZZZCAPE_OWNER_IDS || '').split(',').map(x => x.trim()).filter(Boolean);
+    const emails = String(process.env.SOUNDZZZCAPE_OWNER_EMAILS || '').split(',').map(x => x.trim().toLowerCase()).filter(Boolean);
+    if (!owners.includes(user.id) && !(user.email_confirmed_at && emails.includes(String(user.email || '').toLowerCase()))) {
+      sendJson(response, 403, {ok:false,error:'soundzzzcape_access_not_configured'});
+      return;
+    }
+    await proxySoundzzzcape(request, response, url);
+    return;
+  }
 
   if (url.pathname === "/api/state" && request.method === "GET") {
     sendJson(response, 200, { ok: true, state: await getAppState(user.id) });

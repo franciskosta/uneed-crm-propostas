@@ -3941,11 +3941,80 @@ function renderAll() {
   renderHistory();
   renderSettings();
   renderMissions();
+  renderSoundzzzcape();
+}
+
+let soundzzzcapeData = null;
+let soundzzzcapeBank = [];
+
+async function soundzzzcapeApi(path = "/status", options = {}) {
+  const client = getSupabaseClient();
+  const accessToken = client ? (await client.auth.getSession()).data.session?.access_token : null;
+  const apiBase = String(window.UNEED_SUPABASE?.apiUrl || "").replace(/\/$/, "");
+  const response = await fetch(`${apiBase}/api/soundzzzcape${path}`, { headers: { "Content-Type": "application/json", Accept: "application/json", ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}) }, ...options });
+  const payload = await response.json().catch(() => ({ ok: false, error: "invalid_response" }));
+  if (!response.ok || !payload.ok) throw new Error(payload.error || "Soundzzzcape Agent indisponível");
+  return payload.data;
+}
+
+function szMetric(label, value, detail = "") { return `<article class="metric-card"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value ?? "—")}</strong>${detail ? `<small>${escapeHtml(detail)}</small>` : ""}</article>`; }
+function szRows(rows, columns) {
+  if (!rows?.length) return `<div class="empty">Sem dados nesta área.</div>`;
+  return `<div class="sz-table-wrap"><table class="sz-table"><thead><tr>${columns.map(([key,label])=>`<th>${escapeHtml(label)}</th>`).join("")}</tr></thead><tbody>${rows.map(row=>`<tr>${columns.map(([key])=>`<td>${escapeHtml(row?.[key] ?? "—")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+}
+
+async function loadSoundzzzcape({ quiet = false } = {}) {
+  try {
+    const [overview, queue, approvals, analytics, bank, costs, channel, system] = await Promise.all([
+      soundzzzcapeApi("/status"), soundzzzcapeApi("/queue"), soundzzzcapeApi("/approvals"), soundzzzcapeApi("/analytics"), soundzzzcapeApi("/content-bank?limit=300"), soundzzzcapeApi("/costs"), soundzzzcapeApi("/channel"), soundzzzcapeApi("/system"),
+    ]);
+    soundzzzcapeData = { overview, queue, approvals, analytics, bank, costs, channel, system };
+    soundzzzcapeBank = bank.items || []; renderSoundzzzcape();
+    if (!quiet) qs("#szMessage").textContent = `Atualizado às ${new Date().toLocaleTimeString("pt-PT")}`;
+  } catch (error) {
+    if (qs("#szAgentHealth")) qs("#szAgentHealth").textContent = "OFFLINE";
+    if (qs("#szMessage")) qs("#szMessage").textContent = error.message;
+  }
+}
+
+function renderSoundzzzcape() {
+  if (!qs("#szToday") || !soundzzzcapeData) return;
+  const { overview, queue, approvals, analytics, bank, costs, channel, system } = soundzzzcapeData;
+  const agent = overview.agent || {};
+  qs("#szAgentHealth").textContent = agent.paused ? "PAUSED" : agent.disk_ok && agent.database === "OK" ? "HEALTHY" : "NEEDS ATTENTION";
+  qs("#szAgentHealth").className = `agent-pill ${agent.paused ? "warn" : agent.disk_ok ? "ok" : "bad"}`;
+  qs("#szAutopilotLevel").textContent = `${agent.enabled ? "ON" : "OFF"} · ${agent.autonomy_level || "LEVEL_1_SUPERVISED"}`;
+  qs("#szTodayMetrics").innerHTML = [szMetric("Estado", agent.paused ? "PAUSED" : agent.enabled ? "ON" : "OFF"), szMetric("Aprovações", overview.approvals_count), szMetric("Custo semanal", eur(costs.weekly_cost_eur)), szMetric("Disco livre", `${agent.disk_free_gb ?? "—"} GB`)].join("");
+  qs("#szToday").innerHTML = `<article class="panel"><h3>Trabalho atual</h3><strong>${escapeHtml(overview.current_work?.state || "Sem execução ativa")}</strong><p>${escapeHtml(overview.current_work?.rationale || "O runtime está livre.")}</p></article><article class="panel"><h3>Próximo vídeo</h3><strong>${escapeHtml(overview.next_content?.concept_name || "—")}</strong><p>${escapeHtml(overview.next_content?.cluster || "")}</p></article><article class="panel"><h3>Último vídeo</h3><strong>${escapeHtml(overview.last_video?.youtube_video_id || "—")}</strong><p>${escapeHtml(overview.last_video?.state || "")}</p></article><article class="panel"><h3>Blockers</h3><strong>${overview.blockers?.length || 0}</strong><p>${escapeHtml(overview.blockers?.[0]?.rationale || "Nenhum blocker ativo")}</p></article>`;
+  const queueRows = [...(queue.active_runs || []), ...(queue.scheduled || [])];
+  qs("#szQueue").innerHTML = szRows(queueRows, [["id","Run"],["state","Estado"],["scheduled_for","Agendado"],["failure_code","Blocker"],["rationale","Rationale"]]);
+  qs("#szApprovals").innerHTML = approvals.length ? approvals.map(run => `<article class="sz-approval"><img src="${escapeAttr(run.package?.thumbnail_preview || "")}" alt="Thumbnail proposta"/><div><span class="agent-pill warn">READY TO PUBLISH</span><h3>${escapeHtml(run.package?.selected_title || run.id)}</h3><p>${escapeHtml(run.package?.visual_provenance || "")}</p><dl><div><dt>Duração</dt><dd>${escapeHtml(run.render?.actual_duration_seconds || "—")} s</dd></div><div><dt>Custo</dt><dd>${eur(run.package?.actual_cost_eur || 0)}</dd></div><div><dt>QC</dt><dd>${escapeHtml(run.render?.qc_status || "—")}</dd></div></dl><p>${escapeHtml(run.rationale || "")}</p><div class="quick-actions"><button class="button primary" data-sz-approve="${escapeAttr(run.id)}">Approve</button><button class="button ghost" data-sz-reject="${escapeAttr(run.id)}">Reject</button></div><small>Aprovar não publica. A publicação continua a exigir confirmação explícita separada.</small></div></article>`).join("") : `<div class="empty">Nada à espera de aprovação.</div>`;
+  qs("#szPerformance").innerHTML = szRows(analytics.videos || [], [["youtube_video_id","Vídeo"],["checkpoint","Checkpoint"],["impressions","Impressions"],["thumbnail_ctr","CTR"],["views","Views"],["watch_time_minutes","Watch time"],["average_percentage_viewed","Retenção"],["subscribers_gained","Subs"]]) + `<h3>Checkpoints</h3>` + szRows(analytics.checkpoints || [], [["youtube_video_id","Vídeo"],["checkpoint_type","Checkpoint"],["due_at","Data"],["state","Estado"]]);
+  renderSoundzzzcapeBank();
+  qs("#szCosts").innerHTML = [szMetric("Custo semanal", eur(costs.weekly_cost_eur)),szMetric("Custo mensal",eur(costs.monthly_cost_eur)),szMetric("Budget semanal",eur(costs.weekly_budget_eur)),szMetric("Budget restante",eur(costs.remaining_weekly_budget_eur))].join("");
+  const ch = channel.channel || {}, health = channel.health || {}, checks = health.checks || {};
+  qs("#szChannel").innerHTML = `<div class="sz-channel-summary"><div><span class="agent-pill ${health.status === "HEALTHY" ? "ok" : "warn"}">${escapeHtml(health.status || "—")}</span><h3>${escapeHtml(ch.name || "—")} ${ch.handle ? `<small>${escapeHtml(ch.handle)}</small>` : ""}</h3><p>${escapeHtml(ch.description || "Sem descrição")}</p><dl><div><dt>Idioma</dt><dd>${escapeHtml(ch.language || "não definido")}</dd></div><div><dt>Links</dt><dd>${escapeHtml((ch.links || []).map(x=>x.url).join(", ") || "não disponíveis")}</dd></div><div><dt>Upload defaults</dt><dd>PRIVATE · categoria ${escapeHtml(ch.default_upload_metadata?.category_name || "—")}</dd></div></dl></div><div><h3>Channel Health Check</h3>${Object.entries(checks).map(([key,value])=>`<div class="sz-check"><strong>${escapeHtml(key.replaceAll("_"," "))}</strong><span>${escapeHtml(typeof value === "object" ? JSON.stringify(value) : String(value))}</span></div>`).join("")}</div></div><h3>Playlists</h3>${szRows(ch.playlists || [], [["name","Playlist"],["description","Descrição"],["video_count","Vídeos"],["privacy","Privacidade"]])}<h3>Sugestões · BEFORE / AFTER</h3><div class="sz-diffs">${(channel.suggestions || []).map(item=>`<article><strong>${escapeHtml(item.field)}</strong><div><span>BEFORE</span><p>${escapeHtml(item.before || "—")}</p></div><div><span>AFTER</span><p>${escapeHtml(item.after || "—")}</p></div><small>${escapeHtml(item.reason)} · HUMAN APPROVAL REQUIRED</small></article>`).join("") || `<div class="empty">Sem alterações sugeridas.</div>`}</div>`;
+  qs("#szSystem").innerHTML = `<div class="sz-system-grid">${Object.entries(system).map(([key,value])=>`<article><span>${escapeHtml(key.replaceAll("_"," "))}</span><strong>${escapeHtml(typeof value === "object" ? JSON.stringify(value) : String(value))}</strong></article>`).join("")}</div>`;
+}
+
+function renderSoundzzzcapeBank() {
+  if (!qs("#szBank")) return;
+  const term = (qs("#szBankSearch")?.value || "").toLowerCase();
+  const rows = soundzzzcapeBank.filter(item => !term || `${item.concept_name} ${item.cluster} ${item.primary_intent}`.toLowerCase().includes(term));
+  qs("#szBank").innerHTML = szRows(rows, [["concept_name","Conceito"],["cluster","Cluster"],["explore_or_exploit","Explore/Exploit"],["dynamic_priority","Prioridade"],["status","Estado"],["currently_producible","Ready"]]);
+}
+
+async function soundzzzcapeAction(path, body = {}) {
+  body = { ...body, request_id: crypto.randomUUID() };
+  qs("#szMessage").textContent = "A executar…";
+  try { const result = await soundzzzcapeApi(path,{method:"POST",body:JSON.stringify(body)});qs("#szMessage").textContent=result.message || "Concluído";await loadSoundzzzcape({quiet:true}); }
+  catch(error){qs("#szMessage").textContent=error.message;}
 }
 
 function switchView(view) {
   qsa(".nav-tab").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.view === view));
   qsa(".view").forEach((section) => section.classList.toggle("is-active", section.id === `view-${view}`));
+  if (view === "soundzzzcape") loadSoundzzzcape({ quiet: Boolean(soundzzzcapeData) });
 }
 
 function openProposal(id) {
@@ -3956,6 +4025,21 @@ function openProposal(id) {
 
 function bindEvents() {
   qsa(".nav-tab").forEach((tab) => tab.addEventListener("click", () => switchView(tab.dataset.view)));
+  qsa("[data-sz-tab]").forEach((tab) => tab.addEventListener("click", () => {
+    qsa("[data-sz-tab]").forEach(item => item.classList.toggle("is-active", item === tab));
+    qsa("[data-sz-pane]").forEach(item => item.classList.toggle("is-active", item.dataset.szPane === tab.dataset.szTab));
+  }));
+  qs("#szRefreshBtn")?.addEventListener("click", () => loadSoundzzzcape());
+  qs("#szPauseBtn")?.addEventListener("click", () => soundzzzcapeAction("/autopilot/pause"));
+  qs("#szResumeBtn")?.addEventListener("click", () => soundzzzcapeAction("/autopilot/resume"));
+  qs("#szRunBtn")?.addEventListener("click", () => soundzzzcapeAction("/autopilot/run"));
+  qs("#szChannelRefreshBtn")?.addEventListener("click", async () => { try { soundzzzcapeData.channel=await soundzzzcapeApi("/channel?refresh=true");renderSoundzzzcape(); } catch(error){qs("#szMessage").textContent=error.message;} });
+  qs("#szBankSearch")?.addEventListener("input", renderSoundzzzcapeBank);
+  qs("#szApprovals")?.addEventListener("click", (event) => {
+    const approveButton=event.target.closest("[data-sz-approve]"),rejectButton=event.target.closest("[data-sz-reject]");
+    if(approveButton && window.confirm("Aprovar este package? Esta ação NÃO publica o vídeo.")) soundzzzcapeAction(`/runs/${approveButton.dataset.szApprove}/approve`);
+    if(rejectButton && window.confirm("Rejeitar este package? Os artefactos serão preservados.")) soundzzzcapeAction(`/runs/${rejectButton.dataset.szReject}/reject`);
+  });
 
   qs("#newProposalBtn").addEventListener("click", () => {
     const proposal = emptyProposal();

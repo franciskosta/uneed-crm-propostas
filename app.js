@@ -405,6 +405,8 @@ setInterval(() => {
     const prospect = state.instagramProspects?.find((item) => item.id === card.dataset.instagramOpen);
     const flag = card.querySelector(".contact-alert-flag");
     if (prospect && flag) flag.innerHTML = renderContactAlert(prospect);
+    const reminders = card.querySelector('.manual-reminder-flags');
+    if (prospect && reminders) reminders.innerHTML = renderManualReminderFlags(prospect);
   }
   checkContactAlertEmails();
 }, 60000);
@@ -413,6 +415,43 @@ function renderContactAlert(prospect) {
   if (!alert) return "";
   return `<span class="contact-alert ${alert.due ? "is-due" : "is-upcoming"}">${alert.due ? "⚑ " : ""}${escapeHtml(alert.action)} ${alert.overdue ? "em atraso desde" : alert.due ? "hoje" : "a partir de"} ${alert.due && !alert.overdue ? "" : escapeHtml(alert.dueDate.split("-").reverse().join("/"))}</span>`;
 }
+
+function renderManualReminderFlags(prospect) {
+  return window.UNEED_REMINDERS.pending(prospect).map(r => `<button type="button" class="contact-alert ${r.due ? 'is-due' : 'is-upcoming'}" data-reminder-open="${escapeAttr(r.id)}">🔔 ${r.overdue ? 'Lembrete em atraso' : r.due ? 'Lembrete para hoje' : `Lembrete ${escapeHtml(r.date.split('-').reverse().join('/'))}`}${r.time ? ` · ${escapeHtml(r.time)}` : ''}</button>`).join('');
+}
+
+function openManualReminder(prospect, reminderId) {
+  const existing = (prospect.manualReminders || []).find(r => r.id === reminderId);
+  const dialog = document.createElement('dialog');
+  dialog.className = 'manual-reminder-dialog';
+  dialog.innerHTML = `<form><h2>${existing ? 'Editar / reagendar lembrete' : 'Adicionar lembrete'}</h2><p>${escapeHtml(prospect.name || 'Lead')} · Hora de Lisboa</p><label>Mensagem<textarea name="message" required maxlength="2000" rows="5">${escapeHtml(existing?.message || '')}</textarea></label><label>Data<input name="date" type="date" required value="${escapeAttr(existing?.date || window.UNEED_REMINDERS.clock().date)}"></label><label>Hora (opcional)<input name="time" type="time" value="${escapeAttr(existing?.time || '')}"></label><p role="alert" class="reminder-error"></p><div class="deal-actions"><button class="button primary" type="submit">Guardar</button>${existing ? '<button class="button ghost" type="button" data-complete>Concluir</button>' : ''}<button class="button ghost" type="button" data-close>Fechar</button></div></form>`;
+  document.body.append(dialog);
+  dialog.addEventListener('close', () => dialog.remove());
+  dialog.querySelector('[data-close]').onclick = () => dialog.close();
+  const save = (complete) => {
+    const current = state.instagramProspects.find(p => p.id === prospect.id);
+    if (!current || !window.UNEED_REMINDERS.enabled(current)) { dialog.close(); return; }
+    const form = dialog.querySelector('form');
+    const reminder = { ...existing, id: existing?.id || crypto.randomUUID(), message: form.elements.message.value.trim(), date: form.elements.date.value, time: form.elements.time.value, updatedAt: new Date().toISOString(), completedAt: complete ? new Date().toISOString() : null };
+    if (!window.UNEED_REMINDERS.valid(reminder)) { dialog.querySelector('.reminder-error').textContent = 'Preenche a mensagem e uma data válida.'; return; }
+    updateInstagramProspect(current.id, { manualReminders: [...(current.manualReminders || []).filter(r => r.id !== reminder.id), reminder] });
+    dialog.close();
+  };
+  dialog.querySelector('form').onsubmit = event => { event.preventDefault(); save(false); };
+  const complete = dialog.querySelector('[data-complete]');
+  if (complete) complete.onclick = () => save(true);
+  dialog.showModal();
+}
+
+document.addEventListener('click', event => {
+  const button = event.target.closest('[data-reminder-open], [data-reminder-add]');
+  if (!button) return;
+  event.preventDefault();
+  event.stopPropagation();
+  const id = button.closest('[data-instagram-open]')?.dataset.instagramOpen;
+  const prospect = state.instagramProspects.find(p => p.id === id);
+  if (prospect && window.UNEED_REMINDERS.enabled(prospect)) openManualReminder(prospect, button.dataset.reminderOpen);
+});
 
 async function loadSupabaseState() {
   const client = getSupabaseClient();
@@ -2910,6 +2949,7 @@ function renderInstagramProspecting() {
                         <span class="card-meta">${escapeHtml(prospect.phone || "Sem telefone")}</span>
                         <span class="card-meta prospect-contact-summary">${escapeHtml(prospectContactSummary(prospect))}</span>
                         <span class="contact-alert-flag" aria-live="polite">${renderContactAlert(prospect)}</span>
+                        <span class="manual-reminder-flags" aria-live="polite">${renderManualReminderFlags(prospect)}</span>
                         <span class="card-meta">${escapeHtml(prospect.acquisitionStrategy === "high_ticket" ? "HIGH TICKET" : "PRESENÇA")}${prospect.score ? ` · Score ${escapeHtml(prospect.score)}` : ""}</span>
                       </span>
                       <span class="prospect-score">${prospect.hasWebsite ? "Site" : "Sem site"}</span>
@@ -2946,6 +2986,7 @@ function renderInstagramProspecting() {
                       ${instagramProspectStatuses.map((item) => `<option value="${escapeAttr(item)}" ${item === prospect.status ? "selected" : ""}>${escapeHtml(prospectLabel(item))}</option>`).join("")}
                     </select>
                     ${renderProspectContactRecords(prospect)}
+                    ${window.UNEED_REMINDERS.enabled(prospect) ? '<button class="button ghost mini" type="button" data-reminder-add>Adicionar lembrete</button>' : ''}
                     <div class="deal-actions">
                       <button class="button ghost mini" data-instagram-research="${escapeAttr(prospect.id)}" type="button">${prospect.researchHistory?.length ? "Atualizar análise" : prospect.readiness === "researching" ? "Ver investigação" : "Investigar empresa"}</button>
                       ${prospect.acquisitionStrategy === "high_ticket" ? "" : `<button class="button primary mini" data-instagram-mockup="${escapeAttr(prospect.id)}" type="button">${prospect.generatedMockupPrompt ? "Refazer prompt" : "Criar mockup"}</button>`}

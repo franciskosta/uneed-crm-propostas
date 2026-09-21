@@ -3421,3 +3421,10 @@ textarea {
 .mission-timeline time { color:#777c91; font-size:12px; }
 .mission-error { color:#991b1b; }
 @media (max-width:700px) { .command-hero,.mission-row,.mission-result-head { align-items:flex-start; flex-direction:column; } .mission-score { flex-wrap:wrap; } }
+/* Specific lead reminders are independent of automatic contact alerts. */
+.manual-reminder-flags { display: grid; gap: 6px; margin-top: 6px; }
+.manual-reminder-flags button { text-align: left; cursor: pointer; font: inherit; }
+.manual-reminder-dialog { width: min(520px, 90vw); border: 1px solid #dce0ee; border-radius: 16px; padding: 24px; color: #191c4c; }
+.manual-reminder-dialog::backdrop { background: #191c4c80; }
+.manual-reminder-dialog label { display: grid; gap: 6px; margin: 14px 0; }
+.manual-reminder-dialog textarea { white-space: pre-wrap; }

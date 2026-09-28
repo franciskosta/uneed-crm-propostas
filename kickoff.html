@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Prepare a ativação da sua presença digital UNEED, passo a passo.">
+  <meta name="theme-color" content="#111639">
+  <title>Começar com a UNEED</title>
+  <link rel="icon" href="assets/favicon.ico">
+  <link rel="stylesheet" href="kickoff.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="logo-link" href="https://uneed.pt" aria-label="UNEED — página inicial">
+      <img src="assets/uneed-logo-login.png" alt="UNEED">
+    </a>
+    <div class="topbar-help">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span>Precisa de ajuda?</span>
+      <a href="mailto:geral@uneed.pt">geral@uneed.pt</a>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section class="intro" aria-labelledby="page-title">
+      <div>
+        <p class="eyebrow" id="introEyebrow">Ativação UNEED</p>
+        <h1 id="page-title">Vamos pôr o seu negócio <span>online.</span></h1>
+        <p class="intro-copy" id="introCopy">Prepare tudo connosco, ao seu ritmo. Demora cerca de 5 minutos e pode continuar mais tarde.</p>
+      </div>
+      <div class="trust-card" aria-label="O que acontece a seguir">
+        <span class="trust-icon" aria-hidden="true">✓</span>
+        <div>
+          <strong>O serviço começa após o pagamento</strong>
+          <span>Revê tudo, recebe os dados de pagamento e só depois iniciamos o kickoff.</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="workspace">
+      <aside class="journey" aria-label="Progresso da ativação">
+        <div class="journey-head">
+          <p>O seu progresso</p>
+          <strong><span id="progressPercent">20</span>%</strong>
+        </div>
+        <div class="progress-track" aria-hidden="true"><span id="progressBar"></span></div>
+        <ol id="stepList">
+          <li class="is-active" data-step-indicator="1"><button type="button"><span>1</span><div><strong>Objetivo</strong><small>O que precisa</small></div></button></li>
+          <li data-step-indicator="2"><button type="button"><span>2</span><div><strong>Plano</strong><small>Base e extras</small></div></button></li>
+          <li data-step-indicator="3"><button type="button"><span>3</span><div><strong>Negócio</strong><small>Dados essenciais</small></div></button></li>
+          <li data-step-indicator="4"><button type="button"><span>4</span><div><strong>Conteúdo</strong><small>Para começar bem</small></div></button></li>
+          <li data-step-indicator="5"><button type="button"><span>5</span><div><strong>Pagamento</strong><small>Rever e avançar</small></div></button></li>
+        </ol>
+        <div class="save-note">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9M12 7v5l3 2M17 3h4v4"/></svg>
+          <span>As respostas ficam guardadas neste dispositivo.</span>
+        </div>
+      </aside>
+
+      <form id="kickoffForm" class="form-card" novalidate>
+        <div class="step-panel is-active" data-step="1">
+          <div class="step-heading">
+            <p class="step-kicker">Passo 1 de 5</p>
+            <h2>Como quer que os clientes avancem?</h2>
+            <p>Escolha o objetivo principal. Nós adaptamos a página ao seu negócio.</p>
+          </div>
+          <fieldset class="choice-grid objective-grid">
+            <legend class="sr-only">Objetivo principal da página</legend>
+            <label class="choice-card">
+              <input type="radio" name="objective" value="Marcações" required>
+              <span class="choice-icon" aria-hidden="true">◷</span>
+              <span><strong>Fazer marcações</strong><small>Serviços, horários e equipa</small></span>
+              <span class="choice-check" aria-hidden="true">✓</span>
+            </label>
+            <label class="choice-card">
+              <input type="radio" name="objective" value="Cotações">
+              <span class="choice-icon" aria-hidden="true">▤</span>
+              <span><strong>Pedir cotações</strong><small>Produtos e quantidades</small></span>
+              <span class="choice-check" aria-hidden="true">✓</span>
+            </label>
+            <label class="choice-card">
+              <input type="radio" name="objective" value="Orçamentos">
+              <span class="choice-icon" aria-hidden="true">↗</span>
+              <span><strong>Pedir orçamentos</strong><small>Serviço, local e detalhes</small></span>
+              <span class="choice-check" aria-hidden="true">✓</span>
+            </label>
+            <label class="choice-card">
+              <input type="radio" name="objective" value="Informação">
+              <span class="choice-icon" aria-hidden="true">i</span>
+              <span><strong>Pedir informação</strong><small>Questões e inscrições</small></span>
+              <span class="choice-check" aria-hidden="true">✓</span>
+            </label>
+            <label class="choice-card choice-card-wide">
+              <input type="radio" name="objective" value="Contacto comercial">
+              <span class="choice-icon" aria-hidden="true">✦</span>
+              <span><strong>Receber contactos comerciais</strong><small>Apresentação clara e contacto direto</small></span>
+              <span class="choice-check" aria-hidden="true">✓</span>
+            </label>
+          </fieldset>
+        </div>
+
+        <div class="step-panel" data-step="2">
+          <div class="step-heading">
+            <p class="step-kicker">Passo 2 de 5</p>
+            <h2 id="planStepTitle">Comece simples. Acrescente só o que precisa.</h2>
+            <p id="planStepCopy">O plano base já inclui tudo para ter uma presença profissional.</p>
+          </div>
+          <article class="base-plan">
+            <div>
+              <span class="plan-badge" id="planBadge">Plano base</span>
+              <h3 id="planName">UNEED Presença</h3>
+              <p id="planDescription">Website personalizado, domínio, alojamento, SSL, 1 email profissional, manutenção e suporte.</p>
+            </div>
+            <div class="plan-price"><strong id="planPrice">39€</strong><span id="planBilling">+ IVA / mês</span></div>
+          </article>
+          <div class="addons-heading">
+            <div><h3>Extras disponíveis</h3><p>Podem ser ativados agora ou mais tarde.</p></div>
+            <span id="addonCount">0 selecionados</span>
+          </div>
+          <fieldset class="addon-list" id="addonList">
+            <legend class="sr-only">Extras disponíveis</legend>
+          </fieldset>
+          <div class="price-summary" aria-live="polite">
+            <div><span>Estimativa mensal</span><small id="priceSummaryNote">Sem extras selecionados</small></div>
+            <strong id="priceSummaryTotal">39€ <small>+ IVA / mês</small></strong>
+          </div>
+          <div class="pricing-note">
+            <span aria-hidden="true">i</span>
+            <p><strong>Preço transparente antes de avançar.</strong> Alguns extras dependem do volume e da configuração. A UNEED confirma o valor final por escrito antes de enviar qualquer pedido de pagamento.</p>
+          </div>
+        </div>
+
+        <div class="step-panel" data-step="3">
+          <div class="step-heading">
+            <p class="step-kicker">Passo 3 de 5</p>
+            <h2>Conte-nos o essencial sobre o negócio.</h2>
+            <p>Usamos estes dados apenas para preparar a ativação e entrar em contacto.</p>
+          </div>
+          <div class="field-grid">
+            <label class="field field-full"><span>Nome do negócio *</span><input name="businessName" autocomplete="organization" required placeholder="Ex.: Clínica Aurora"></label>
+            <label class="field"><span>O seu nome *</span><input name="contactName" autocomplete="name" required placeholder="Nome e apelido"></label>
+            <label class="field"><span>Telemóvel *</span><input name="phone" autocomplete="tel" inputmode="tel" required placeholder="+351 9xx xxx xxx"></label>
+            <label class="field"><span>Email *</span><input name="email" type="email" autocomplete="email" required placeholder="nome@empresa.pt"></label>
+            <label class="field"><span>NIF</span><input name="taxId" inputmode="numeric" maxlength="9" pattern="[0-9]{9}" placeholder="9 dígitos"></label>
+            <label class="field field-full"><span>Morada de faturação</span><input name="billingAddress" autocomplete="street-address" placeholder="Rua, número, código postal e localidade"></label>
+            <label class="field field-full"><span>Website ou rede social atual</span><input name="currentUrl" type="url" placeholder="https://"></label>
+          </div>
+          <p class="field-hint">Os dados de faturação podem ser completados mais tarde. Nunca pedimos dados bancários neste formulário.</p>
+        </div>
+
+        <div class="step-panel" data-step="4">
+          <div class="step-heading">
+            <p class="step-kicker">Passo 4 de 5</p>
+            <h2 id="contentStepTitle">Já tem alguma informação preparada?</h2>
+            <p id="contentStepCopy">Partilhe o que souber agora. O resto pode ser completado connosco depois.</p>
+          </div>
+          <fieldset class="domain-block">
+            <legend>Domínio e email profissional</legend>
+            <label><input type="radio" name="domainStatus" value="Quero uma sugestão" checked><span><strong>Quero uma sugestão</strong><small>A UNEED verifica opções adequadas.</small></span></label>
+            <label><input type="radio" name="domainStatus" value="Ja escolhi"><span><strong>Já tenho um nome em mente</strong><small>Indique-o no campo abaixo.</small></span></label>
+            <label><input type="radio" name="domainStatus" value="Ja tenho dominio"><span><strong>Já tenho domínio</strong><small>Avaliamos a ligação ou transferência.</small></span></label>
+          </fieldset>
+          <div class="field-grid content-fields">
+            <label class="field field-full"><span>Domínio pretendido ou atual</span><input name="domain" placeholder="ex.: o-meu-negocio.pt"></label>
+            <label class="field field-full"><span id="servicesLabel">Serviços principais</span><textarea name="services" rows="3" placeholder="Um por linha — pode adicionar valores e duração se fizer sentido"></textarea></label>
+            <label class="field"><span>Horário de funcionamento</span><textarea name="hours" rows="3" placeholder="Ex.: Seg–Sex, 09:00–18:00"></textarea></label>
+            <label class="field"><span id="teamLabel">Equipa ou colaboradores</span><textarea name="team" rows="3" placeholder="Nomes e funções, se aplicável"></textarea></label>
+            <label class="field field-full"><span>O que pretende criar ou alterar no site? *</span><textarea name="siteChanges" rows="5" required placeholder="Ex.: manter o logótipo, alterar os textos da página inicial, substituir fotografias, acrescentar uma página de serviços e destacar o WhatsApp."></textarea><small>Se é um site novo, descreva aqui o que quer ver na página e o que prefere evitar.</small></label>
+            <label class="field field-full"><span>Sites ou referências de que gosta</span><input name="referenceUrls" placeholder="Links ou nomes de páginas que sirvam de inspiração"></label>
+            <label class="field field-full"><span>Notas ou pedidos especiais</span><textarea name="notes" rows="3" placeholder="Algo importante que devamos saber?"></textarea></label>
+          </div>
+          <div class="later-card"><span aria-hidden="true">✓</span><p><strong>Não precisa de ter tudo pronto.</strong> Depois de recebermos este pedido, enviamos uma checklist curta apenas com o que estiver em falta.</p></div>
+        </div>
+
+        <div class="step-panel" data-step="5">
+          <div class="step-heading">
+            <p class="step-kicker">Passo 5 de 5</p>
+            <h2>Confirme e prepare o primeiro pagamento.</h2>
+            <p>O pedido fica a aguardar pagamento. O kickoff só começa depois da confirmação.</p>
+          </div>
+          <div class="review-card" id="reviewCard"></div>
+          <fieldset class="payment-choice">
+            <legend>Como prefere pagar a primeira mensalidade?</legend>
+            <label><input type="radio" name="paymentMethod" value="bank_transfer" required checked><span><strong>Transferência bancária</strong><small>Recebe o IBAN, titular e referência após confirmar.</small></span></label>
+            <label id="mbwayChoice"><input type="radio" name="paymentMethod" value="mbway" required><span><strong>MB WAY</strong><small id="mbwayAvailability">A verificar disponibilidade…</small></span></label>
+          </fieldset>
+          <div class="payment-rule"><span aria-hidden="true">✓</span><p><strong>O kickoff só fica completo após três validações.</strong> Precisamos de confirmar o primeiro pagamento, ativar e validar o débito direto GoCardless e validar toda a informação necessária. Só então começa o prazo de execução.</p></div>
+          <div class="next-steps">
+            <h3>O que acontece depois?</h3>
+            <ol>
+              <li><span>1</span><div><strong>Recebe os dados de pagamento</strong><small>Mostramos o valor, a referência e o método escolhido.</small></div></li>
+              <li><span>2</span><div><strong>Confirmamos o pagamento</strong><small>A equipa valida a entrada da primeira mensalidade.</small></div></li>
+              <li><span>3</span><div><strong>Ativamos o débito direto</strong><small>Enviamos depois o link individual GoCardless para as mensalidades seguintes.</small></div></li>
+              <li><span>4</span><div><strong>Validamos a informação e iniciamos</strong><small>O prazo normal é até 10 dias úteis após pagamento, GoCardless ativo e conteúdos completos.</small></div></li>
+            </ol>
+          </div>
+          <label class="consent"><input type="checkbox" name="consent" required><span>Confirmo que os dados estão corretos e autorizo a UNEED a contactar-me sobre este pedido. Li a <a href="https://uneed.pt" target="_blank" rel="noreferrer">informação do serviço</a>.</span></label>
+          <label class="honeypot" aria-hidden="true">Não preencher<input name="website" tabindex="-1" autocomplete="off"></label>
+        </div>
+
+        <div class="form-error" id="formError" role="alert" hidden></div>
+        <footer class="form-actions">
+          <button class="button button-ghost" type="button" id="backButton" hidden><span aria-hidden="true">←</span> Voltar</button>
+          <span class="action-reassurance" id="actionReassurance">Pode alterar as respostas antes de enviar.</span>
+          <button class="button button-primary" type="button" id="nextButton">Continuar <span aria-hidden="true">→</span></button>
+          <button class="button button-primary" type="submit" id="submitButton" hidden>Confirmar e ver pagamento <span aria-hidden="true">→</span></button>
+        </footer>
+      </form>
+    </div>
+
+    <section class="assurance-strip" aria-label="Garantias UNEED">
+      <div><span>✓</span><p><strong>Dados protegidos</strong><small>Informação usada só para a ativação.</small></p></div>
+      <div><span>✓</span><p><strong>Preço confirmado</strong><small>Sem cobranças antes da sua validação.</small></p></div>
+      <div><span>✓</span><p><strong>Acompanhamento humano</strong><small>Falamos consigo se houver alguma dúvida.</small></p></div>
+    </section>
+  </main>
+
+  <div class="success-screen" id="successScreen" hidden>
+    <div class="success-card">
+      <img src="assets/uneed-logo-login.png" alt="UNEED">
+      <span class="success-mark" aria-hidden="true">✓</span>
+      <p class="eyebrow">Pedido registado</p>
+      <h1>Falta confirmar o pagamento.</h1>
+      <p>O serviço ainda não começou. Use os dados abaixo e indique sempre a referência do pedido.</p>
+      <div class="success-reference"><span>Referência</span><strong id="successReference"></strong></div>
+      <div class="payment-instructions" id="paymentInstructions" hidden>
+        <div><span>Total da primeira mensalidade</span><strong id="paymentAmount"></strong><small id="paymentVat"></small></div>
+        <dl id="bankPaymentDetails" hidden><dt>Titular</dt><dd id="paymentAccountName"></dd><dt>IBAN</dt><dd id="paymentIban"></dd></dl>
+        <dl id="mbwayPaymentDetails" hidden><dt>Número MB WAY</dt><dd id="paymentMbway"></dd></dl>
+      </div>
+      <div class="success-note"><strong>Pedido recebido — ativação ainda não concluída</strong><span id="emailConfirmation">Enviámos para o seu email o resumo da aquisição e estes dados de pagamento.</span><span>Depois de confirmarmos o pagamento, enviaremos o link individual GoCardless. O prazo começa apenas após pagamento, GoCardless ativo e informação validada.</span></div>
+    </div>
+  </div>
+
+  <script src="kickoff.js"></script>
+</body>
+</html>
+

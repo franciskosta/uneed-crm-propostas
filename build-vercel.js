@@ -5,6 +5,9 @@ const root = __dirname;
 const outDir = path.join(root, "dist");
 const files = [
   "index.html",
+  "kickoff.html",
+  "kickoff.css",
+  "kickoff.js",
   "login.html",
   "suporte.html",
   "styles.css",

@@ -3,14 +3,16 @@
   "outputDirectory": "dist",
   "crons": [{ "path": "/api/contact-alerts", "schedule": "0 8 * * *" }],
   "functions": {
+    "api/kickoff.js": { "maxDuration": 15 },
     "api/contact-alerts.js": { "maxDuration": 60 },
     "api/prospect/search.js": { "maxDuration": 60 },
     "api/mission-worker.js": { "maxDuration": 60 },
     "api/missions/**/*.js": { "maxDuration": 60 }
   },
   "rewrites": [
+    { "source": "/kickoff", "destination": "/kickoff.html" },
     {
-      "source": "/((?!api/|assets/|styles.css|app.js|pricing.js|supabase-config.js|login.html|favicon.ico).*)",
+      "source": "/((?!api/|assets/|styles.css|app.js|pricing.js|supabase-config.js|login.html|kickoff.html|kickoff.css|kickoff.js|favicon.ico).*)",
       "destination": "/index.html"
     }
   ]

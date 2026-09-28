@@ -33,7 +33,10 @@ module.exports = async function handler(req, res) {
   }, "smtp-configuration-test/2026-09-28");
 
   if (!result.sent) {
-    console.error("kickoff_email_test_failed", result.reason);
+    const safeDetail = String(result.detail || "")
+      .replaceAll(process.env.SMTP_USER || "__no_smtp_user__", "[SMTP_USER]")
+      .slice(0, 500);
+    console.error("kickoff_email_test_failed", result.reason, safeDetail);
     return send(res, 502, { ok: false, error: "email_test_failed" });
   }
   return send(res, 200, { ok: true, sent: true });

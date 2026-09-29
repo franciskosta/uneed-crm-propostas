@@ -90,9 +90,10 @@ function publicView(row) {
   const images=(row.data.images||[]).map(({id,name,status,size,width,height,error,createdAt})=>({id,name,status,size,width,height,error,createdAt}));
   return {id:row.id,revision:row.revision,reference:'UNEED-'+row.id.slice(0,8).toUpperCase(),templateId:row.data.templateId||null,notifications:{customer:row.data.mail?.['submitted-customer']?.status||null,admin:row.data.mail?.['submitted-admin']?.status||null},offer:safeOffer,checks,answers,stage,status,expiresAt,submittedAt,images};
 }
-const answerFields=['businessName','email','businessAddress','socialLinks','sectorNotes','contact','phone','taxId','billingAddress','siteType','currentUrl','domain','services','hours','team','keep','remove','changes','newPages','references','contentLinks','notes'];
+const answerFields=['organizedAccounting','businessName','email','businessAddress','socialLinks','sectorNotes','contact','phone','taxId','billingAddress','siteType','currentUrl','domain','services','hours','team','keep','remove','changes','newPages','references','contentLinks','notes'];
 function answers(input, validate=true) {
   const out=Object.fromEntries(answerFields.map(k=>[k,text(input[k],k==='changes'?6000:2000)]));
+  if(out.organizedAccounting&&!['Sim','Não','Não sei'].includes(out.organizedAccounting))fail('Resposta sobre contabilidade organizada inválida.');
   if(validate && out.taxId && !/^\d{9}$/.test(out.taxId))fail('NIF inválido.');
   if(validate && out.currentUrl)out.currentUrl=url(out.currentUrl);
   if(validate && out.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(out.email))fail('Email inválido.');

@@ -710,6 +710,11 @@ function parseRate(value) {
   return Number(String(value || "0").replace(",", "."));
 }
 
+function ensureRateOption(selector, rate) {
+  const select=qs(selector),value=String(rate ?? '0');
+  if(![...select.options].some(o=>o.value===value)) select.add(new Option(`${value}%`,value));
+}
+
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -1542,6 +1547,7 @@ function renderForm() {
   qs("#companyWebsite").value = proposal.companyWebsite || "";
   qs("#sampleUrl").value = proposal.sampleUrl || "";
   qs("#discount").value = proposal.discount || 0;
+  ensureRateOption('#vatMode',proposal.vatMode);ensureRateOption('#withholdingMode',proposal.withholdingMode);
   qs("#vatMode").value = proposal.vatMode || "0";
   qs("#withholdingMode").value = proposal.withholdingMode || "0";
   qs("#paymentTerms").value = proposal.paymentTerms || state.brand.paymentTerms || "";
@@ -3654,7 +3660,7 @@ function emptyContract(seed = {}) {
     activationValue: seed.customer ? billingTotals(seed).once : recurring ? 0 : Number(sum.taxable || 0),
     monthlyValue: recurring ? recurringMonthlyValue(seed) : 0,
     periodicity: recurring ? "Mensal" : "Anual",
-    vatRate: seed.vatMode === "23" ? "23" : "0",
+    vatRate: String(seed.vatMode || '0'),
     paymentMethod: recurring ? "Débito direto SEPA" : "Transferência bancária",
     directDebitRequired: recurring,
     paymentException: "",
@@ -3795,7 +3801,8 @@ function renderContractForm() {
   qs("#contractActivation").value = Number(contract.activationValue || 0);
   qs("#contractMonthly").value = Number(contract.monthlyValue || 0);
   qs("#contractPeriodicity").value = contract.periodicity || "Mensal";
-  qs("#contractVat").value = contract.vatRate || "23";
+  ensureRateOption('#contractVat',contract.vatRate ?? '23');
+  qs("#contractVat").value = contract.vatRate ?? "23";
   qs("#contractPaymentMethod").value = contract.paymentMethod || "Débito direto SEPA";
   qs("#contractStatus").value = contract.status || "Rascunho";
   qs("#contractCancelNotice").value = Number(contract.cancelNoticeDays || 30);
@@ -3826,15 +3833,15 @@ function contractRecurringLabel(periodicity = "Mensal") {
 }
 
 function contractVatLabel(contract) {
-  return contract.vatRate === "23" ? "IVA 23%" : "Sem IVA";
+  return parseRate(contract.vatRate) ? `IVA ${contract.vatRate}%` : "Sem IVA";
 }
 
 function contractVatSummary(contract) {
-  return contract.vatRate === "23" ? "+ IVA 23%" : "Sem IVA";
+  return parseRate(contract.vatRate) ? `+ IVA ${contract.vatRate}%` : "Sem IVA";
 }
 
 function contractVatSentence(contract) {
-  if (contract.vatRate === "23") return "Aos valores indicados acresce IVA à taxa legal em vigor.";
+  if (parseRate(contract.vatRate)) return `Aos valores indicados acresce IVA de ${contract.vatRate}%.`;
   return "Os valores indicados seguem o enquadramento de IVA assinalado no Anexo I.";
 }
 

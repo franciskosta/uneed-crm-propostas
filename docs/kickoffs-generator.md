@@ -2,9 +2,9 @@
 
 ## Estado da entrega
 
-Implementação local sobre `31f87b2`, a ponta de `origin/main` verificada no início da tarefa. **Sem deploy, migração ou emails reais nesta tarefa.**
+Implementação sobre `31f87b2`, a ponta de `origin/main` verificada no início da tarefa. Em 29/09, o utilizador autorizou a tabela e pediu uploads seguros. A tabela e o bucket privado foram aplicados pelo SQL Editor da sessão autorizada, após verificação read-only; sem alterar clientes/submissões existentes nem enviar emails reais.
 
-O Supabase público de produção foi identificado em `crm.uneed.pt/supabase-config.js`: `kkmjocyhtcbmlmbhispo`. O conector disponível só lista staging e recusou uma consulta read-only a produção. Não usar o staging como substituto. A extração de todas as variáveis Vercel foi bloqueada pela revisão de segurança; não foi criado um ficheiro com segredos de produção.
+O Supabase de produção é `kkmjocyhtcbmlmbhispo`. O conector só lista staging, mas a sessão autorizada no navegador Codex dá acesso ao projeto correto. Não usar staging como substituto. Não foi extraído qualquer ficheiro com segredos de produção.
 
 ## Reutilização / alterações
 
@@ -21,7 +21,9 @@ Ficheiro gerado pelo CLI: `supabase/migrations/20260929015421_kickoff_flows.sql`
 
 Uma tabela **nova**, `kickoff_flows`, contém proprietário, hash do token, revisão otimista e documento com oferta, respostas, checklist, eventos e registos SMTP. Índices por proprietário/data e hash único. RLS ativo; `anon`/`authenticated` sem privilégios; apenas o backend tem SELECT/INSERT/UPDATE. Sem DELETE, funções privilegiadas, mudança de tabelas antigas ou políticas existentes.
 
-Antes de aplicar: aprovação explícita, ligação ao projeto correto, verificar ausência de tabela homónima e estado atual do schema. Depois: conferir estrutura, privilégios e advisors; executar teste controlado em ambiente não produtivo. O SQL ainda não foi executado nem validado numa base real. Não fazer `db push` indiscriminadamente sobre migrações preexistentes.
+Aplicadas pelo SQL Editor as migrações `20260929015421_kickoff_flows.sql` e `20260929022549_kickoff_private_images.sql`, numa transação. Verificação SQL confirmou tabela com RLS ativo, anon/authenticated sem SELECT, service_role com INSERT e zero kickoffs criados. Bucket `kickoff-images` privado, 10 MB e MIME restritos. Não reaplicar estes scripts nem fazer `db push` indiscriminadamente: o SQL Editor não regista automaticamente histórico no CLI.
+
+Advisor: zero erros; dois avisos preexistentes sobre `support_tickets` permissivo e leaked-password protection desligada. Não foram alterados por estarem fora do âmbito. Ausência de políticas na tabela nova é intencional: acesso exclusivo pelo backend.
 
 ## Segurança
 
@@ -38,7 +40,7 @@ Limites de payload real e throttling de escrita por documento; limitador por IP 
 ## Limites explícitos desta fase
 
 - GoCardless por link e validação manual, sem API/webhooks.
-- Conteúdos por links partilhados ou email; **não há upload direto**. Upload privado exige um bucket e políticas adicionais, a aprovar separadamente.
+- Upload direto de JPG/PNG/WebP, até 10 MB e 40 megapíxeis, estáticos. Máximo 20 reservas por kickoff, orçamento conservador de 100 MB incluindo quarentena/cópia validada; ficheiros maiores/outros formatos por links. Não converte HEIC nem redimensiona/comprime os originais.
 - Planos iniciais Presença/Marcações/Leads. High Ticket mantém a página existente.
 - Cada oferta tem uma periodicidade; propostas com linhas em periodicidades diferentes ou serviços não mapeáveis são recusadas na importação, sem omitir linhas.
 - Pré-visualização interna mostra a oferta, sem simular preenchimento ou envio. Percurso completo verificado pelo smoke test local.
@@ -47,6 +49,12 @@ Limites de payload real e throttling de escrita por documento; limitador por IP 
 - A taxa fixa do `/kickoff` legado foi preservada por compatibilidade. O percurso personalizado novo usa IVA/retenção da oferta, incluindo zero. Não encaminhar ofertas personalizadas para o formulário legado.
 
 ## Verificação e publicação
+
+Uploads: reserva autenticada pelo token, URL de upload assinado sem overwrite (validade Supabase: 2 horas), armazenamento privado de quarentena, verificação de assinatura/tipo e descodificação completa via sharp, cópia imutável dos bytes originais e só depois disponibilidade para download. Downloads como anexo, assinados por 60 segundos. Uma URL de download já emitida permanece válida até esse prazo mesmo após revogação do kickoff. Nenhuma imagem é publicada no website automaticamente.
+
+Uploads incompletos/rejeitados contam para a quota para impedir abuso; não há limpeza automática destrutiva. A quarentena conserva a cópia de entrada, contabilizada no orçamento. Monitorizar o espaço total do plano Free. Se necessário, preparar limpeza com confirmação humana, sem apagar originais aceites. Os metadados do original (incluindo EXIF) também são preservados: rever antes de publicar. Validação de imagem não é um antivírus.
+
+Testes locais: suite 125 testes passou após adição de uploads; formulário testado no navegador com PNG sintético de 1200 × 800, transporte e backend em memória, confirmando «original guardado». Nenhuma imagem de teste foi enviada para Supabase de produção.
 
 Executar `npm ci`, `npm test`, `node --test test/release-surface.test.js`, `npm run build`, `git diff --check`.
 

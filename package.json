@@ -13,7 +13,9 @@
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
+    "@supabase/storage-js": "2.117.2",
     "nodemailer": "10.0.12",
-    "pg": "^8.13.1"
+    "pg": "^8.13.1",
+    "sharp": "0.35.5"
   }
 }

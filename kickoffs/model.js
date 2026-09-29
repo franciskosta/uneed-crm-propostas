@@ -73,7 +73,8 @@ function available(row) {if(!row || row.data.revoked || row.data.status==='cance
 function publicView(row) {
   const {offer:o,checks,answers,stage,status,expiresAt,submittedAt}=row.data;
   const {internalNotes,proposalId,companyId,leadId,...safeOffer}=o;
-  return {id:row.id,revision:row.revision,reference:'UNEED-'+row.id.slice(0,8).toUpperCase(),offer:safeOffer,checks,answers,stage,status,expiresAt,submittedAt};
+  const images=(row.data.images||[]).map(({id,name,status,size,width,height,error,createdAt})=>({id,name,status,size,width,height,error,createdAt}));
+  return {id:row.id,revision:row.revision,reference:'UNEED-'+row.id.slice(0,8).toUpperCase(),offer:safeOffer,checks,answers,stage,status,expiresAt,submittedAt,images};
 }
 const answerFields=['contact','phone','taxId','billingAddress','siteType','currentUrl','domain','services','hours','team','keep','remove','changes','newPages','references','contentLinks','notes'];
 function answers(input) {
@@ -82,5 +83,5 @@ function answers(input) {
   if(out.currentUrl)out.currentUrl=url(out.currentUrl);
   out.accepted=input.accepted===true;return out;
 }
-function complete(row) {const {checks:c,offer:o,submittedAt}=row.data;return !!(submittedAt && (o.initial.net===0||c.payment) && (!o.requiresDebit||c.debit) && (!o.requiresContent||c.content) && c.validated);}
+function complete(row) {const {checks:c,offer:o,submittedAt}=row.data;return !!(submittedAt && !(row.data.images||[]).some(x=>['pending','validating'].includes(x.status)) && (o.initial.net===0||c.payment) && (!o.requiresDebit||c.debit) && (!o.requiresContent||c.content) && c.validated);}
 module.exports={offer,create,event,issue,reveal,hash,available,publicView,answers,complete,fail,text};

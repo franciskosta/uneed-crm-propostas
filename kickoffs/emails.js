@@ -8,6 +8,7 @@ function compose(row,link,payment,internal=false,invite=false) {
     o.paymentMethod==='mbway'?`MB WAY: ${payment.mbway}`:`Transferência: ${payment.accountName} · ${payment.iban}`,
     ...(o.requiresDebit?['Débito direto: por validar pela UNEED',o.gocardless?`Ativar: ${o.gocardless}`:'A UNEED enviará o link de adesão.']:['Débito direto: não aplicável']),
     `Conteúdos: ${row.data.checks.content?'validados':o.requiresContent?'a validar':'não aplicável'}`,
+    `Imagens originais recebidas: ${(row.data.images||[]).filter(x=>x.status==='ready').length} (acesso privado pelo kickoff)`,
     'O prazo começa após confirmação do pagamento e débito direto aplicáveis, conteúdos e validação UNEED.',
     ...(o.deadline?[`Prazo estimado: ${o.deadline}`]:[]),
     ...(internal?[`Contacto: ${o.contact} · ${o.email} · ${o.phone}`,`Alterações: ${a.changes||'—'}`,`Conteúdos: ${a.contentLinks||'—'}`]:[]),link];

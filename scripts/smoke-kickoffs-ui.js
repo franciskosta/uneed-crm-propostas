@@ -1,7 +1,7 @@
 // Local-only browser smoke test. In-memory persistence and mocked SMTP, no production data.
 // Run with Playwright available through NODE_PATH: node scripts/smoke-kickoffs-ui.js
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const {chromium}=require('playwright');
+const chromium=process.env.KICKOFF_SMOKE_SERVER_ONLY?null:require('playwright').chromium;
 const {makeHandler}=require('../api/kickoffs');
 const M=require('../kickoffs/model');
 const root=path.join(__dirname,'..');const rows=new Map();let sent=0;
@@ -10,9 +10,16 @@ const repo={cfg:{secret:'local-fixture'},authenticate:async()=> 'local-owner',re
   byToken:async hash=>structuredClone([...rows.values()].find(x=>x.token_hash===hash)),
   list:async()=>structuredClone([...rows.values()]),insert:async r=>{rows.set(r.id,structuredClone(r));return r;},
   save:async(r,v)=>{if(rows.get(r.id).revision!==v)M.fail('Conflict',409);const saved={...r,revision:v+1};rows.set(r.id,structuredClone(saved));return saved;}};
-const handler=makeHandler(repo,async()=>{sent++;return {sent:true};});
+let localOrigin;const images=new Map();
+const imageClient={createSignedUploadUrl:async key=>({data:{signedUrl:localOrigin+'/fixture-upload/'+encodeURIComponent(key)}}),
+  download:async key=>images.has(key)?{data:new Blob([images.get(key)])}:{error:'not found'},
+  upload:async(key,bytes)=>{if(images.has(key))return {error:'exists'};images.set(key,Buffer.from(bytes));return {data:{path:key}};},
+  createSignedUrl:async key=>({data:{signedUrl:localOrigin+'/fixture-download/'+encodeURIComponent(key)}})};
+const handler=makeHandler(repo,async()=>{sent++;return {sent:true};},imageClient);
 const server=http.createServer(async(req,res)=>{
   const url=new URL(req.url,'http://localhost');
+  if(url.pathname.startsWith('/fixture-upload/')){const key=decodeURIComponent(url.pathname.slice('/fixture-upload/'.length));if(images.has(key)){res.statusCode=409;res.end();return;}const chunks=[];for await(const chunk of req)chunks.push(chunk);images.set(key,Buffer.concat(chunks));res.setHeader('content-type','application/json');res.end('{}');return;}
+  if(url.pathname.startsWith('/fixture-download/')){const data=images.get(decodeURIComponent(url.pathname.slice('/fixture-download/'.length)));res.setHeader('content-type','image/png');res.end(data);return;}
   if(url.pathname==='/api/kickoffs'){let raw='';for await(const chunk of req)raw+=chunk;req.body=raw?JSON.parse(raw):{};req.query=Object.fromEntries(url.searchParams);res.status=n=>{res.statusCode=n;return res;};res.json=d=>{res.setHeader('content-type','application/json');res.end(JSON.stringify(d));};return handler(req,res);}
   if(url.pathname.startsWith('/api/')){res.setHeader('content-type','application/json');res.end('{}');return;}
   if(url.pathname==='/supabase-config.js'){res.setHeader('content-type','text/javascript');res.end('window.UNEED_SUPABASE={};');return;}
@@ -22,6 +29,8 @@ const server=http.createServer(async(req,res)=>{
 });
 (async()=>{let browser;try{
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin='http://127.0.0.1:'+server.address().port;
+  localOrigin=origin;
+  if(process.env.KICKOFF_SMOKE_SERVER_ONLY){const row=M.create('local-owner',{product:'presenca',plan:'presenca-essencial',company:'Teste local de imagens',contact:'Teste',email:'test@example.com',phone:'910000000',vat:0,retention:0,initialBase:0,paymentMethod:'bank_transfer'});row.data.stage=4;const token=M.issue(row,repo.cfg.secret);rows.set(row.id,row);await require('sharp')({create:{width:1200,height:800,channels:3,background:'#e71849'}}).png().toFile('/private/tmp/uneed-upload-fixture.png');console.log('Local fixture: '+origin+'/kickoff/'+token);await new Promise(()=>{});return;}
   browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/*',route=>route.request().url().startsWith(origin)?route.continue():route.abort());
   await page.goto(origin);await page.evaluate(()=>{getSupabaseClient=()=>({auth:{getSession:async()=>({data:{session:{access_token:'local-test'}}})}});});

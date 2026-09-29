@@ -2,6 +2,7 @@ const M=require('../kickoffs/model');
 const {repository}=require('../kickoffs/store');
 const {sendEmail}=require('./kickoff-email');
 const {compose}=require('../kickoffs/emails');
+const images=require('../kickoffs/images');
 const limits=new Map();
 function rate(req) {
   const key=String(req.headers['x-real-ip']||req.socket?.remoteAddress||'unknown');const now=Date.now();
@@ -10,7 +11,7 @@ function rate(req) {
   if(v.n>120)M.fail('Demasiados pedidos. Aguarde um minuto.',429);
 }
 function internal(row) {const copy=structuredClone(row);delete copy.data.tokenCipher;delete copy.token_hash;return copy;}
-function makeHandler(repo=repository(),mailer=sendEmail) {
+function makeHandler(repo=repository(),mailer=sendEmail,imageClient) {
   async function payment(row) {
     const data=(await repo.request('crm_state?select=data&user_id=eq.'+encodeURIComponent(row.owner_id)+'&limit=1'))[0]?.data;
     const brand=data?.brand||{};
@@ -45,6 +46,10 @@ function makeHandler(repo=repository(),mailer=sendEmail) {
         if(!/^[A-Za-z0-9_-]{43}$/.test(token))M.fail('Link inválido.',404);
         let row=await repo.byToken(M.hash(token));M.available(row);
         if(req.method==='GET')return res.status(200).json({ok:true,kickoff:M.publicView(row),payment:await payment(row)});
+        if(['image-reserve','image-finish','image-download'].includes(b.action)) {
+          const result=await images.run(repo,row,b,'customer',imageClient);
+          return res.status(200).json({ok:true,kickoff:M.publicView(result.row),upload:result.upload,downloadUrl:result.downloadUrl});
+        }
         if(b.action==='open') {
           if(!row.data.openedAt){row.data.openedAt=new Date().toISOString();M.event(row,'public_page_opened','customer');row=await repo.save(row,row.revision);}
           return res.status(200).json({ok:true,kickoff:M.publicView(row)});
@@ -80,6 +85,10 @@ function makeHandler(repo=repository(),mailer=sendEmail) {
       }
       if(!/^[a-f0-9-]{36}$/.test(String(b.id||'')))M.fail('Kickoff inválido.');
       let row=await repo.get(b.id,owner);if(!row)M.fail('Kickoff não encontrado.',404);
+      if(b.action==='image-download') {
+        const result=await images.run(repo,row,b,owner,imageClient);
+        return res.status(200).json({ok:true,downloadUrl:result.downloadUrl});
+      }
       if(b.action==='preview')return res.status(200).json({ok:true,kickoff:M.publicView(row),payment:await payment(row)});
       if(b.action==='link') {M.available(row);return res.status(200).json({ok:true,url:'https://crm.uneed.pt/kickoff/'+M.reveal(row,repo.cfg.secret)});}
       if(b.action==='duplicate')return res.status(201).json({ok:true,kickoff:internal(await repo.insert(M.create(owner,row.data.offer)))});

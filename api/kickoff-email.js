@@ -73,7 +73,7 @@ async function sendEmail(message, idempotencyKey) {
     const result = await smtpTransporter.sendMail({
       from,
       to: message.to,
-      replyTo: process.env.KICKOFF_REPLY_TO || user,
+      replyTo: message.replyTo && /^[^\s<>@,;]+@[^\s<>@,;]+\.[^\s<>@,;]+$/.test(message.replyTo) ? message.replyTo : process.env.KICKOFF_REPLY_TO || user,
       subject: message.subject,
       html: message.html,
       text: message.text,

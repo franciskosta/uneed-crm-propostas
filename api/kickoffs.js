@@ -60,12 +60,14 @@ function makeHandler(repo=repository(),mailer=sendEmail,imageClient) {
         if(b.revision!==row.revision)M.fail('Existe uma versão mais recente. Recarregue a página antes de gravar.',409);
         if(Date.now()-Date.parse(row.updated_at)<750)M.fail('Aguarde um instante antes de voltar a guardar.',429);
         const nextAnswers=M.answers(b.answers||{},b.action==='submit');
+        if(b.addons!==undefined)M.selectTemplateAddons(row,b.addons);
         if(row.data.submittedAt && JSON.stringify(nextAnswers)!==JSON.stringify(row.data.answers)){row.data.checks.content=false;row.data.checks.validated=false;}
         row.data.answers=nextAnswers;row.data.stage=Math.max(row.data.stage,Math.min(6,Math.max(1,Number(b.stage)||1)));
         row.data.status=row.data.submittedAt?'submitted':'started';
         if(b.action==='submit') {
           const a=row.data.answers;
           if(!a.accepted||!a.contact||!(row.data.offer.email||a.email))M.fail('Indique o seu nome, email e confirme o envio. Os restantes dados podem ser completados depois.');
+          if(row.data.templateId && !(await payment(row)).mbway)M.fail('MB WAY temporariamente indisponível. As respostas podem ser guardadas; contacte a UNEED.',503);
           row.data.submittedAt=new Date().toISOString();row.data.status='submitted';
         }
         M.event(row,b.action==='submit'?'submitted':'progress_saved','customer');row=await repo.save(row,row.revision);
@@ -80,6 +82,20 @@ function makeHandler(repo=repository(),mailer=sendEmail,imageClient) {
         const offset=Math.max(0,Math.min(100000,parseInt(req.query?.offset)||0));
         return res.status(200).json({ok:true,items:(await repo.list(owner,offset)).map(internal)});
       }
+      if(b.action==='create-template'){
+        const row=M.createTemplate(owner,b.templateId,b.company);
+        if(!/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(b.requestId||''))M.fail('Pedido inválido. Volte a abrir o modelo.');
+        const existing=await repo.get(b.requestId,owner);
+        if(existing){
+          if(existing.data.templateId!==b.templateId||existing.data.offer.company!==row.data.offer.company)M.fail('Este pedido já foi utilizado.',409);
+          M.available(existing);return res.status(200).json({ok:true,kickoff:internal(existing),url:'https://crm.uneed.pt/kickoff/'+M.reveal(existing,repo.cfg.secret)});
+        }
+        row.id=b.requestId;
+        if(!(await payment(row)).mbway)M.fail('Configure o número MB WAY antes de criar links deste modelo.',503);
+        const token=M.issue(row,repo.cfg.secret);M.event(row,'template_link_created',owner);
+        const saved=await repo.insert(row);
+        return res.status(201).json({ok:true,kickoff:internal(saved),url:'https://crm.uneed.pt/kickoff/'+token});
+      }
       if(b.action==='create') {
         const row=await repo.insert(M.create(owner,b.offer||{}));return res.status(201).json({ok:true,kickoff:internal(row)});
       }
@@ -91,7 +107,7 @@ function makeHandler(repo=repository(),mailer=sendEmail,imageClient) {
       }
       if(b.action==='preview')return res.status(200).json({ok:true,kickoff:M.publicView(row),payment:await payment(row)});
       if(b.action==='link') {M.available(row);return res.status(200).json({ok:true,url:'https://crm.uneed.pt/kickoff/'+M.reveal(row,repo.cfg.secret)});}
-      if(b.action==='duplicate')return res.status(201).json({ok:true,kickoff:internal(await repo.insert(M.create(owner,row.data.offer)))});
+      if(b.action==='duplicate')return res.status(201).json({ok:true,kickoff:internal(await repo.insert(row.data.templateId?M.createTemplate(owner,row.data.templateId,row.data.offer.company):M.create(owner,row.data.offer)))});
       if(b.revision!==row.revision)M.fail('O kickoff mudou. Atualize a lista.',409);
       if(b.action==='update') {if(row.data.status!=='draft')M.fail('Oferta bloqueada. Duplique para preparar uma nova versão.',409);row.data.offer=M.offer(b.offer||{});const o=row.data.offer;row.data.answers={businessName:o.company,contact:o.contact,email:o.email,phone:o.phone,taxId:o.taxId,billingAddress:o.billingAddress};}
       else if(b.action==='issue') {if(row.data.revoked||row.data.status==='cancelled')M.fail('Duplique o kickoff cancelado para criar uma nova oferta.',409);if(row.token_hash)M.fail('Já existe um link. Copie-o ou revogue-o.',409);M.issue(row,repo.cfg.secret,b.days||30);}

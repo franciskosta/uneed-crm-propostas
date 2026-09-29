@@ -13,9 +13,10 @@ function compose(row,link,payment,internal=false,invite=false) {
     'O prazo começa após confirmação do pagamento e débito direto aplicáveis, conteúdos e validação UNEED.',
     ...(o.deadline?[`Prazo estimado: ${o.deadline}`]:[]),
     ...(!invite?['Informação a completar: '+(intake.pending(row.data).join('; ')||'A aguardar revisão da equipa')]:[]),
+    ...(internal?['Responda diretamente a este email para enviar ao cliente o link GoCardless. Pagamento por confirmar.']:[]),
     ...(internal?Object.entries(a).filter(([k])=>k!=='accepted').map(([k,v])=>`${intake.labels[k]||k}: ${typeof v==='boolean'?(v?'Sim':'Não'):v}`):[]),link];
   const title=invite?'O seu kickoff UNEED':internal?'Kickoff recebido':'Recebemos o seu kickoff';
   const body=lines.map(x=>`<p>${h(x)}</p>`).join('')+`<p><a href="${h(link)}">${internal?'Abrir no CRM':'Abrir o seu kickoff'}</a></p>`;
-  return {subject:`${title} · ${reference}`,text:lines.join('\n'),html:shell({preview:title,eyebrow:'UNEED · Kickoff',title,intro:invite?o.intro:'Acompanhe os próximos passos pelo seu link.',body})};
+  return {...(internal?{replyTo:o.email||a.email}:{}),subject:`${title} · ${reference}`,text:lines.join('\n'),html:shell({preview:title,eyebrow:'UNEED · Kickoff',title,intro:invite?o.intro:'Acompanhe os próximos passos pelo seu link.',body})};
 }
 module.exports={compose};

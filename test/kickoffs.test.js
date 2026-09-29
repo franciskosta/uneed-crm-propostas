@@ -7,6 +7,28 @@ const {commercialCatalog}=require('../kickoff-catalog');
 const {compose}=require('../kickoffs/emails');
 const fs=require('node:fs');
 const base=()=>({product:'presenca',plan:'presenca-essencial',company:'Empresa teste',contact:'Contacto teste',phone:'910000000',email:'teste@example.com',vat:23,retention:0,initialBase:39,paymentMethod:'bank_transfer',requiresDebit:true,requiresContent:true});
+test('gallery templates resolve to existing plans and trusted optional prices',()=>{
+  const T=require('../kickoff-templates');for(const t of T.templates){const r=M.createTemplate('owner',t.id,'Negócio');assert.equal(r.data.offer.paymentMethod,'mbway');assert.equal(r.data.offer.addons.length,0);}
+  const r=M.createTemplate('owner','presenca-vet','Clínica');M.selectTemplateAddons(r,[{id:'management-metrics',unitPrice:0}]);
+  assert.equal(r.data.offer.total.base,51);assert.equal(r.data.offer.initial.net,62.73);assert.equal(r.data.checks.payment,false);
+  assert.throws(()=>M.selectTemplateAddons(r,[{id:'cards'}]));assert.throws(()=>M.selectTemplateAddons(r,[{id:'extra-language',languages:[]}]));
+  M.selectTemplateAddons(r,[{id:'extra-email',quantity:2},{id:'extra-language',languages:['en','fr']}]);assert.equal(r.data.offer.total.base,61);
+  r.data.submittedAt='now';assert.throws(()=>M.selectTemplateAddons(r,[]),/já foi enviado/);
+  assert.throws(()=>M.selectTemplateAddons(M.create('owner',base()),[]),/condições acordadas/);
+});
+test('name-only creation is authenticated, retry-safe and does not send invitations',async()=>{
+  const f=fixture(),b={action:'create-template',templateId:'presenca-vet',company:'Clínica',requestId:require('node:crypto').randomUUID()};
+  assert.equal((await f.call(b,null,'POST',false)).status,401);
+  const a=await f.call(b),retry=await f.call(b);assert.equal(a.status,201);assert.equal(retry.url,a.url);assert.equal(f.rows.size,1);assert.equal(f.mails.length,0);
+  assert.equal(a.kickoff.data.offer.email,'');assert.equal((await f.call({...b,company:'Outro'})).status,409);
+});
+test('template submission persists metrics amount and sends reply-ready notifications once',async()=>{
+  const f=fixture(),r=M.createTemplate('owner','presenca-geral','Negócio'),token=M.issue(r,f.repo.cfg.secret);r.updated_at='2020-01-01';await f.repo.insert(r);
+  const b={action:'submit',revision:1,stage:6,addons:[{id:'management-metrics',unitPrice:0}],answers:{contact:'Teste',email:'cliente@example.com',accepted:true}};
+  const result=await f.call(b,token);assert.equal(result.status,200);assert.equal(result.kickoff.offer.initial.net,62.73);assert.equal(result.kickoff.notifications.customer,'accepted');
+  assert.equal(f.mails[1].replyTo,'cliente@example.com');assert.match(f.mails[1].text,/GoCardless/);assert.match(f.mails[0].text,/62,73/);assert.equal(result.kickoff.checks.payment,false);
+  await f.call(b,token);assert.equal(f.mails.length,2);
+});
 test('kickoff can be prepared before collecting contact and billing details',()=>{
   const row=M.create('owner',{...base(),contact:'',email:'',phone:'',taxId:'',billingAddress:'',niche:'veterinaria'});
   assert.equal(row.data.answers.businessName,'Empresa teste');
@@ -28,7 +50,7 @@ function fixture() {
   const rows=new Map();let mails=[];
   const repo={cfg:{secret:'test-secret-not-production'},
     async authenticate(req){if(req.headers.authorization!=='Bearer test')M.fail('Unauthorized',401);return 'owner';},
-    async request(){return [{data:{brand:{name:'UNEED',iban:'PT-TEST'}}}];},
+    async request(){return [{data:{brand:{name:'UNEED',iban:'PT-TEST',mbway:'910000000'}}}];},
     async get(id,owner){const r=rows.get(id);return r&&(!owner||r.owner_id===owner)?structuredClone(r):undefined;},
     async byToken(hash){return structuredClone([...rows.values()].find(x=>x.token_hash===hash));},
     async list(owner){return structuredClone([...rows.values()].filter(x=>x.owner_id===owner));},

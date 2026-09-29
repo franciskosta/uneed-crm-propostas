@@ -5,7 +5,7 @@ const chromium=process.env.KICKOFF_SMOKE_SERVER_ONLY?null:require('playwright').
 const {makeHandler}=require('../api/kickoffs');
 const M=require('../kickoffs/model');
 const root=path.join(__dirname,'..');const rows=new Map();let sent=0;
-const repo={cfg:{secret:'local-fixture'},authenticate:async()=> 'local-owner',request:async()=>[{data:{brand:{name:'UNEED',iban:'PT-LOCAL-TEST'}}}],
+const repo={cfg:{secret:'local-fixture'},authenticate:async()=> 'local-owner',request:async()=>[{data:{brand:{name:'UNEED',iban:'PT-LOCAL-TEST',mbway:'910000000'}}}],
   get:async(id,owner)=>{const r=rows.get(id);return r&&(!owner||r.owner_id===owner)?structuredClone(r):null;},
   byToken:async hash=>structuredClone([...rows.values()].find(x=>x.token_hash===hash)),
   list:async()=>structuredClone([...rows.values()]),insert:async r=>{rows.set(r.id,structuredClone(r));return r;},
@@ -18,6 +18,7 @@ const imageClient={createSignedUploadUrl:async key=>({data:{signedUrl:localOrigi
 const handler=makeHandler(repo,async()=>{sent++;return {sent:true};},imageClient);
 const server=http.createServer(async(req,res)=>{
   const url=new URL(req.url,'http://localhost');
+  if(url.pathname==='/fixture-gallery'){res.setHeader('content-type','text/html');res.end('<!doctype html><html lang="pt"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/kickoff-gallery.css"><main style="max-width:1100px;margin:30px auto;padding:20px"><div id="kickoffGallery"></div></main><script src="/kickoff-catalog.js"></script><script src="/kickoff-templates.js"></script><script src="/kickoff-gallery.js"></script><script>KickoffGallery.init({api:async body=>{const r=await fetch("/api/kickoffs",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});const p=await r.json();if(!r.ok)throw Error(p.error);return {...p,url:p.url.replace("https://crm.uneed.pt",location.origin)}},refresh:()=>{},advanced:()=>{}})</script></html>');return;}
   if(url.pathname.startsWith('/fixture-upload/')){const key=decodeURIComponent(url.pathname.slice('/fixture-upload/'.length));if(images.has(key)){res.statusCode=409;res.end();return;}const chunks=[];for await(const chunk of req)chunks.push(chunk);images.set(key,Buffer.concat(chunks));res.setHeader('content-type','application/json');res.end('{}');return;}
   if(url.pathname.startsWith('/fixture-download/')){const data=images.get(decodeURIComponent(url.pathname.slice('/fixture-download/'.length)));res.setHeader('content-type','image/png');res.end(data);return;}
   if(url.pathname==='/api/kickoffs'){let raw='';for await(const chunk of req)raw+=chunk;req.body=raw?JSON.parse(raw):{};req.query=Object.fromEntries(url.searchParams);res.status=n=>{res.statusCode=n;return res;};res.json=d=>{res.setHeader('content-type','application/json');res.end(JSON.stringify(d));};return handler(req,res);}
@@ -30,11 +31,11 @@ const server=http.createServer(async(req,res)=>{
 (async()=>{let browser;try{
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin='http://127.0.0.1:'+server.address().port;
   localOrigin=origin;
-  if(process.env.KICKOFF_SMOKE_SERVER_ONLY){const row=M.create('local-owner',{product:'presenca',plan:'presenca-essencial',company:'Clínica Exemplo (teste local)',niche:'veterinaria',gocardless:'https://pay.gocardless.com/test-only',requiresDebit:true,contact:'Teste',email:'test@example.com',phone:'910000000',vat:0,retention:0,initialBase:0,paymentMethod:'bank_transfer'});row.data.stage=1;const token=M.issue(row,repo.cfg.secret);rows.set(row.id,row);await require('sharp')({create:{width:1200,height:800,channels:3,background:'#e71849'}}).png().toFile('/private/tmp/uneed-upload-fixture.png');console.log('Local fixture: '+origin+'/kickoff/'+token);await new Promise(()=>{});return;}
+  if(process.env.KICKOFF_SMOKE_SERVER_ONLY){const row=M.createTemplate('local-owner','presenca-vet','Clínica Exemplo (teste local)');row.data.stage=1;const token=M.issue(row,repo.cfg.secret);rows.set(row.id,row);await require('sharp')({create:{width:1200,height:800,channels:3,background:'#e71849'}}).png().toFile('/private/tmp/uneed-upload-fixture.png');console.log('Local fixture: '+origin+'/kickoff/'+token);await new Promise(()=>{});return;}
   browser=await chromium.launch({headless:true});const page=await browser.newPage({viewport:{width:1440,height:1000}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/*',route=>route.request().url().startsWith(origin)?route.continue():route.abort());
   await page.goto(origin);await page.evaluate(()=>{getSupabaseClient=()=>({auth:{getSession:async()=>({data:{session:{access_token:'local-test'}}})}});});
-  await page.getByRole('button',{name:'Kickoffs',exact:true}).click();await page.getByRole('button',{name:'Criar kickoff',exact:true}).click();
+  await page.getByRole('button',{name:'Kickoffs',exact:true}).click();await page.getByRole('button',{name:'preparar uma oferta acordada',exact:true}).click();
   const d=page.locator('dialog');await d.locator('[name=company]').fill('Clínica Exemplo');await d.getByText('Dados já conhecidos · opcionais',{exact:true}).click();await d.locator('[name=contact]').fill('Pessoa de Teste');await d.locator('[name=email]').fill('test@example.com');await d.locator('[name=phone]').fill('910000000');await d.getByText('Condições já acordadas · confirmar valores e impostos',{exact:true}).click();await d.locator('[name=vat]').fill('23');await d.locator('[name=retention]').fill('25');await d.locator('[name=initialBase]').fill('39');await d.locator('[name=niche]').selectOption('clinica');
   await d.getByText('Extras já contratados',{exact:true}).click();await d.locator('[data-addon="extra-email"]').check();await d.locator('[data-qty="extra-email"]').fill('2');
   await page.screenshot({path:'/private/tmp/uneed-kickoffs-editor.png',fullPage:true});

@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
 const { fiscal } = require('../customer-model');
 const { commercialCatalog, addonCatalog, allowedLanguages } = require('../kickoff-catalog');
+const templates=require('../kickoff-templates');
 const text = (v, n=4000) => String(v ?? '').trim().slice(0,n);
 function fail(message, status=400) { throw Object.assign(new Error(message), {status}); }
 function number(v, max=1000000) { if(v==='' || v==null || !Number.isFinite(Number(v)) || Number(v)<0 || Number(v)>max) fail('Valor numérico inválido.'); return Number(v); }
@@ -48,6 +49,18 @@ function create(owner, input, now=new Date().toISOString()) {
   const id=crypto.randomUUID(), prepared=offer(input);
   return {id,owner_id:owner,token_hash:null,revision:1,created_at:now,updated_at:now,data:{offer:prepared,status:'draft',checks:{payment:false,debit:false,content:false,validated:false,execution:false},answers:{businessName:prepared.company,contact:prepared.contact,email:prepared.email,phone:prepared.phone,taxId:prepared.taxId,billingAddress:prepared.billingAddress},stage:0,events:[{at:now,type:'created',actor:owner}],mail:{}}};
 }
+function createTemplate(owner,templateId,company){
+  const t=templates.get(templateId);if(!t)fail('Modelo de kickoff inválido.');
+  const plan=commercialCatalog[t.product].plans[t.plan];
+  const row=create(owner,{company,product:t.product,plan:t.plan,niche:t.niche,vat:23,retention:0,initialBase:plan.price,paymentMethod:'mbway',requiresDebit:true,requiresContent:true});
+  row.data.templateId=t.id;return row;
+}
+function selectTemplateAddons(row,input){
+  if(!row.data.templateId)fail('Este kickoff tem condições acordadas que não podem ser alteradas pelo cliente.',403);
+  if(row.data.submittedAt)fail('O pedido já foi enviado. Contacte a UNEED para alterar os extras.',409);
+  let addons;try{addons=templates.selection(row.data.offer.product,input);}catch(e){fail(e.message);}
+  const o=row.data.offer;row.data.offer=offer({...o,addons,initialBase:o.basePrice+addons.reduce((sum,a)=>sum+a.subtotal,0)});
+}
 function event(row,type,actor,now=new Date().toISOString()) {
   row.updated_at=now; row.data.events.push({at:now,type,actor});
   // Stop rather than silently deleting audit history.
@@ -75,7 +88,7 @@ function publicView(row) {
   const {offer:o,checks,answers,stage,status,expiresAt,submittedAt}=row.data;
   const {internalNotes,proposalId,companyId,leadId,...safeOffer}=o;
   const images=(row.data.images||[]).map(({id,name,status,size,width,height,error,createdAt})=>({id,name,status,size,width,height,error,createdAt}));
-  return {id:row.id,revision:row.revision,reference:'UNEED-'+row.id.slice(0,8).toUpperCase(),offer:safeOffer,checks,answers,stage,status,expiresAt,submittedAt,images};
+  return {id:row.id,revision:row.revision,reference:'UNEED-'+row.id.slice(0,8).toUpperCase(),templateId:row.data.templateId||null,notifications:{customer:row.data.mail?.['submitted-customer']?.status||null,admin:row.data.mail?.['submitted-admin']?.status||null},offer:safeOffer,checks,answers,stage,status,expiresAt,submittedAt,images};
 }
 const answerFields=['businessName','email','businessAddress','socialLinks','sectorNotes','contact','phone','taxId','billingAddress','siteType','currentUrl','domain','services','hours','team','keep','remove','changes','newPages','references','contentLinks','notes'];
 function answers(input, validate=true) {
@@ -86,4 +99,4 @@ function answers(input, validate=true) {
   out.contentHelp=input.contentHelp===true;out.accepted=input.accepted===true;return out;
 }
 function complete(row) {const {checks:c,offer:o,submittedAt}=row.data;return !!(submittedAt && !(row.data.images||[]).some(x=>['pending','validating'].includes(x.status)) && (o.initial.net===0||c.payment) && (!o.requiresDebit||c.debit) && (!o.requiresContent||c.content) && c.validated);}
-module.exports={offer,create,event,issue,reveal,hash,available,publicView,answers,complete,fail,text};
+module.exports={offer,create,createTemplate,selectTemplateAddons,event,issue,reveal,hash,available,publicView,answers,complete,fail,text};

@@ -677,11 +677,11 @@
           </div>
         </section>
 
-        <section class="view" id="view-kickoffs">
-          <div class="panel"><div class="panel-heading"><h2>Kickoffs</h2><div><button id="kickoffsRefresh" class="button ghost">Atualizar</button><button id="kickoffsCreate" class="button primary">Criar kickoff</button></div></div>
+        <section class="view" id="view-kickoffs"><div id="kickoffGallery"></div><details class="kickoff-history"><summary>Acompanhar kickoffs enviados</summary>
+          <div class="panel"><div class="panel-heading"><h2>Kickoffs</h2><div><button id="kickoffsRefresh" class="button ghost">Atualizar</button><button id="kickoffsCreate" class="button primary">Escolher modelo</button></div></div>
           <p>Crie o kickoff e acompanhe o preenchimento pelo cliente. Os campos abaixo são filtros da lista, não configuram um novo kickoff.</p>
-          <div class="form-grid"><label>Pesquisar<input id="kickoffsSearch" placeholder="Cliente, email ou referência"></label><label>Produto<select id="kickoffsProduct"><option value="">Todos</option><option value="presenca">UNEED Presença</option><option value="marcacoes">Marcações</option><option value="leads">Leads</option></select></label><label>Fase do kickoff<select id="kickoffsStatus" aria-describedby="kickoffsFilterHelp"></select></label><label>Nicho<select id="kickoffsNiche"><option value="">Todos os nichos</option></select></label></div><p id="kickoffsFilterHelp" class="card-meta">A fase indica o progresso do kickoff: rascunho, link criado, enviado, em preenchimento, em validação ou concluído. Não é o estado comercial do lead. O nicho do novo kickoff é escolhido em «Criar kickoff».</p><p id="kickoffsMessage" role="status"></p></div>
-          <div id="kickoffsList" class="kickoff-grid"></div>
+          <div class="form-grid"><label>Pesquisar<input id="kickoffsSearch" placeholder="Cliente, email ou referência"></label><label>Produto<select id="kickoffsProduct"><option value="">Todos</option><option value="presenca">UNEED Presença</option><option value="marcacoes">Marcações</option><option value="leads">Leads</option></select></label><label>Fase do kickoff<select id="kickoffsStatus" aria-describedby="kickoffsFilterHelp"></select></label><label>Nicho<select id="kickoffsNiche"><option value="">Todos os nichos</option></select></label></div><p id="kickoffsFilterHelp" class="card-meta">A fase indica o progresso do kickoff: rascunho, link criado, enviado, em preenchimento, em validação ou concluído. Não é o estado comercial do lead. Escolha o nicho do novo kickoff nos cards da galeria acima.</p><p id="kickoffsMessage" role="status"></p></div>
+          <div id="kickoffsList" class="kickoff-grid"></div></details>
         </section>
         <section class="view" id="view-clients">
           <header class="panel"><p class="eyebrow">A comunidade UNEED está a crescer</p><h2>Cada luz, um cliente.</h2><div class="customer-metrics" id="customerMetrics"></div></header>
@@ -1132,7 +1132,7 @@
     <link rel="stylesheet" href="/kickoffs.css">
     <script src="/kickoff-catalog.js"></script>
     <script src="/kickoff-intake.js"></script>
-    <script src="/kickoffs-ui.js"></script>
+    <link rel="stylesheet" href="/kickoff-gallery.css"><script src="/kickoff-templates.js"></script><script src="/kickoff-gallery.js"></script><script src="/kickoffs-ui.js"></script>
     <script src="./app.js?v=20260929-customers"></script>
   </body>
 </html>

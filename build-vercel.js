@@ -6,6 +6,7 @@ const outDir = path.join(root, "dist");
 const files = [
   "index.html",
   "kickoff.html",
+  "kickoff-project.html",
   "kickoff.css",
   "kickoff.js",
   "login.html",
@@ -14,6 +15,8 @@ const files = [
   "app.js",
   "contact-alerts.js",
   "manual-reminders.js",
+  "customer-model.js",
+  "customer-ui.js",
   "pricing.js",
   "commercial-core.js",
   "acquisition-strategies.js",

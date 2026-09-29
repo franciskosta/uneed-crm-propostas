@@ -971,6 +971,7 @@ function monthsInYear(year = new Date().getFullYear(), activeFrom = today()) {
 }
 
 function recurringMonthlyValue(proposal) {
+  if (proposal.customer) return proposal.customer.active === false ? 0 : billingTotals(proposal).monthly;
   if (proposal.status !== "Faturado") return 0;
   return billingTotals(proposal).monthly;
 }
@@ -2005,7 +2006,7 @@ function renderDashboard() {
       const billing = billingTotals(p);
       return sum + recognizedRevenue(p) - (p.status === "Faturado" ? billing.monthly : 0);
     }, 0);
-  const billed = Math.max(billedOneOff, 0) + recurringMonthly;
+  const billed = Math.max(billedOneOff, 0) + recurringProposals().filter(p => p.status === 'Faturado').reduce((sum,p)=>sum+recurringMonthlyValue(p),0);
   const currentQuarter = quarterKey();
   const fiscal = fiscalQuarterStats(currentQuarter);
   const fiscalYear = fiscalYearStats();
@@ -2986,6 +2987,7 @@ function renderInstagramProspecting() {
                       ${instagramProspectStatuses.map((item) => `<option value="${escapeAttr(item)}" ${item === prospect.status ? "selected" : ""}>${escapeHtml(prospectLabel(item))}</option>`).join("")}
                     </select>
                     ${renderProspectContactRecords(prospect)}
+                    ${customerActions(prospect)}
                     ${window.UNEED_REMINDERS.enabled(prospect) ? '<button class="button ghost mini" type="button" data-reminder-add>Adicionar lembrete</button>' : ''}
                     <div class="deal-actions">
                       <button class="button ghost mini" data-instagram-research="${escapeAttr(prospect.id)}" type="button">${prospect.researchHistory?.length ? "Atualizar análise" : prospect.readiness === "researching" ? "Ver investigação" : "Investigar empresa"}</button>
@@ -3074,9 +3076,11 @@ function updateInstagramProspect(id, patch) {
   const prospect = state.instagramProspects.find((item) => item.id === id);
   if (!prospect) return;
   Object.assign(prospect, patch, { updatedAt: new Date().toISOString() });
+  if (prospect.customer) UNEED_CUSTOMERS.sync(state, prospect, emptyProposal());
   if (patch.status === "Pediu demonstração" && !prospect.demonstration) prospect.demonstration = { status: "Solicitada", date: "", stage: patch.status };
   saveState();
   renderInstagramProspecting();
+  if (prospect.customer) { renderClients(); renderDashboard(); renderPerformance(); renderRecurring(); }
   if (prospectContactStages.includes(patch.status)) {
     const card = [...qs("#instagramKanban").querySelectorAll("[data-instagram-open]")].find((item) => item.dataset.instagramOpen === id);
     if (card) { card.open = true; card.querySelector(`[data-contact-stage="${patch.status}"][data-contact-field="date"]`)?.focus(); }
@@ -3263,7 +3267,7 @@ function renderRecurring() {
     .join("") || `<div class="empty">Quando marcares uma proposta mensal como Faturado, ela aparece aqui automaticamente.</div>`;
 }
 
-function renderClients() {
+function renderLegacyClients() {
   const grid = qs("#clientsGrid");
   if (!grid) return;
   const term = (qs("#clientSearchInput")?.value || "").trim().toLowerCase();
@@ -3637,7 +3641,7 @@ function emptyContract(seed = {}) {
     commercialName: seed.companyName || seed.clientName || "",
     fiscalName: seed.companyName || seed.clientName || "",
     nif: seed.clientNif || "",
-    address: "",
+    address: seed.customer?.address || "",
     email: seed.clientEmail || "",
     phone: seed.clientPhone || "",
     contactPerson: seed.clientName || "",
@@ -3645,9 +3649,9 @@ function emptyContract(seed = {}) {
     clientType: "Empresa",
     contractDate: today(),
     mainService: services[0]?.name || seed.opportunityCategory || "",
-    startDate: today(),
+    startDate: seed.customer?.startDate || today(),
     implementation: services[0]?.commitment || "10 a 15 dias úteis",
-    activationValue: recurring ? 0 : Number(sum.taxable || 0),
+    activationValue: seed.customer ? billingTotals(seed).once : recurring ? 0 : Number(sum.taxable || 0),
     monthlyValue: recurring ? recurringMonthlyValue(seed) : 0,
     periodicity: recurring ? "Mensal" : "Anual",
     vatRate: seed.vatMode === "23" ? "23" : "0",
@@ -3659,7 +3663,7 @@ function emptyContract(seed = {}) {
     cancelNoticeDays: 30,
     services: services.length ? ["projeto_personalizado"] : [],
     addons: [],
-    notes: seed.proposalNotes || "",
+    notes: seed.customer ? `${seed.customer.notes || ''}\nServiços adquiridos:\n${services.map(s=>`${s.name} · ${s.qty} × ${s.price} EUR · ${s.billing || 'Pontual'}`).join('\n')}` : seed.proposalNotes || "",
     version: 1,
     versions: [],
     createdAt: now,
@@ -4053,6 +4057,7 @@ async function soundzzzcapeAction(path, body = {}) {
 }
 
 function switchView(view) {
+  view = ({command:'instagram',pipeline:'instagram',recurring:'clients',history:'performance'})[view] || view;
   qsa(".nav-tab").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.view === view));
   qsa(".view").forEach((section) => section.classList.toggle("is-active", section.id === `view-${view}`));
   if (view === "soundzzzcape") loadSoundzzzcape({ quiet: Boolean(soundzzzcapeData) });
@@ -4903,6 +4908,7 @@ function formatBits(mask) {
   return ((data << 10) | value) ^ 0x5412;
 }
 
+setupCustomerWorkspace();
 bindEvents();
 qs("#prospectNiche").innerHTML = prospectNiches.map((item) => `<option value="${escapeAttr(item.id)}">${escapeHtml(item.label)}</option>`).join("");
 loadPortugalMunicipalities();

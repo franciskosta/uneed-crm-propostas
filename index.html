@@ -55,19 +55,15 @@
         </div>
 
         <nav class="nav-tabs" aria-label="Secções">
-          <button class="nav-tab" data-view="command">Centro de Comando</button>
-          <button class="nav-tab" data-view="soundzzzcape">Soundzzzcape</button>
+          <button class="nav-tab" data-view="instagram">PROSPEÇÃO</button>
           <button class="nav-tab is-active" data-view="dashboard">Dashboard</button>
           <button class="nav-tab" data-view="performance">Performance</button>
           <button class="nav-tab" data-view="proposal">Proposta</button>
           <button class="nav-tab" data-view="contracts">Contratos</button>
           <button class="nav-tab" data-view="clients">Clientes</button>
-          <button class="nav-tab" data-view="pipeline">Pipeline</button>
-          <button class="nav-tab" data-view="instagram">Prospeção IG</button>
           <button class="nav-tab" data-view="tickets">Tickets</button>
-          <button class="nav-tab" data-view="recurring">Avenças</button>
-          <button class="nav-tab" data-view="history">Histórico</button>
           <button class="nav-tab" data-view="settings">Configuração</button>
+          <button class="nav-tab" data-view="soundzzzcape">Soundzzzcape</button>
         </nav>
       </aside>
 
@@ -681,8 +677,12 @@
         </section>
 
         <section class="view" id="view-clients">
+          <header class="panel"><p class="eyebrow">A comunidade UNEED está a crescer</p><h2>Cada luz, um cliente.</h2><div class="customer-metrics" id="customerMetrics"></div></header>
           <div class="clients-toolbar">
             <input id="clientSearchInput" placeholder="Pesquisar cliente, empresa, NIF ou email..." />
+            <select id="customerTypeFilter"><option value="">Todas as tipologias</option><option value="presence">UNEED Presença</option><option value="bookings">Marcações</option><option value="leads">Captação de leads</option><option value="high_ticket">High Ticket</option><option value="other">Outros</option></select>
+            <select id="customerLocationFilter"><option value="">Todas as localidades</option></select>
+            <select id="customerNicheFilter"><option value="">Todos os nichos</option></select>
           </div>
           <div class="clients-grid" id="clientsGrid"></div>
         </section>
@@ -1119,6 +1119,8 @@
     <script src="./lead-intelligence.js"></script>
     <script src="./contact-alerts.js"></script>
     <script src="./manual-reminders.js"></script>
-    <script src="./app.js?v=20260918-soundzzzcape"></script>
+    <script src="./customer-model.js"></script>
+    <script src="./customer-ui.js"></script>
+    <script src="./app.js?v=20260929-customers"></script>
   </body>
 </html>

@@ -25,14 +25,14 @@ Estas instruções aplicam-se a qualquer agente, tarefa ou intervenção neste r
 
 - Executar a suite de testes completa e o build.
 - Executar especificamente `test/release-surface.test.js`. Nunca remover, ignorar ou enfraquecer as suas verificações.
-- Confirmar que o build inclui Prospeção IG, Kanban, lembretes, Centro de Comando, restantes módulos do CRM e kickoff.
+- Confirmar que o build inclui PROSPEÇÃO (antiga Prospeção IG), Kanban, lembretes, missões integradas na Prospeção, Clientes, restantes módulos do CRM e kickoff. Desde 29/09/2026, a pedido do utilizador, Centro de Comando e Pipeline estão integrados na Prospeção, Histórico na Performance e Avenças em Clientes; não reintroduzir os separadores redundantes.
 - Rever o diff final e confirmar que não existem remoções ou alterações não relacionadas.
 - Guardar as alterações no repositório antes de publicar, garantindo que a versão a publicar corresponde exatamente ao código versionado.
 - Não fazer deploy se o checkout usado para construir não estiver associado ao repositório e commit confirmados.
 
 ## Verificações obrigatórias depois do deploy
 
-- Verificar diretamente em `https://crm.uneed.pt` que **Prospeção IG** continua disponível no menu.
+- Verificar diretamente em `https://crm.uneed.pt` que **PROSPEÇÃO** continua disponível no topo do menu e Soundzzzcape é o último item.
 - Confirmar que os ficheiros e recursos dos lembretes são servidos corretamente.
 - Verificar `https://crm.uneed.pt/kickoff` e a disponibilidade de `https://crm.uneed.pt/api/kickoff`.
 - Não enviar emails reais nem criar submissões de teste em produção sem autorização explícita do utilizador.

@@ -3428,3 +3428,20 @@ textarea {
 .manual-reminder-dialog::backdrop { background: #191c4c80; }
 .manual-reminder-dialog label { display: grid; gap: 6px; margin: 14px 0; }
 .manual-reminder-dialog textarea { white-space: pre-wrap; }
+/* Customer wall: compact, accessible active-state signals at portfolio scale. */
+.customer-metrics {display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-top:20px}
+.customer-metrics article {display:grid;gap:6px;padding:16px;background:#f3f5fb;border-radius:14px}
+.customer-metrics strong {font-size:25px;color:#171a49}.customer-metrics span {font-size:12px;color:#626985}
+#clientsGrid {display:block}.customer-wall {display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:12px}
+.customer-group {margin:24px 0}.customer-group h2 small {color:#64748b;font-size:14px}
+.customer-tile {text-align:left;border:1px solid #e1e7ee;background:linear-gradient(135deg,#fff,#f0faf6);border-radius:16px;padding:18px;display:grid;gap:8px;min-height:132px;cursor:pointer;color:#191c49;box-shadow:0 5px 18px #15244008}
+.customer-tile:hover {transform:translateY(-2px);border-color:#28b58a}.customer-tile:focus-visible {outline:3px solid #312e81}
+.customer-tile span,.customer-tile small {font-size:11px;color:#63738a}.customer-tile strong {font-size:15px;overflow-wrap:anywhere}
+.customer-light {height:10px;width:10px;border-radius:50%;background:#94a3b8}.customer-light.active {background:#16bf78;box-shadow:0 0 0 5px #16bf781a,0 0 15px #16bf7866}
+.customer-dialog {width:min(850px,94vw);max-height:90vh;border:1px solid #dce0ee;border-radius:20px;padding:26px;color:#191c49}.customer-dialog::backdrop {background:#171a4970}
+.customer-dialog header {display:flex;justify-content:space-between;align-items:center;gap:15px}.customer-form-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.customer-dialog label {display:grid;gap:6px;margin:8px 0}.customer-dialog [data-error] {color:#b42318}.customer-dialog input,.customer-dialog select,.customer-dialog textarea {width:100%}
+.customer-addons label {display:grid;grid-template-columns:2fr 60px 100px 100px;align-items:center;gap:8px}.customer-addons input[type=checkbox] {width:auto}
+.customer-activation {display:grid;gap:10px;padding:14px;border:1px solid #b8e8d6;border-radius:12px;background:#effbf5}
+.customer-total {font-size:19px;font-weight:800}.workspace-secondary {margin-top:25px}.workspace-secondary>summary {cursor:pointer;font-weight:700;padding:14px}.clients-toolbar {flex-wrap:wrap}
+@media(max-width:600px){.customer-form-grid {grid-template-columns:1fr}.customer-addons label {grid-template-columns:1fr 55px 80px}.customer-addons select {grid-column:1/-1}.customer-dialog {padding:16px}}

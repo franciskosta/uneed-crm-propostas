@@ -4068,6 +4068,7 @@ function switchView(view) {
   qsa(".nav-tab").forEach((tab) => tab.classList.toggle("is-active", tab.dataset.view === view));
   qsa(".view").forEach((section) => section.classList.toggle("is-active", section.id === `view-${view}`));
   if (view === "soundzzzcape") loadSoundzzzcape({ quiet: Boolean(soundzzzcapeData) });
+  if (view === "kickoffs") KickoffsUI.load();
 }
 
 function openProposal(id) {

@@ -85,5 +85,4 @@ async function sendEmail(message, idempotencyKey) {
   }
 }
 
-module.exports = { adminEmail, customerEmail, sendEmail };
-
+module.exports = { adminEmail, customerEmail, sendEmail, shell, escapeHtml };

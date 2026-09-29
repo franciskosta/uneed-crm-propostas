@@ -61,6 +61,7 @@
           <button class="nav-tab" data-view="proposal">Proposta</button>
           <button class="nav-tab" data-view="contracts">Contratos</button>
           <button class="nav-tab" data-view="clients">Clientes</button>
+          <button class="nav-tab" data-view="kickoffs">Kickoffs</button>
           <button class="nav-tab" data-view="tickets">Tickets</button>
           <button class="nav-tab" data-view="settings">Configuração</button>
           <button class="nav-tab" data-view="soundzzzcape">Soundzzzcape</button>
@@ -676,6 +677,12 @@
           </div>
         </section>
 
+        <section class="view" id="view-kickoffs">
+          <div class="panel"><div class="panel-heading"><h2>Kickoffs</h2><div><button id="kickoffsRefresh" class="button ghost">Atualizar</button><button id="kickoffsCreate" class="button primary">Criar kickoff</button></div></div>
+          <p>Prepare a oferta, envie o link e acompanhe os passos do cliente.</p>
+          <div class="form-grid"><label>Pesquisar<input id="kickoffsSearch" placeholder="Cliente, email ou referência"></label><label>Produto<select id="kickoffsProduct"><option value="">Todos</option><option value="presenca">UNEED Presença</option><option value="marcacoes">Marcações</option><option value="leads">Leads</option></select></label><label>Estado<select id="kickoffsStatus"></select></label><label>Nicho<select id="kickoffsNiche"><option value="">Todos os nichos</option></select></label></div><p id="kickoffsMessage" role="status"></p></div>
+          <div id="kickoffsList" class="kickoff-grid"></div>
+        </section>
         <section class="view" id="view-clients">
           <header class="panel"><p class="eyebrow">A comunidade UNEED está a crescer</p><h2>Cada luz, um cliente.</h2><div class="customer-metrics" id="customerMetrics"></div></header>
           <div class="clients-toolbar">
@@ -1122,6 +1129,9 @@
     <script src="./manual-reminders.js"></script>
     <script src="./customer-model.js"></script>
     <script src="./customer-ui.js"></script>
+    <link rel="stylesheet" href="/kickoffs.css">
+    <script src="/kickoff-catalog.js"></script>
+    <script src="/kickoffs-ui.js"></script>
     <script src="./app.js?v=20260929-customers"></script>
   </body>
 </html>

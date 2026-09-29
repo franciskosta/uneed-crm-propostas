@@ -85,7 +85,7 @@ function openCustomerEditor(lead, legacyProposal) {
   form.onsubmit=e=>{e.preventDefault();const p=save();if(p){if(form.elements.contract.value==='gerar')contract(p);else d.close();}};
   form.addEventListener('change',event=>{if(form.elements.service.value && form.elements.serviceName.value.trim() && form.elements.price.value!==''){const p=save(true);if(p && event.target===form.elements.contract && event.target.value==='gerar')contract(p);}});
   d.querySelector('[data-contract]').onclick=()=>{const p=save();if(p)contract(p);};
-  d.querySelector('[data-kickoff]').onclick=()=>{const p=save();if(!p)return; const t=form.elements.type.value;const params=new URLSearchParams({produto:t==='bookings'?'marcacoes':t==='leads'?'leads':'presenca',nicho:form.elements.niche.value,plano:form.elements.service.value==='uneed-start-monthly'?'presenca-essencial':form.elements.service.value}); window.open(t==='high_ticket'||t==='other'?'/kickoff-project.html':`/kickoff?${params}`,'_blank','noopener');};
+  d.querySelector('[data-kickoff]').onclick=()=>{const p=save();if(!p)return;const t=form.elements.type.value;if(t==='high_ticket'||t==='other'){window.open('/kickoff-project.html','_blank','noopener');return;}d.close();KickoffsUI.fromClient(p);};
   d.querySelector('[data-close]').onclick=()=>d.close(); d.onclose=()=>d.remove();preview();d.showModal();
 }
 

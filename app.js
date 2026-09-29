@@ -2998,6 +2998,7 @@ function renderInstagramProspecting() {
                     <div class="deal-actions">
                       <button class="button ghost mini" data-instagram-research="${escapeAttr(prospect.id)}" type="button">${prospect.researchHistory?.length ? "Atualizar análise" : prospect.readiness === "researching" ? "Ver investigação" : "Investigar empresa"}</button>
                       ${prospect.acquisitionStrategy === "high_ticket" ? "" : `<button class="button primary mini" data-instagram-mockup="${escapeAttr(prospect.id)}" type="button">${prospect.generatedMockupPrompt ? "Refazer prompt" : "Criar mockup"}</button>`}
+                      <button class="button ghost mini" data-prospect-kickoff="${escapeAttr(prospect.id)}" type="button">Preparar kickoff</button>
                       <button class="button ghost mini" data-instagram-edit="${escapeAttr(prospect.id)}" type="button">Editar</button>
                       <button class="button danger mini" data-instagram-delete="${escapeAttr(prospect.id)}" type="button">Apagar</button>
                     </div>
@@ -4347,6 +4348,8 @@ function bindEvents() {
   qs("#prospectMunicipalityFilter").addEventListener("change", renderInstagramProspecting);
 
   qs("#instagramKanban").addEventListener("click", (event) => {
+    const kickoffButton = event.target.closest("[data-prospect-kickoff]");
+    if(kickoffButton){event.preventDefault();event.stopPropagation();KickoffsUI.fromProspect(state.instagramProspects.find(p=>p.id===kickoffButton.dataset.prospectKickoff));return;}
     const mockupButton = event.target.closest("[data-instagram-mockup]");
     if (mockupButton) {
       event.preventDefault();

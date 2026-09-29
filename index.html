@@ -679,8 +679,8 @@
 
         <section class="view" id="view-kickoffs">
           <div class="panel"><div class="panel-heading"><h2>Kickoffs</h2><div><button id="kickoffsRefresh" class="button ghost">Atualizar</button><button id="kickoffsCreate" class="button primary">Criar kickoff</button></div></div>
-          <p>Prepare a oferta, envie o link e acompanhe os passos do cliente.</p>
-          <div class="form-grid"><label>Pesquisar<input id="kickoffsSearch" placeholder="Cliente, email ou referência"></label><label>Produto<select id="kickoffsProduct"><option value="">Todos</option><option value="presenca">UNEED Presença</option><option value="marcacoes">Marcações</option><option value="leads">Leads</option></select></label><label>Estado<select id="kickoffsStatus"></select></label><label>Nicho<select id="kickoffsNiche"><option value="">Todos os nichos</option></select></label></div><p id="kickoffsMessage" role="status"></p></div>
+          <p>Crie o kickoff e acompanhe o preenchimento pelo cliente. Os campos abaixo são filtros da lista, não configuram um novo kickoff.</p>
+          <div class="form-grid"><label>Pesquisar<input id="kickoffsSearch" placeholder="Cliente, email ou referência"></label><label>Produto<select id="kickoffsProduct"><option value="">Todos</option><option value="presenca">UNEED Presença</option><option value="marcacoes">Marcações</option><option value="leads">Leads</option></select></label><label>Fase do kickoff<select id="kickoffsStatus" aria-describedby="kickoffsFilterHelp"></select></label><label>Nicho<select id="kickoffsNiche"><option value="">Todos os nichos</option></select></label></div><p id="kickoffsFilterHelp" class="card-meta">A fase indica o progresso do kickoff: rascunho, link criado, enviado, em preenchimento, em validação ou concluído. Não é o estado comercial do lead. O nicho do novo kickoff é escolhido em «Criar kickoff».</p><p id="kickoffsMessage" role="status"></p></div>
           <div id="kickoffsList" class="kickoff-grid"></div>
         </section>
         <section class="view" id="view-clients">

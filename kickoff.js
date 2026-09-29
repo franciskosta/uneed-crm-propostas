@@ -1,31 +1,10 @@
 (function () {
   "use strict";
 
-  const addons = [
-    { id: "management-metrics", name: "Métricas de gestão", note: "Indicadores de gestão · 12 €/mês + IVA", help: "Indicadores para acompanhar a gestão do negócio, de acordo com os dados e integrações configurados. É um extra opcional de 12 € por mês, acrescido de IVA quando aplicável.", unitPrice: 12, products: ["presenca", "marcacoes", "leads"] },
-    { id: "extra-email", name: "Email profissional extra", note: "15 GB por conta", help: "O plano já inclui uma conta. Adicione uma unidade por cada novo endereço profissional de que precisa, por exemplo geral@, comercial@ ou nome@empresa.pt. Cada conta tem caixa e acesso próprios.", unitPrice: 6, configurable: "quantity", products: ["presenca", "marcacoes", "leads"] },
-    { id: "extra-language", name: "Idioma adicional", note: "Uma versão extra da página", help: "Cria uma versão navegável da página no idioma escolhido, com seletor de idioma. O preço é aplicado por cada idioma adicional. A tradução inicial standard está incluída; conteúdos extensos podem ser avaliados à parte.", unitPrice: 5, configurable: "languages", products: ["presenca", "marcacoes", "leads"] },
-    { id: "guided-assistant", name: "Assistente Guiado 24h", note: "Respostas por opções preparadas", help: "O visitante escolhe entre botões e percursos definidos antecipadamente. As respostas são fixas e aprovadas por si: é previsível, controlado e indicado para perguntas frequentes e encaminhamento. Não interpreta perguntas escritas livremente.", unitPrice: 12, products: ["presenca", "marcacoes", "leads"] },
-    { id: "smart-assistant", name: "Assistente Inteligente 24h", note: "Perguntas livres com IA", help: "O visitante escreve a pergunta com as suas próprias palavras. A IA interpreta-a e responde apenas com base na informação aprovada do negócio. É mais flexível para dúvidas variadas e inclui até 2.000 respostas por mês.", unitPrice: 29, products: ["presenca", "marcacoes", "leads"] },
-    { id: "backoffice", name: "Backoffice de conteúdos", note: "Edite conteúdos selecionados", help: "Área reservada onde pode alterar autonomamente conteúdos definidos, como textos, contactos, horários ou imagens. Não inclui mudanças de design, novas páginas ou novas funcionalidades.", unitPrice: 15, products: ["presenca", "leads"] },
-    { id: "sms", name: "Pacote SMS", note: "Lembretes e confirmações", help: "Envia confirmações e lembretes de marcação por SMS para reduzir faltas. O valor depende do plafond mensal de mensagens escolhido e é confirmado antes da ativação.", price: "Por volume", products: ["marcacoes"] },
-    { id: "multi-location", name: "Multi-estabelecimento", note: "Agenda e equipa por espaço", help: "Permite gerir vários espaços no mesmo sistema, mantendo horários, profissionais, serviços e disponibilidade próprios para cada estabelecimento.", price: "A confirmar", products: ["marcacoes"] },
-    { id: "registrations", name: "Sistema de inscrições", note: "Formulário personalizado", help: "Formulário adaptado aos dados que precisa de recolher, com submissões organizadas e notificações por email. Campos, documentos e fluxo são confirmados consigo antes da ativação.", price: "A confirmar", products: ["presenca"] },
-    { id: "remove-credit", name: "Remover “by uneed.pt”", note: "Sem referência no rodapé", help: "Retira a assinatura visível “by uneed.pt” do rodapé. A UNEED continua responsável pelo alojamento, manutenção e suporte contratados.", unitPrice: 5, products: ["presenca", "marcacoes", "leads"] },
-    { id: "cards", name: "250 cartões por ano", note: "Design e impressão incluídos", help: "Inclui criação ou adaptação do design e impressão de até 250 cartões de visita ou fidelização por ano. Acabamentos especiais e entregas podem ser avaliados à parte.", price: "A confirmar", products: ["presenca", "marcacoes", "leads"] }
-  ];
-
-  const languages = [
-    { code: "en", short: "EN", name: "Inglês" },
-    { code: "es", short: "ES", name: "Espanhol" },
-    { code: "fr", short: "FR", name: "Francês" },
-    { code: "de", short: "DE", name: "Alemão" }
-  ];
-
   const productCatalog = {
     presenca: {
       objective: "Presença digital profissional", eyebrow: "Ativação UNEED Presença", title: "A sua presença profissional começa aqui.",
-      intro: "Confirme o essencial para prepararmos a página do seu negócio. Demora cerca de 4 minutos.",
+      intro: "Confirme o essencial para prepararmos a página do seu negócio. Pode guardar e continuar mais tarde neste dispositivo.",
       contentTitle: "Conte-nos o que deve aparecer na sua página.", contentCopy: "Partilhe o que já tiver. A UNEED ajuda a organizar o resto.",
       plans: { essencial: { id: "presenca-essencial", name: "UNEED Presença", price: 39, description: "Website personalizado, domínio, alojamento, SSL, 1 email profissional, manutenção e suporte." } }, defaultPlan: "essencial"
     },
@@ -60,13 +39,12 @@
 
   const query = new URLSearchParams(location.search);
   const productKey = String(query.get("produto") || "").toLowerCase();
-  const nicheKey = String(query.get("nicho") || "").toLowerCase();
+  let nicheKey = UNEED_KICKOFF_INTAKE.nicheKey(query.get("nicho"));
   const product = productCatalog[productKey] || null;
   const requestedPlan = String(query.get("plano") || "").toLowerCase();
   const planKey = product && product.plans[requestedPlan] ? requestedPlan : product?.defaultPlan;
   const plan = product ? product.plans[planKey] : { id: "presenca-essencial", name: "UNEED Presença", price: 39, description: "Website personalizado, domínio, alojamento, SSL, 1 email profissional, manutenção e suporte." };
   const niche = nicheCatalog[nicheKey] || null;
-  const activeAddons = product ? addons.filter(function (addon) { return addon.products.includes(productKey); }) : addons;
 
   const form = document.getElementById("kickoffForm");
   const panels = Array.from(document.querySelectorAll("[data-step]"));
@@ -83,37 +61,7 @@
     return String(value || "").replace(/[&<>"']/g, function (char) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]; });
   }
 
-  function addonPriceLabel(addon) {
-    return Number.isFinite(addon.unitPrice) ? addon.unitPrice + "€ / mês" + (addon.configurable ? " cada" : "") : addon.price;
-  }
-
-  function renderAddons() {
-    document.getElementById("addonList").innerHTML = activeAddons.map(function (addon) {
-      const tooltipId = "tooltip-" + addon.id;
-      const heading = '<div class="addon-heading"><label class="addon-main"><input type="checkbox" name="addons" value="' + escapeHtml(addon.id) + '"><span><strong>' + escapeHtml(addon.name) + '</strong><small>' + escapeHtml(addon.note) + '</small></span></label><span class="addon-help"><button type="button" aria-label="Mais informação sobre ' + escapeHtml(addon.name) + '" aria-describedby="' + tooltipId + '">i</button><span class="addon-tooltip" id="' + tooltipId + '" role="tooltip"><strong>' + escapeHtml(addon.name) + '</strong>' + escapeHtml(addon.help) + '</span></span><em>' + escapeHtml(addonPriceLabel(addon)) + '</em></div>';
-      if (addon.configurable === "quantity") {
-        return '<div class="addon addon-configurable" data-addon="' + escapeHtml(addon.id) + '">' + heading + '<div class="addon-options quantity-option"><span>Quantidade</span><div class="quantity-control"><button type="button" data-quantity="-1" aria-label="Diminuir quantidade">−</button><input type="number" name="extraEmailQuantity" value="1" min="1" max="20" inputmode="numeric" aria-label="Quantidade de emails extra"><button type="button" data-quantity="1" aria-label="Aumentar quantidade">+</button></div><strong data-email-subtotal>6€ / mês</strong></div></div>';
-      }
-      if (addon.configurable === "languages") {
-        const choices = languages.map(function (language) { return '<label class="language-option"><input type="checkbox" name="addonLanguages" value="' + language.code + '"><span><strong>' + language.short + '</strong><small>' + language.name + '</small></span></label>'; }).join("");
-        return '<div class="addon addon-configurable" data-addon="' + escapeHtml(addon.id) + '">' + heading + '<div class="addon-options language-options">' + choices + '</div><p class="language-total" data-language-total>Escolha um ou mais idiomas</p></div>';
-      }
-      return '<div class="addon">' + heading + '</div>';
-    }).join("");
-  }
-
-  function selectedAddonData() {
-    const data = new FormData(form);
-    return data.getAll("addons").map(function (id) {
-      const addon = activeAddons.find(function (item) { return item.id === id; });
-      if (!addon) return null;
-      const selectedLanguages = id === "extra-language" ? data.getAll("addonLanguages").filter(function (code) { return languages.some(function (language) { return language.code === code; }); }) : [];
-      const quantity = id === "extra-email" ? Math.max(1, Math.min(20, Number(data.get("extraEmailQuantity")) || 1)) : id === "extra-language" ? selectedLanguages.length : 1;
-      const subtotal = Number.isFinite(addon.unitPrice) ? addon.unitPrice * quantity : null;
-      const languageNames = selectedLanguages.map(function (code) { return languages.find(function (language) { return language.code === code; }).name; });
-      return { id: addon.id, name: addon.name, price: Number.isFinite(addon.unitPrice) ? addon.unitPrice + "€ / mês" : addon.price, unitPrice: Number.isFinite(addon.unitPrice) ? addon.unitPrice : null, quantity, languages: selectedLanguages, subtotal, label: addon.name + (id === "extra-email" ? " × " + quantity : languageNames.length ? " — " + languageNames.join(", ") : "") };
-    }).filter(Boolean).filter(function (addon) { return addon.id !== "extra-language" || addon.quantity > 0; });
-  }
+  function selectedAddonData() { return []; }
 
   function formDataObject() {
     const data = new FormData(form);
@@ -164,7 +112,7 @@
     const rows = [
       ["Objetivo", data.objective || "—"], ["Plano", plan.name + " — " + plan.price + "€ + IVA / mês"],
       ...(nicheKey ? [["Área de negócio", nicheKey.charAt(0).toUpperCase() + nicheKey.slice(1)]] : []),
-      ["Extras", selectedAddonNames().join(", ") || "Nenhum por agora"], ["Negócio", data.businessName || "—"],
+      ["Negócio", data.businessName || "—"],
       ["Contacto", [data.contactName, data.phone, data.email].filter(Boolean).join(" · ") || "—"],
       ["Domínio", [data.domainStatus, data.domain].filter(Boolean).join(" — ") || "A definir"],
       ["O que quer criar ou alterar", data.siteChanges || "—"],
@@ -174,33 +122,6 @@
     document.getElementById("reviewCard").innerHTML = rows.map(function (row) { return '<div class="review-row"><span>' + escapeHtml(row[0]) + '</span><strong>' + escapeHtml(row[1]) + '</strong></div>'; }).join("");
   }
 
-  function updateAddonCount() {
-    const selected = selectedAddonData();
-    const count = selected.length;
-    const knownExtras = selected.reduce(function (total, addon) { return total + (addon.subtotal || 0); }, 0);
-    const pending = selected.some(function (addon) { return addon.subtotal === null; });
-    const total = plan.price + knownExtras;
-    document.getElementById("addonCount").textContent = count + (count === 1 ? " selecionado" : " selecionados");
-    document.getElementById("priceSummaryNote").textContent = count ? plan.price + "€ base + " + knownExtras + "€ em extras" + (pending ? " + valores a confirmar" : "") : "Sem extras selecionados";
-    document.getElementById("priceSummaryTotal").innerHTML = total + '€' + (pending ? ' + extras' : '') + ' <small>+ IVA / mês</small>';
-    const email = selected.find(function (addon) { return addon.id === "extra-email"; });
-    const emailSubtotal = form.querySelector("[data-email-subtotal]");
-    if (emailSubtotal) emailSubtotal.textContent = (email?.subtotal || 6) + "€ / mês";
-    const language = selected.find(function (addon) { return addon.id === "extra-language"; });
-    const languageTotal = form.querySelector("[data-language-total]");
-    if (languageTotal) languageTotal.textContent = language ? language.quantity + (language.quantity === 1 ? " idioma selecionado" : " idiomas selecionados") + " · " + language.subtotal + "€ / mês" : "Escolha um ou mais idiomas";
-  }
-
-  function syncConfigurableAddon(target) {
-    const emailCheckbox = form.querySelector('[name="addons"][value="extra-email"]');
-    const languageCheckbox = form.querySelector('[name="addons"][value="extra-language"]');
-    const languageFields = Array.from(form.querySelectorAll('[name="addonLanguages"]'));
-    if (target === emailCheckbox && emailCheckbox.checked) form.elements.extraEmailQuantity.value = Math.max(1, Number(form.elements.extraEmailQuantity.value) || 1);
-    if (target === languageCheckbox && languageCheckbox.checked && !languageFields.some(function (field) { return field.checked; }) && languageFields[0]) languageFields[0].checked = true;
-    if (target?.name === "addonLanguages" && languageCheckbox) languageCheckbox.checked = languageFields.some(function (field) { return field.checked; });
-    if (target?.name === "extraEmailQuantity" && emailCheckbox) emailCheckbox.checked = Number(target.value) > 0;
-  }
-
   function applyProductPreset() {
     if (!product) return;
     document.body.dataset.product = productKey;
@@ -208,8 +129,8 @@
     document.getElementById("introEyebrow").textContent = product.eyebrow;
     document.getElementById("page-title").textContent = product.title;
     document.getElementById("introCopy").textContent = product.intro;
-    document.getElementById("planStepTitle").textContent = "O serviço certo, sem escolhas desnecessárias.";
-    document.getElementById("planStepCopy").textContent = "Este é o plano preparado para si. Acrescente apenas algum extra que já saiba que precisa.";
+    document.getElementById("planStepTitle").textContent = "Vamos preparar o seu projeto.";
+    document.getElementById("planStepCopy").textContent = "Um resumo do serviço. Agora vamos reunir a informação para preparar o seu negócio online.";
     document.getElementById("planBadge").textContent = "Plano selecionado";
     document.getElementById("planName").textContent = plan.name;
     document.getElementById("planDescription").textContent = plan.description;
@@ -306,18 +227,16 @@
     }
   }
 
-  applyProductPreset(); renderAddons(); restoreDraft();
-  syncConfigurableAddon(form.querySelector('[name="addons"][value="extra-language"]'));
-  updateAddonCount();
-  form.addEventListener("click", function (event) {
-    const control = event.target.closest("[data-quantity]");
-    if (!control) return;
-    const field = form.elements.extraEmailQuantity;
-    field.value = Math.max(1, Math.min(20, (Number(field.value) || 1) + Number(control.dataset.quantity)));
-    syncConfigurableAddon(field); updateAddonCount(); saveDraft();
-  });
-  form.addEventListener("input", function (event) { event.target.removeAttribute("aria-invalid"); errorBox.hidden = true; syncConfigurableAddon(event.target); updateAddonCount(); saveDraft(); });
-  form.addEventListener("change", function (event) { syncConfigurableAddon(event.target); updateAddonCount(); saveDraft(); });
+  applyProductPreset(); restoreDraft();
+  const sectorSelect=form.elements.niche;
+  sectorSelect.innerHTML=Object.entries(UNEED_KICKOFF_INTAKE.niches).map(([id,n])=>'<option value="'+id+'">'+escapeHtml(n.name)+'</option>').join('');
+  try{const saved=JSON.parse(localStorage.getItem(storageKey)||"null");if(saved?.niche&&UNEED_KICKOFF_INTAKE.niches[saved.niche])nicheKey=saved.niche;}catch(_){}
+  sectorSelect.value=nicheKey;
+  function sectorFields(){nicheKey=sectorSelect.value;const n=UNEED_KICKOFF_INTAKE.niches[nicheKey];document.getElementById("servicesLabel").textContent=n.services;document.getElementById("teamLabel").textContent=n.team;document.getElementById("sectorHint").textContent=n.sector+' '+n.hint;}
+  sectorFields();sectorSelect.addEventListener('change',sectorFields);
+  form.addEventListener("input",function(event){event.target.removeAttribute("aria-invalid");errorBox.hidden=true;saveDraft();});
+  form.addEventListener("change",saveDraft);
+  document.getElementById("saveLater").onclick=function(){saveDraft();document.getElementById("actionReassurance").textContent="Guardado neste dispositivo. Pode regressar a este link.";};
   nextButton.addEventListener("click", function () { if (validateStep(currentStep)) setStep(currentStep + 1); });
   backButton.addEventListener("click", function () { setStep(currentStep - 1); });
   indicators.forEach(function (indicator) { indicator.querySelector("button").addEventListener("click", function () { const target = Number(indicator.dataset.stepIndicator); if (target < currentStep && target >= firstStep) setStep(target); }); });

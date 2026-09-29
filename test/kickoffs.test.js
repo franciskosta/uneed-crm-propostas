@@ -7,6 +7,23 @@ const {commercialCatalog}=require('../kickoff-catalog');
 const {compose}=require('../kickoffs/emails');
 const fs=require('node:fs');
 const base=()=>({product:'presenca',plan:'presenca-essencial',company:'Empresa teste',contact:'Contacto teste',phone:'910000000',email:'teste@example.com',vat:23,retention:0,initialBase:39,paymentMethod:'bank_transfer',requiresDebit:true,requiresContent:true});
+test('kickoff can be prepared before collecting contact and billing details',()=>{
+  const row=M.create('owner',{...base(),contact:'',email:'',phone:'',taxId:'',billingAddress:'',niche:'veterinaria'});
+  assert.equal(row.data.answers.businessName,'Empresa teste');
+  assert.equal(row.data.answers.contact,'');assert.equal(row.data.offer.total.base,39);
+  assert.ok(M.issue(row,'test'));assert.throws(()=>M.offer({...base(),email:'invalid'}),/Email/);
+});
+test('intake whitelists sector data and permits incomplete drafts without commercial mutation',()=>{
+  const a=M.answers({sectorNotes:'Urgências até às 20h',contentHelp:true,businessName:'Negócio',email:'a@',taxId:'123',basePrice:0},false);
+  assert.equal(a.sectorNotes,'Urgências até às 20h');assert.equal(a.contentHelp,true);assert.equal(a.taxId,'123');assert.equal(a.basePrice,undefined);
+  assert.throws(()=>M.answers(a),/NIF/);
+});
+test('sector templates and pending checklist distinguish intake from execution approval',()=>{
+  const I=require('../kickoff-intake');assert.equal(I.nicheKey('Clínicas veterinárias'),'veterinaria');assert.equal(I.nicheKey('Cabeleireiros'),'cabeleireiro');assert.equal(I.nicheKey('Outro negócio'),'geral');
+  const row=M.create('owner',base());row.data.answers.contentHelp=true;
+  assert.ok(I.pending(row.data).includes('NIF'));assert.ok(I.pending(row.data).includes('Apoio UNEED na preparação dos conteúdos'));
+  row.data.submittedAt='now';assert.equal(M.complete(row),false);
+});
 function fixture() {
   const rows=new Map();let mails=[];
   const repo={cfg:{secret:'test-secret-not-production'},
@@ -41,6 +58,22 @@ test('public progress strips commercial/internal injection and persists resume',
 test('submission is durable, sends mocked emails once and cannot be replayed to duplicate',async()=>{const f=fixture(),{r,token}=await f.linked();const b={action:'submit',revision:1,stage:6,answers:{accepted:true,contact:'Test',phone:'910000000',taxId:'123456789',billingAddress:'Address',changes:'New site'}};const p=await f.call(b,token);assert.equal(p.status,200);assert.equal(f.mails.length,2);assert.equal(f.mails[0].to,base().email);assert.equal(f.mails[1].to,'geral@uneed.pt');assert.equal((await f.call(b,token)).status,200);assert.equal(f.mails.length,2);assert.equal(f.rows.get(r.id).data.status,'submitted');});
 test('sent offers cannot be edited in place; duplicate resets state and token',async()=>{const f=fixture(),{r}=await f.linked();assert.equal((await f.call({action:'update',id:r.id,revision:1,offer:base()})).status,409);const p=await f.call({action:'duplicate',id:r.id});assert.equal(p.status,201);assert.notEqual(p.kickoff.id,r.id);assert.equal(p.kickoff.data.status,'draft');assert.equal(p.kickoff.data.tokenCipher,undefined);});
 test('payload size limit is enforced without trusting Content-Length',async()=>{const f=fixture();assert.equal((await f.call({padding:'x'.repeat(61000)})).status,413);});
+test('partial intake submission succeeds and notifies without approving execution',async()=>{
+  const f=fixture(),{r,token}=await f.linked();const row=f.rows.get(r.id);row.data.offer.email='';
+  const p=await f.call({action:'submit',revision:1,stage:6,answers:{contact:'Teste',email:'cliente@example.com',accepted:true,contentHelp:true,sectorNotes:'Especialidades a confirmar'}},token);
+  assert.equal(p.status,200);assert.equal(f.mails[0].to,'cliente@example.com');assert.equal(f.mails.length,2);
+  const saved=f.rows.get(r.id);assert.equal(saved.data.answers.sectorNotes,'Especialidades a confirmar');assert.equal(saved.data.checks.content,false);assert.equal(M.complete(saved),false);
+  assert.match(f.mails[1].text,/Informação a completar/);assert.match(f.mails[1].text,/Preciso de ajuda/);
+});
+test('email-free link cannot send an invitation to a missing recipient',async()=>{
+  const f=fixture(),{r}=await f.linked();f.rows.get(r.id).data.offer.email='';
+  const result=await f.call({action:'send',id:r.id,revision:1,kind:'invite'});
+  assert.equal(result.status,400);assert.match(result.error,/email/);assert.equal(f.mails.length,0);
+});
+test('generic public kickoff no longer renders an extras shop',()=>{
+  const html=fs.readFileSync(require.resolve('../kickoff.html'),'utf8'),js=fs.readFileSync(require.resolve('../kickoff.js'),'utf8');
+  assert.ok(!html.includes('Extras disponíveis'));assert.ok(!js.includes('renderAddons'));assert.match(html,/Guardar para depois/);assert.match(html,/kickoff-intake.js/);
+});
 test('emails escape user HTML and include fiscal data without internal notes',()=>{const r=M.create('o',{...base(),company:'<script>alert(1)</script>',internalNotes:'PRIVATE'});const e=compose(r,'https://crm.uneed.pt/inicio/test',{iban:'TEST',accountName:'UNEED'});assert.ok(!e.html.includes('<script>'));assert.ok(!e.html.includes('PRIVATE'));assert.match(e.text,/Retenção/);});
 test('API auth validates user server-side and requires owner CRM state',async()=>{const env={...process.env};process.env.SUPABASE_URL='https://test.invalid';process.env.SUPABASE_SERVICE_ROLE_KEY='secret';process.env.SUPABASE_ANON_KEY='anon';try{const repo=repository(async(url)=>({ok:true,json:async()=>url.includes('/auth/')?{id:'owner'}:[]}));await assert.rejects(repo.authenticate({headers:{authorization:'Bearer test'}}),/Sem acesso/);}finally{process.env=env;}});
 test('release includes internal and token UI without replacing legacy kickoff',()=>{const read=p=>fs.readFileSync(require('node:path').join(__dirname,'..',p),'utf8');assert.match(read('index.html'),/data-view="kickoffs"/);const cfg=JSON.parse(read('vercel.json'));assert.ok(cfg.rewrites.some(r=>r.source==='/kickoff'));assert.ok(cfg.rewrites.some(r=>r.source==='/kickoff/:token'));assert.ok(cfg.rewrites.some(r=>r.source==='/inicio/:token'));for(const f of ['kickoff-catalog.js','kickoffs-ui.js','kickoffs.css','kickoff-personal.html','kickoff-personal.js'])assert.ok(read('build-vercel.js').includes(f));assert.match(read('supabase/migrations/20260929015421_kickoff_flows.sql'),/revoke all on public.kickoff_flows from public, anon, authenticated/);});

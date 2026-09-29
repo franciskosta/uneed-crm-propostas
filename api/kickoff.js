@@ -84,7 +84,7 @@ function normalizePayload(received) {
 }
 
 function validationError(payload) {
-  if (!payload.objective || !payload.businessName || !payload.contactName || !payload.phone || !payload.email || !payload.siteChanges || !payload.paymentMethod || !payload.consent) return "missing_required_fields";
+  if (!payload.objective || !payload.businessName || !payload.contactName || !payload.phone || !payload.email || !payload.paymentMethod || !payload.consent) return "missing_required_fields";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.email)) return "invalid_email";
   if (payload.taxId && !/^\d{9}$/.test(payload.taxId)) return "invalid_tax_id";
   if (!["bank_transfer", "mbway"].includes(payload.paymentMethod)) return "invalid_payment_method";

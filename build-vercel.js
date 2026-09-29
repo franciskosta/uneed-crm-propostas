@@ -10,6 +10,7 @@ const files = [
   "kickoff.css",
   "kickoff.js",
   "kickoff-catalog.js",
+  "kickoff-intake.js",
   "kickoffs-ui.js",
   "kickoffs.css",
   "kickoff-personal.html",

@@ -31,8 +31,8 @@
       <div class="trust-card" aria-label="O que acontece a seguir">
         <span class="trust-icon" aria-hidden="true">✓</span>
         <div>
-          <strong>O serviço começa após o pagamento</strong>
-          <span>Revê tudo, recebe os dados de pagamento e só depois iniciamos o kickoff.</span>
+          <strong>Vamos preparar o projeto consigo</strong>
+          <span>Complete o que souber agora. A equipa acompanha o que faltar para iniciar o trabalho.</span>
         </div>
       </div>
     </section>
@@ -46,7 +46,7 @@
         <div class="progress-track" aria-hidden="true"><span id="progressBar"></span></div>
         <ol id="stepList">
           <li class="is-active" data-step-indicator="1"><button type="button"><span>1</span><div><strong>Objetivo</strong><small>O que precisa</small></div></button></li>
-          <li data-step-indicator="2"><button type="button"><span>2</span><div><strong>Plano</strong><small>Base e extras</small></div></button></li>
+          <li data-step-indicator="2"><button type="button"><span>2</span><div><strong>Boas-vindas</strong><small>O serviço</small></div></button></li>
           <li data-step-indicator="3"><button type="button"><span>3</span><div><strong>Negócio</strong><small>Dados essenciais</small></div></button></li>
           <li data-step-indicator="4"><button type="button"><span>4</span><div><strong>Conteúdo</strong><small>Para começar bem</small></div></button></li>
           <li data-step-indicator="5"><button type="button"><span>5</span><div><strong>Pagamento</strong><small>Rever e avançar</small></div></button></li>
@@ -102,7 +102,7 @@
         <div class="step-panel" data-step="2">
           <div class="step-heading">
             <p class="step-kicker">Passo 2 de 5</p>
-            <h2 id="planStepTitle">Comece simples. Acrescente só o que precisa.</h2>
+            <h2 id="planStepTitle">Vamos preparar o seu projeto.</h2>
             <p id="planStepCopy">O plano base já inclui tudo para ter uma presença profissional.</p>
           </div>
           <article class="base-plan">
@@ -113,21 +113,7 @@
             </div>
             <div class="plan-price"><strong id="planPrice">39€</strong><span id="planBilling">+ IVA / mês</span></div>
           </article>
-          <div class="addons-heading">
-            <div><h3>Extras disponíveis</h3><p>Podem ser ativados agora ou mais tarde.</p></div>
-            <span id="addonCount">0 selecionados</span>
-          </div>
-          <fieldset class="addon-list" id="addonList">
-            <legend class="sr-only">Extras disponíveis</legend>
-          </fieldset>
-          <div class="price-summary" aria-live="polite">
-            <div><span>Estimativa mensal</span><small id="priceSummaryNote">Sem extras selecionados</small></div>
-            <strong id="priceSummaryTotal">39€ <small>+ IVA / mês</small></strong>
-          </div>
-          <div class="pricing-note">
-            <span aria-hidden="true">i</span>
-            <p><strong>Preço transparente antes de avançar.</strong> Alguns extras dependem do volume e da configuração. A UNEED confirma o valor final por escrito antes de enviar qualquer pedido de pagamento.</p>
-          </div>
+          <p>Vamos reunir as informações necessárias para preparar o serviço. Não precisa de ter tudo pronto.</p>
         </div>
 
         <div class="step-panel" data-step="3">
@@ -137,6 +123,7 @@
             <p>Usamos estes dados apenas para preparar a ativação e entrar em contacto.</p>
           </div>
           <div class="field-grid">
+            <label class="field field-full"><span>Setor / nicho</span><select name="niche"></select></label>
             <label class="field field-full"><span>Nome do negócio *</span><input name="businessName" autocomplete="organization" required placeholder="Ex.: Clínica Aurora"></label>
             <label class="field"><span>O seu nome *</span><input name="contactName" autocomplete="name" required placeholder="Nome e apelido"></label>
             <label class="field"><span>Telemóvel *</span><input name="phone" autocomplete="tel" inputmode="tel" required placeholder="+351 9xx xxx xxx"></label>
@@ -160,23 +147,23 @@
             <label><input type="radio" name="domainStatus" value="Ja escolhi"><span><strong>Já tenho um nome em mente</strong><small>Indique-o no campo abaixo.</small></span></label>
             <label><input type="radio" name="domainStatus" value="Ja tenho dominio"><span><strong>Já tenho domínio</strong><small>Avaliamos a ligação ou transferência.</small></span></label>
           </fieldset>
-          <div class="field-grid content-fields">
+          <p id="sectorHint"></p><div class="field-grid content-fields">
             <label class="field field-full"><span>Domínio pretendido ou atual</span><input name="domain" placeholder="ex.: o-meu-negocio.pt"></label>
             <label class="field field-full"><span id="servicesLabel">Serviços principais</span><textarea name="services" rows="3" placeholder="Um por linha — pode adicionar valores e duração se fizer sentido"></textarea></label>
             <label class="field"><span>Horário de funcionamento</span><textarea name="hours" rows="3" placeholder="Ex.: Seg–Sex, 09:00–18:00"></textarea></label>
             <label class="field"><span id="teamLabel">Equipa ou colaboradores</span><textarea name="team" rows="3" placeholder="Nomes e funções, se aplicável"></textarea></label>
-            <label class="field field-full"><span>O que pretende criar ou alterar no site? *</span><textarea name="siteChanges" rows="5" required placeholder="Ex.: manter o logótipo, alterar os textos da página inicial, substituir fotografias, acrescentar uma página de serviços e destacar o WhatsApp."></textarea><small>Se é um site novo, descreva aqui o que quer ver na página e o que prefere evitar.</small></label>
+            <label class="field field-full"><span>O que gostaria de destacar no site? (opcional)</span><textarea name="siteChanges" rows="5" placeholder="Ex.: manter o logótipo, alterar os textos da página inicial, substituir fotografias, acrescentar uma página de serviços e destacar o WhatsApp."></textarea><small>Se é um site novo, descreva aqui o que quer ver na página e o que prefere evitar.</small></label>
             <label class="field field-full"><span>Sites ou referências de que gosta</span><input name="referenceUrls" placeholder="Links ou nomes de páginas que sirvam de inspiração"></label>
             <label class="field field-full"><span>Notas ou pedidos especiais</span><textarea name="notes" rows="3" placeholder="Algo importante que devamos saber?"></textarea></label>
           </div>
-          <div class="later-card"><span aria-hidden="true">✓</span><p><strong>Não precisa de ter tudo pronto.</strong> Depois de recebermos este pedido, enviamos uma checklist curta apenas com o que estiver em falta.</p></div>
+          <div class="later-card"><span aria-hidden="true">✓</span><p><strong>Não precisa de ter tudo pronto.</strong> Para enviar imagens originais em segurança, peça à UNEED o seu link individual de kickoff. Não envie palavras-passe por este formulário. Depois de recebermos este pedido, enviamos uma checklist curta apenas com o que estiver em falta.</p></div>
         </div>
 
         <div class="step-panel" data-step="5">
           <div class="step-heading">
             <p class="step-kicker">Passo 5 de 5</p>
             <h2>Confirme e prepare o primeiro pagamento.</h2>
-            <p>O pedido fica a aguardar pagamento. O kickoff só começa depois da confirmação.</p>
+            <p>Revemos a informação consigo. A execução começa após as validações aplicáveis.</p>
           </div>
           <div class="review-card" id="reviewCard"></div>
           <fieldset class="payment-choice">
@@ -202,6 +189,7 @@
         <footer class="form-actions">
           <button class="button button-ghost" type="button" id="backButton" hidden><span aria-hidden="true">←</span> Voltar</button>
           <span class="action-reassurance" id="actionReassurance">Pode alterar as respostas antes de enviar.</span>
+          <button class="button button-ghost" type="button" id="saveLater">Guardar para depois</button>
           <button class="button button-primary" type="button" id="nextButton">Continuar <span aria-hidden="true">→</span></button>
           <button class="button button-primary" type="submit" id="submitButton" hidden>Confirmar e ver pagamento <span aria-hidden="true">→</span></button>
         </footer>
@@ -232,7 +220,7 @@
     </div>
   </div>
 
+  <script src="kickoff-intake.js"></script>
   <script src="kickoff.js"></script>
 </body>
 </html>
-

@@ -23,7 +23,7 @@ function makeHandler(repo=repository(),mailer=sendEmail,imageClient) {
     row.data.mail[key]={status:'pending',at:new Date().toISOString()};M.event(row,'email_claimed:'+key,'system');
     row=await repo.save(row,row.revision);
     const link=kind==='admin'?'https://crm.uneed.pt/#kickoffs='+row.id:'https://crm.uneed.pt/'+(kind==='invite'?'kickoff/':'inicio/')+token;
-    let result;try {result=await mailer({...compose(row,link,pay,kind==='admin',kind==='invite'),to:kind==='admin'?(process.env.KICKOFF_NOTIFICATION_TO||'geral@uneed.pt'):row.data.offer.email},'kickoffs/'+row.id+'/'+key);} catch {result={sent:false};}
+    let result;try {result=await mailer({...compose(row,link,pay,kind==='admin',kind==='invite'),to:kind==='admin'?(process.env.KICKOFF_NOTIFICATION_TO||'geral@uneed.pt'):(row.data.offer.email||row.data.answers.email)},'kickoffs/'+row.id+'/'+key);} catch {result={sent:false};}
     // Merge with current progress, not the snapshot taken before SMTP.
     for(let attempt=0;attempt<3;attempt++) {
       const latest=await repo.get(row.id,row.owner_id);
@@ -59,13 +59,13 @@ function makeHandler(repo=repository(),mailer=sendEmail,imageClient) {
         if(row.data.submittedAt && b.action==='submit')return res.status(200).json({ok:true,kickoff:M.publicView(row)});
         if(b.revision!==row.revision)M.fail('Existe uma versão mais recente. Recarregue a página antes de gravar.',409);
         if(Date.now()-Date.parse(row.updated_at)<750)M.fail('Aguarde um instante antes de voltar a guardar.',429);
-        const nextAnswers=M.answers(b.answers||{});
+        const nextAnswers=M.answers(b.answers||{},b.action==='submit');
         if(row.data.submittedAt && JSON.stringify(nextAnswers)!==JSON.stringify(row.data.answers)){row.data.checks.content=false;row.data.checks.validated=false;}
         row.data.answers=nextAnswers;row.data.stage=Math.max(row.data.stage,Math.min(6,Math.max(1,Number(b.stage)||1)));
         row.data.status=row.data.submittedAt?'submitted':'started';
         if(b.action==='submit') {
           const a=row.data.answers;
-          if(!a.accepted||!a.contact||!a.phone||!a.taxId||!a.billingAddress||!a.changes)M.fail('Confirme os dados de faturação, instruções e aceitação.');
+          if(!a.accepted||!a.contact||!(row.data.offer.email||a.email))M.fail('Indique o seu nome, email e confirme o envio. Os restantes dados podem ser completados depois.');
           row.data.submittedAt=new Date().toISOString();row.data.status='submitted';
         }
         M.event(row,b.action==='submit'?'submitted':'progress_saved','customer');row=await repo.save(row,row.revision);
@@ -93,7 +93,7 @@ function makeHandler(repo=repository(),mailer=sendEmail,imageClient) {
       if(b.action==='link') {M.available(row);return res.status(200).json({ok:true,url:'https://crm.uneed.pt/kickoff/'+M.reveal(row,repo.cfg.secret)});}
       if(b.action==='duplicate')return res.status(201).json({ok:true,kickoff:internal(await repo.insert(M.create(owner,row.data.offer)))});
       if(b.revision!==row.revision)M.fail('O kickoff mudou. Atualize a lista.',409);
-      if(b.action==='update') {if(row.data.status!=='draft')M.fail('Oferta bloqueada. Duplique para preparar uma nova versão.',409);row.data.offer=M.offer(b.offer||{});const o=row.data.offer;row.data.answers={contact:o.contact,phone:o.phone,taxId:o.taxId,billingAddress:o.billingAddress};}
+      if(b.action==='update') {if(row.data.status!=='draft')M.fail('Oferta bloqueada. Duplique para preparar uma nova versão.',409);row.data.offer=M.offer(b.offer||{});const o=row.data.offer;row.data.answers={businessName:o.company,contact:o.contact,email:o.email,phone:o.phone,taxId:o.taxId,billingAddress:o.billingAddress};}
       else if(b.action==='issue') {if(row.data.revoked||row.data.status==='cancelled')M.fail('Duplique o kickoff cancelado para criar uma nova oferta.',409);if(row.token_hash)M.fail('Já existe um link. Copie-o ou revogue-o.',409);M.issue(row,repo.cfg.secret,b.days||30);}
       else if(b.action==='revoke') {row.data.revoked=true;row.data.status='cancelled';}
       else if(b.action==='checks') {
@@ -107,6 +107,7 @@ function makeHandler(repo=repository(),mailer=sendEmail,imageClient) {
         M.available(row);const pay=await payment(row),o=row.data.offer;
         if(o.initial.net>0&&(o.paymentMethod==='mbway'?!pay.mbway:!pay.iban||!pay.accountName))M.fail('Configure os dados de pagamento antes de enviar.');
         const kind=['invite','customer','admin'].includes(b.kind)?b.kind:'invite';
+        if(kind==='invite'&&!o.email)M.fail('Indique um email no rascunho antes de enviar um convite. Pode partilhar o link manualmente.');
         if(kind!=='invite'&&!row.data.submittedAt)M.fail('Ainda não existe submissão.');
         const key=kind==='invite'?'invite':kind==='admin'?'submitted-admin':'submitted-customer';
         if(row.data.mail[key]) {

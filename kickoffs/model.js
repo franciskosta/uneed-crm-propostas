@@ -33,8 +33,8 @@ function offer(input) {
   const initial=fiscal(number(input.initialBase),vat,retention);
   if(!['bank_transfer','mbway'].includes(input.paymentMethod))fail('Escolha transferência ou MB WAY.');
   const email=text(input.email,254).toLowerCase();
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))fail('Email inválido.');
-  const company=text(input.company,180),contact=text(input.contact,180);if(!company||!contact)fail('Indique empresa e contacto.');
+  if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))fail('Email inválido.');
+  const company=text(input.company,180),contact=text(input.contact,180);if(!company)fail('Indique o nome do negócio.');
   const day=number(input.collectionDay||1,28);if(day<1||!Number.isInteger(day))fail('Dia de cobrança inválido.');
   return {product,plan,planName:catalog.plans[plan].name,basePrice:base,addons,period,vat,retention,total,initial,initialBase:initial.base,
     company,contact,email,phone:text(input.phone,40),taxId:text(input.taxId,30),billingAddress:text(input.billingAddress,500),
@@ -46,7 +46,7 @@ function offer(input) {
 }
 function create(owner, input, now=new Date().toISOString()) {
   const id=crypto.randomUUID(), prepared=offer(input);
-  return {id,owner_id:owner,token_hash:null,revision:1,created_at:now,updated_at:now,data:{offer:prepared,status:'draft',checks:{payment:false,debit:false,content:false,validated:false,execution:false},answers:{contact:prepared.contact,phone:prepared.phone,taxId:prepared.taxId,billingAddress:prepared.billingAddress},stage:0,events:[{at:now,type:'created',actor:owner}],mail:{}}};
+  return {id,owner_id:owner,token_hash:null,revision:1,created_at:now,updated_at:now,data:{offer:prepared,status:'draft',checks:{payment:false,debit:false,content:false,validated:false,execution:false},answers:{businessName:prepared.company,contact:prepared.contact,email:prepared.email,phone:prepared.phone,taxId:prepared.taxId,billingAddress:prepared.billingAddress},stage:0,events:[{at:now,type:'created',actor:owner}],mail:{}}};
 }
 function event(row,type,actor,now=new Date().toISOString()) {
   row.updated_at=now; row.data.events.push({at:now,type,actor});
@@ -77,12 +77,13 @@ function publicView(row) {
   const images=(row.data.images||[]).map(({id,name,status,size,width,height,error,createdAt})=>({id,name,status,size,width,height,error,createdAt}));
   return {id:row.id,revision:row.revision,reference:'UNEED-'+row.id.slice(0,8).toUpperCase(),offer:safeOffer,checks,answers,stage,status,expiresAt,submittedAt,images};
 }
-const answerFields=['contact','phone','taxId','billingAddress','siteType','currentUrl','domain','services','hours','team','keep','remove','changes','newPages','references','contentLinks','notes'];
-function answers(input) {
+const answerFields=['businessName','email','businessAddress','socialLinks','sectorNotes','contact','phone','taxId','billingAddress','siteType','currentUrl','domain','services','hours','team','keep','remove','changes','newPages','references','contentLinks','notes'];
+function answers(input, validate=true) {
   const out=Object.fromEntries(answerFields.map(k=>[k,text(input[k],k==='changes'?6000:2000)]));
-  if(out.taxId && !/^\d{9}$/.test(out.taxId))fail('NIF inválido.');
-  if(out.currentUrl)out.currentUrl=url(out.currentUrl);
-  out.accepted=input.accepted===true;return out;
+  if(validate && out.taxId && !/^\d{9}$/.test(out.taxId))fail('NIF inválido.');
+  if(validate && out.currentUrl)out.currentUrl=url(out.currentUrl);
+  if(validate && out.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(out.email))fail('Email inválido.');
+  out.contentHelp=input.contentHelp===true;out.accepted=input.accepted===true;return out;
 }
 function complete(row) {const {checks:c,offer:o,submittedAt}=row.data;return !!(submittedAt && !(row.data.images||[]).some(x=>['pending','validating'].includes(x.status)) && (o.initial.net===0||c.payment) && (!o.requiresDebit||c.debit) && (!o.requiresContent||c.content) && c.validated);}
 module.exports={offer,create,event,issue,reveal,hash,available,publicView,answers,complete,fail,text};

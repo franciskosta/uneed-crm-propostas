@@ -24,7 +24,7 @@
     amounts(sale.rows);
     state.proposals ||= [];
     let proposal=state.proposals.find(p => p.id === sale.proposalId || p.sourceProspectId === lead.id);
-    if (!proposal) { proposal={...seed,id:`customer-sale:${lead.id}`,createdAt:new Date().toISOString(),status:'Aceite',discount:0,vatMode:'0',withholdingMode:'0',billedAmount:0,paidAmount:0}; state.proposals.push(proposal); }
+    if (!proposal) { proposal={...seed,id:`customer-sale:${lead.id}`,createdAt:new Date().toISOString(),status:'Aceite',followupDate:'',proposalSentDate:'',discount:0,vatMode:'0',withholdingMode:'0',billedAmount:0,paidAmount:0}; state.proposals.push(proposal); }
     sale.proposalId=proposal.id;
     Object.assign(proposal, { sourceProspectId:lead.id, companyId:lead.companyId || proposal.companyId, leadId:lead.leadId || proposal.leadId,
       companyName:sale.companyName || lead.name || '', clientName:sale.contactName || lead.contactName || lead.name || '',

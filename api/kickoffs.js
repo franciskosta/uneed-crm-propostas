@@ -66,6 +66,12 @@ function makeHandler(repo=repository(),mailer=sendEmail,imageClient) {
         row.data.status=row.data.submittedAt?'submitted':'started';
         if(b.action==='submit') {
           const a=row.data.answers;
+          if(row.data.templateId){
+            const required={businessName:'nome do negócio',contact:'nome do contacto',phone:'telefone',email:'email',taxId:'NIF',billingAddress:'morada de faturação'};
+            const missing=Object.entries(required).filter(([key])=>!String(a[key]||row.data.offer[key]||'').trim()).map(([,label])=>label);
+            if(missing.length)M.fail('Complete os campos obrigatórios antes de enviar: '+missing.join(', ')+'. Pode guardar e continuar mais tarde.');
+            if(!/^\+?[\d\s()-]{7,25}$/.test(a.phone))M.fail('Indique um telefone válido.');
+          }
           if(!a.accepted||!a.contact||!(row.data.offer.email||a.email))M.fail('Indique o seu nome, email e confirme o envio. Os restantes dados podem ser completados depois.');
           if(row.data.templateId && !(await payment(row)).mbway)M.fail('MB WAY temporariamente indisponível. As respostas podem ser guardadas; contacte a UNEED.',503);
           row.data.submittedAt=new Date().toISOString();row.data.status='submitted';

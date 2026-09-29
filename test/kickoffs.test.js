@@ -24,10 +24,16 @@ test('name-only creation is authenticated, retry-safe and does not send invitati
 });
 test('template submission persists metrics amount and sends reply-ready notifications once',async()=>{
   const f=fixture(),r=M.createTemplate('owner','presenca-geral','Negócio'),token=M.issue(r,f.repo.cfg.secret);r.updated_at='2020-01-01';await f.repo.insert(r);
-  const b={action:'submit',revision:1,stage:6,addons:[{id:'management-metrics',unitPrice:0}],answers:{contact:'Teste',email:'cliente@example.com',accepted:true}};
+  const b={action:'submit',revision:1,stage:6,addons:[{id:'management-metrics',unitPrice:0}],answers:{businessName:'Negócio',contact:'Teste',email:'cliente@example.com',phone:'910000000',taxId:'123456789',billingAddress:'Rua de teste',accepted:true}};
   const result=await f.call(b,token);assert.equal(result.status,200);assert.equal(result.kickoff.offer.initial.net,62.73);assert.equal(result.kickoff.notifications.customer,'accepted');
   assert.equal(f.mails[1].replyTo,'cliente@example.com');assert.match(f.mails[1].text,/GoCardless/);assert.match(f.mails[0].text,/62,73/);assert.equal(result.kickoff.checks.payment,false);
   await f.call(b,token);assert.equal(f.mails.length,2);
+});
+test('template submission requires complete billing and contact data but drafts remain available',async()=>{
+  const f=fixture(),r=M.createTemplate('owner','presenca-geral','Negócio'),token=M.issue(r,f.repo.cfg.secret);r.updated_at='2020-01-01';await f.repo.insert(r);
+  const b={action:'submit',revision:1,answers:{businessName:'Negócio',contact:'Teste',email:'cliente@example.com',accepted:true}};
+  const result=await f.call(b,token);assert.equal(result.status,400);assert.match(result.error,/telefone, NIF, morada/);assert.equal(f.mails.length,0);assert.equal(f.rows.get(r.id).data.submittedAt,undefined);
+  assert.equal((await f.call({...b,action:'save'},token)).status,200);
 });
 test('kickoff can be prepared before collecting contact and billing details',()=>{
   const row=M.create('owner',{...base(),contact:'',email:'',phone:'',taxId:'',billingAddress:'',niche:'veterinaria'});

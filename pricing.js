@@ -151,6 +151,22 @@ window.UNEED_PRICING = {
           includes: "Tudo do BOOKINGS PRO, pagamentos online, automações, IA, analytics e integrações especiais."
         }
       ]
+    },
+    {
+      id: "uneed-addons",
+      title: "Add-ons UNEED",
+      items: [{
+        id: "addon:management-metrics",
+        name: "Métricas de gestão",
+        objective: "Acompanhamento da gestão do negócio",
+        pitch: "Indicadores de gestão de acordo com os dados e integrações configurados.",
+        price: 12,
+        billing: "Mensal",
+        commitment: "",
+        tag: "Add-on opcional",
+        cta: "Adicionar métricas",
+        includes: "Métricas de gestão como extra opcional: 12 €/mês + IVA quando aplicável. Indicadores dependentes dos dados e integrações configurados."
+      }]
     }
   ]
 };

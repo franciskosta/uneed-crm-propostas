@@ -1,12 +1,13 @@
 (function(root) {
   const types = { presence: 'UNEED Presença', bookings: 'Marcações', leads: 'Captação de leads', high_ticket: 'High Ticket', other: 'Outros' };
   const addons = [
+    ['management-metrics','Métricas de gestão',12],
     ['extra-email','Email extra',6], ['extra-language','Idioma extra',5],
     ['guided-assistant','Assistente Guiado',12], ['smart-assistant','Assistente Inteligente',29],
     ['backoffice','Backoffice',15], ['remove-credit','Remover crédito UNEED',5],
     ['sms','SMS',null], ['multi-location','Multi-estabelecimento',null],
     ['registrations','Inscrições',null], ['cards','Cartões',null]
-  ].map(([id,name,price]) => ({id,name,price,billing:'Mensal'}));
+  ].map(([id,name,price]) => ({id,name,price,billing:'Mensal',...(id==='management-metrics'?{description:'Indicadores para acompanhar a gestão do negócio, de acordo com os dados e integrações configurados. 12 €/mês + IVA.'}:{})}));
   function typeOf(p) {
     if (p.customer?.type) return p.customer.type;
     const text = (p.services || []).map(s => `${s.id || ''} ${s.name || ''}`).join(' ').toLowerCase();

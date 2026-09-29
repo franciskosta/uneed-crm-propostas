@@ -4,7 +4,7 @@ const commercialCatalog = {
     objective: "Presença digital profissional",
     defaultPlan: "presenca-essencial",
     plans: { "presenca-essencial": { name: "UNEED Presença", price: 39 } },
-    addons: ["extra-email", "extra-language", "guided-assistant", "smart-assistant", "backoffice", "registrations", "remove-credit", "cards"],
+    addons: ["extra-email", "extra-language", "guided-assistant", "smart-assistant", "management-metrics", "backoffice", "registrations", "remove-credit", "cards"],
   },
   marcacoes: {
     objective: "Marcações online",
@@ -14,7 +14,7 @@ const commercialCatalog = {
       "bookings-pro-monthly": { name: "BOOKINGS PRO", price: 99 },
       "bookings-premium-monthly": { name: "BOOKINGS PREMIUM", price: 149 },
     },
-    addons: ["extra-email", "extra-language", "guided-assistant", "smart-assistant", "sms", "multi-location", "remove-credit", "cards"],
+    addons: ["extra-email", "extra-language", "guided-assistant", "smart-assistant", "management-metrics", "sms", "multi-location", "remove-credit", "cards"],
   },
   leads: {
     objective: "Captação de leads",
@@ -24,11 +24,12 @@ const commercialCatalog = {
       "leads-flow-monthly": { name: "LEADS FLOW", price: 99 },
       "leads-ai-monthly": { name: "LEADS AI", price: 199 },
     },
-    addons: ["extra-email", "extra-language", "guided-assistant", "smart-assistant", "backoffice", "remove-credit", "cards"],
+    addons: ["extra-email", "extra-language", "guided-assistant", "smart-assistant", "management-metrics", "backoffice", "remove-credit", "cards"],
   },
 };
 
 const addonCatalog = {
+  "management-metrics": { name: "Métricas de gestão", unitPrice: 12, billing: "monthly", description: "Indicadores para acompanhar a gestão do negócio, de acordo com os dados e integrações configurados. 12 €/mês + IVA." },
   "extra-email": { name: "Email profissional extra", unitPrice: 6, type: "quantity" },
   "extra-language": { name: "Idioma adicional", unitPrice: 5, type: "languages" },
   "guided-assistant": { name: "Assistente Guiado 24h", unitPrice: 12 },
@@ -48,4 +49,3 @@ const api={commercialCatalog,addonCatalog,allowedLanguages};
 if(typeof module!=='undefined') module.exports=api;
 if(root) root.UNEED_KICKOFF_CATALOG=api;
 })(typeof window!=='undefined'?window:null);
-

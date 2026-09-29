@@ -2,6 +2,7 @@
   "use strict";
 
   const addons = [
+    { id: "management-metrics", name: "Métricas de gestão", note: "Indicadores de gestão · 12 €/mês + IVA", help: "Indicadores para acompanhar a gestão do negócio, de acordo com os dados e integrações configurados. É um extra opcional de 12 € por mês, acrescido de IVA quando aplicável.", unitPrice: 12, products: ["presenca", "marcacoes", "leads"] },
     { id: "extra-email", name: "Email profissional extra", note: "15 GB por conta", help: "O plano já inclui uma conta. Adicione uma unidade por cada novo endereço profissional de que precisa, por exemplo geral@, comercial@ ou nome@empresa.pt. Cada conta tem caixa e acesso próprios.", unitPrice: 6, configurable: "quantity", products: ["presenca", "marcacoes", "leads"] },
     { id: "extra-language", name: "Idioma adicional", note: "Uma versão extra da página", help: "Cria uma versão navegável da página no idioma escolhido, com seletor de idioma. O preço é aplicado por cada idioma adicional. A tradução inicial standard está incluída; conteúdos extensos podem ser avaliados à parte.", unitPrice: 5, configurable: "languages", products: ["presenca", "marcacoes", "leads"] },
     { id: "guided-assistant", name: "Assistente Guiado 24h", note: "Respostas por opções preparadas", help: "O visitante escolhe entre botões e percursos definidos antecipadamente. As respostas são fixas e aprovadas por si: é previsível, controlado e indicado para perguntas frequentes e encaminhamento. Não interpreta perguntas escritas livremente.", unitPrice: 12, products: ["presenca", "marcacoes", "leads"] },
@@ -322,4 +323,3 @@
   indicators.forEach(function (indicator) { indicator.querySelector("button").addEventListener("click", function () { const target = Number(indicator.dataset.stepIndicator); if (target < currentStep && target >= firstStep) setStep(target); }); });
   form.addEventListener("submit", submitForm); loadPaymentAvailability(); setStep(firstStep);
 })();
-

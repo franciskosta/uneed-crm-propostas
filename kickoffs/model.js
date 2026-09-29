@@ -24,10 +24,11 @@ function offer(input) {
     const qty=def.type==='languages'?languages.length:def.type==='quantity'?number(a.quantity,20):1;
     if(!Number.isInteger(qty)||qty<1)fail('Confirme quantidades e idiomas.');
     const unitPrice=number(a.unitPrice ?? def.unitPrice);
-    return {id:a.id,name:def.name,quantity:qty,languages,unitPrice,subtotal:Math.round(unitPrice*qty*100)/100};
+    return {id:a.id,name:def.name,description:def.description||'',quantity:qty,languages,unitPrice,subtotal:Math.round(unitPrice*qty*100)/100};
   });
   const vat=number(input.vat,100),retention=number(input.retention,100);
   const period=['monthly','annual','once'].includes(input.period)?input.period:'monthly';
+  if(period!=='monthly'&&addons.some(a=>a.id==='management-metrics'))fail('Métricas de gestão é um extra mensal (12 €/mês + IVA). Prepare uma oferta mensal para o incluir.');
   const total=fiscal(base+addons.reduce((s,a)=>s+a.subtotal,0),vat,retention);
   const initial=fiscal(number(input.initialBase),vat,retention);
   if(!['bank_transfer','mbway'].includes(input.paymentMethod))fail('Escolha transferência ou MB WAY.');

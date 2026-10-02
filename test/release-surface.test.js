@@ -15,6 +15,15 @@ test('production release includes prospecting, reminders and kickoff together', 
     assert.match(read('build-vercel.js'), new RegExp(file.replaceAll('.', '\\.')));
     assert.ok(read(file).length);
   }
+  for (const file of ['legal.css', 'termos.html', 'privacidade.html', 'contactos.html', 'reclamacoes.html']) {
+    assert.ok(read('build-vercel.js').includes(file), `${file} must be included in the production build`);
+  }
+  const vercel=read('vercel.json');
+  for (const route of ['/termos','/privacidade','/contactos','/reclamacoes'])assert.ok(vercel.includes(route), `${route} must be publicly routed`);
+  for (const page of ['kickoff.html','kickoff-personal.html','kickoff-project.html']) {
+    const html=read(page);assert.match(html,/\/termos/);assert.match(html,/\/privacidade/);assert.match(html,/\/contactos/);assert.match(html,/\/reclamacoes/);assert.match(html,/233993843/);
+  }
+  assert.match(read('api/kickoffs.js'), /legalAcceptance=\{termsVersion:'2026-10-02',privacyVersion:'2026-10-02'/);
   assert.match(read('api/kickoff-email.js'), /nodemailer/);
   assert.ok(JSON.parse(read('vercel.json')).rewrites.some(r => r.source === '/kickoff'));
 });

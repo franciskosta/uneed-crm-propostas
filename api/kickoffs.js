@@ -72,9 +72,11 @@ function makeHandler(repo=repository(),mailer=sendEmail,imageClient) {
             if(missing.length)M.fail('Complete os campos obrigatórios antes de enviar: '+missing.join(', ')+'. Pode guardar e continuar mais tarde.');
             if(!/^\+?[\d\s()-]{7,25}$/.test(a.phone))M.fail('Indique um telefone válido.');
           }
-          if(!a.accepted||!a.contact||!(row.data.offer.email||a.email))M.fail('Indique o seu nome, email e confirme o envio. Os restantes dados podem ser completados depois.');
+          if(!a.accepted||!a.contact||!(row.data.offer.email||a.email))M.fail('Indique o seu nome, email e aceite os Termos e a Política de Privacidade. Os restantes dados podem ser completados depois.');
           if(row.data.templateId && !(await payment(row)).mbway)M.fail('MB WAY temporariamente indisponível. As respostas podem ser guardadas; contacte a UNEED.',503);
-          row.data.submittedAt=new Date().toISOString();row.data.status='submitted';
+          const submittedAt=new Date().toISOString();
+          row.data.legalAcceptance={termsVersion:'2026-10-02',privacyVersion:'2026-10-02',acceptedAt:submittedAt};
+          row.data.submittedAt=submittedAt;row.data.status='submitted';
         }
         M.event(row,b.action==='submit'?'submitted':'progress_saved','customer');row=await repo.save(row,row.revision);
         if(b.action==='submit') {

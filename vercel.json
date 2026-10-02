@@ -15,8 +15,12 @@
     { "source": "/inicio/:token", "destination": "/kickoff-personal.html" },
     { "source": "/kickoff-project.html", "destination": "/kickoff-project.html" },
     { "source": "/kickoff", "destination": "/kickoff.html" },
+    { "source": "/termos", "destination": "/termos.html" },
+    { "source": "/privacidade", "destination": "/privacidade.html" },
+    { "source": "/contactos", "destination": "/contactos.html" },
+    { "source": "/reclamacoes", "destination": "/reclamacoes.html" },
     {
-      "source": "/((?!api/|assets/|styles.css|app.js|pricing.js|supabase-config.js|login.html|kickoff.html|kickoff.css|kickoff.js|kickoff-catalog.js|kickoffs-ui.js|kickoffs.css|kickoff-personal.html|kickoff-personal.js|favicon.ico).*)",
+      "source": "/((?!api/|assets/|styles.css|legal.css|app.js|pricing.js|supabase-config.js|login.html|termos.html|privacidade.html|contactos.html|reclamacoes.html|kickoff.html|kickoff.css|kickoff.js|kickoff-catalog.js|kickoffs-ui.js|kickoffs.css|kickoff-personal.html|kickoff-personal.js|favicon.ico).*)",
       "destination": "/index.html"
     }
   ]

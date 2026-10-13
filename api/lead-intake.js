@@ -60,12 +60,33 @@ function canonical(value) {
 }
 function samePayload(stored, incoming) { return JSON.stringify(canonical(stored)) === JSON.stringify(canonical(incoming)); }
 function validEmail(value) { return /^[^\s<>@,;]+@[^\s<>@,;]+\.[^\s<>@,;]+$/.test(String(value || "").trim()); }
+const PRODUCT_LABELS = Object.freeze({ uneed: "Uneed", uneed_360: "Uneed 360º", uneed_presence: "Uneed Presença" });
+const MODULE_LABELS = Object.freeze({ clientes: "Clientes e CRM", propostas: "Propostas e orçamentos", obras: "Obras e projetos", agenda: "Agenda", despesas: "Despesas", documentos: "Documentos" });
+const MODEL_LABELS = Object.freeze({ purchase: "Compra", subscription: "Subscrição" });
+const PRESENCE_NEED_LABELS = Object.freeze({ booking: "Marcações online", catalogue: "Catálogo", quote: "Pedidos de orçamento", contact: "Contactos e captação", institutional: "Website institucional" });
 function estimateLine(estimate = {}) {
-  if (estimate.priceStatus === "requires_quote") return "O valor será confirmado numa proposta personalizada após análise.";
+  if (estimate.priceStatus === "not_applicable") return "";
   const parts = [];
   if (Number(estimate.initial) > 0) parts.push(`${estimate.initial} € inicial`);
   if (Number(estimate.monthly) > 0) parts.push(`${estimate.monthly} €/mês`);
-  return parts.length ? `Estimativa indicativa: ${parts.join(" · ")} + IVA.` : "O valor será confirmado após análise.";
+  if (estimate.priceStatus === "requires_quote") return parts.length ? `Base estimada: ${parts.join(" · ")} + IVA; a opção personalizada será orçamentada à parte.` : "Será preparada uma proposta personalizada após análise.";
+  if (estimate.priceStatus === "recurring_requires_quote") return `Estimativa inicial: ${parts.join(" · ")} + IVA; eventuais componentes recorrentes serão confirmadas após análise.`;
+  return parts.length ? `Estimativa indicativa: ${parts.join(" · ")} + IVA.` : "";
+}
+function customerSummary(payload) {
+  const configuration = payload.configuration || {};
+  const product = PRODUCT_LABELS[payload.product] || "Uneed";
+  if (payload.product === "uneed_360") {
+    return {
+      product,
+      variant: MODEL_LABELS[configuration.model] || "Modelo a definir contigo",
+      modules: (configuration.modules || []).map((module) => MODULE_LABELS[module] || module),
+    };
+  }
+  if (payload.product === "uneed_presence") {
+    return { product, variant: PRESENCE_NEED_LABELS[configuration.presenceNeed] || "Presença digital", modules: [] };
+  }
+  return { product, variant: "Pedido geral", modules: [] };
 }
 function adminEmailFor(row) {
   const payload = row.payload, estimate = row.estimate;
@@ -95,32 +116,35 @@ function adminEmailFor(row) {
 }
 function customerEmailFor(row) {
   const payload = row.payload;
-  const modules = payload.configuration?.modules || [];
+  const readable = customerSummary(payload);
+  const modules = readable.modules;
   const addons = payload.configuration?.addons || [];
+  const price = estimateLine(row.estimate);
   const summary = [
     `<strong>Referência:</strong> ${escapeHtml(row.reference)}`,
-    `<strong>Pedido:</strong> ${escapeHtml(payload.product)}`,
+    `<strong>Pedido:</strong> ${escapeHtml(readable.product)}`,
+    `<strong>Opção:</strong> ${escapeHtml(readable.variant)}`,
     payload.business?.name ? `<strong>Negócio:</strong> ${escapeHtml(payload.business.name)}` : "",
     payload.message ? `<strong>Mensagem:</strong> ${escapeHtml(payload.message)}` : "",
     modules.length ? `<strong>Módulos indicados:</strong> ${escapeHtml(modules.join(", "))}` : "",
     addons.length ? `<strong>Opções indicadas:</strong> ${escapeHtml(addons.map((addon) => `${addon.name} × ${addon.quantity}`).join(", "))}` : "",
-    `<strong>Valor:</strong> ${escapeHtml(estimateLine(row.estimate))}`,
+    price ? `<strong>Valor:</strong> ${escapeHtml(price)}` : "",
   ].filter(Boolean);
-  const body = `<div style="margin:22px 0;padding:20px;border:1px solid #e1e3ed;border-radius:16px;line-height:1.8;color:#4f566e">${summary.map((line) => `<p style="margin:0 0 8px">${line}</p>`).join("")}</div><div style="margin:22px 0;padding:20px;background:#f4f5fa;border-radius:16px;color:#4f566e;line-height:1.7"><strong style="color:#15164b">Próximo passo</strong><br>A equipa UNEED vai rever a informação e entrar em contacto consigo. Esta mensagem confirma apenas a receção do pedido; não constitui uma encomenda, adjudicação ou contrato.</div><p style="color:#4f566e;line-height:1.7">Se precisar de acrescentar alguma informação, responda a este email ou contacte <a href="mailto:geral@uneed.pt">geral@uneed.pt</a> · <a href="tel:+351934419375">+351 934 419 375</a>.</p>`;
+  const body = `<div style="margin:22px 0;padding:20px;border:1px solid #e1e3ed;border-radius:16px;line-height:1.8;color:#4f566e">${summary.map((line) => `<p style="margin:0 0 8px">${line}</p>`).join("")}</div><div style="margin:22px 0;padding:20px;background:#f4f5fa;border-radius:16px;color:#4f566e;line-height:1.7"><strong style="color:#15164b">Próximo passo</strong><br>A equipa Uneed vai rever a informação e entrar em contacto contigo. Este email confirma apenas a receção do pedido; não constitui uma encomenda, adjudicação ou contrato.</div><p style="color:#4f566e;line-height:1.7">Se precisares de acrescentar alguma informação, responde a este email ou contacta <a href="mailto:geral@uneed.pt">geral@uneed.pt</a> · <a href="tel:+351934419375">+351 934 419 375</a>.</p>`;
   const plain = [
-    `Olá ${payload.contact.name},`, "", "Recebemos o seu pedido.", `Referência: ${row.reference}`,
-    `Pedido: ${payload.product}`, payload.business?.name ? `Negócio: ${payload.business.name}` : "",
+    `Olá ${payload.contact.name}.`, "", "Recebemos o teu pedido.", `Referência: ${row.reference}`,
+    `Pedido: ${readable.product}`, `Opção: ${readable.variant}`, payload.business?.name ? `Negócio: ${payload.business.name}` : "",
     payload.message ? `Mensagem: ${payload.message}` : "", modules.length ? `Módulos indicados: ${modules.join(", ")}` : "",
     addons.length ? `Opções indicadas: ${addons.map((addon) => `${addon.name} × ${addon.quantity}`).join(", ")}` : "",
-    estimateLine(row.estimate), "", "Próximo passo: a equipa UNEED vai rever a informação e entrar em contacto consigo.",
-    "Esta mensagem confirma apenas a receção do pedido; não constitui uma encomenda, adjudicação ou contrato.", "",
-    "UNEED · geral@uneed.pt · +351 934 419 375",
+    price, "", "Próximo passo: a equipa Uneed vai rever a informação e entrar em contacto contigo.",
+    "Este email confirma apenas a receção do pedido; não constitui uma encomenda, adjudicação ou contrato.", "",
+    "Uneed · geral@uneed.pt · +351 934 419 375",
   ].filter(Boolean).join("\n");
   return {
     to: payload.contact.email,
     replyTo: process.env.KICKOFF_REPLY_TO || process.env.SMTP_USER || "geral@uneed.pt",
     subject: `Recebemos o seu pedido — ${row.reference}`,
-    html: shell({ preview: `Confirmação de receção do pedido ${row.reference}`, eyebrow: "Pedido recebido", title: `Olá ${payload.contact.name}.`, intro: "Obrigado pelo seu contacto. Guardámos a informação que nos enviou.", body }),
+    html: shell({ preview: `Confirmação de receção do pedido ${row.reference}`, eyebrow: "Pedido recebido", title: `Olá ${payload.contact.name}.`, intro: "Obrigado pelo teu contacto. Guardámos a informação que nos enviaste.", body }),
     text: plain,
   };
 }
@@ -152,7 +176,8 @@ async function attemptNotification(cfg, row, kind) {
   let notice;
   try { notice = await sendEmail(definition.email(claimed[0]), `lead-intake/${row.id}/${kind}`); }
   catch (notificationError) { notice = { sent: false, reason: "email_unavailable", detail: notificationError.message }; }
-  const finalStatus = notice?.sent ? "sent" : "failed";
+  const uncertain = ["smtp_unavailable", "email_unavailable"].includes(notice?.reason);
+  const finalStatus = notice?.sent ? "sent" : uncertain ? "unknown" : "failed";
   const updateBody = {
     [definition.status]: finalStatus,
     [definition.detail]: notice?.sent
@@ -161,7 +186,9 @@ async function attemptNotification(cfg, row, kind) {
     updated_at: new Date().toISOString(),
   };
   if (kind === "admin") {
-    updateBody.notification_status = finalStatus;
+    // Keep the legacy four-state column compatible; the explicit admin column
+    // carries the fail-closed ambiguous outcome.
+    updateBody.notification_status = finalStatus === "unknown" ? "sending" : finalStatus;
     updateBody.notification_detail = updateBody[definition.detail];
   }
   try {

@@ -161,7 +161,7 @@ test('an idempotent retry retries a failed notice once and changed content confl
   }
 });
 
-test('a thrown notification error never turns a persisted lead into a failed request', async () => {
+test('an ambiguous notification error never turns a persisted lead into a failed request or an automatic retry', async () => {
   const oldFetch = global.fetch, oldUrl = process.env.SUPABASE_URL, oldSecret = process.env.SUPABASE_SECRET_KEY, oldOwner = process.env.CRM_OWNER_USER_ID;
   process.env.SUPABASE_URL = 'https://db.example'; process.env.SUPABASE_SECRET_KEY = 'secret'; process.env.CRM_OWNER_USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const database = mockDatabase(); global.fetch = database.fetch;
@@ -170,8 +170,10 @@ test('a thrown notification error never turns a persisted lead into a failed req
   delete require.cache[require.resolve('../api/lead-intake')]; const handler = require('../api/lead-intake');
   try {
     const res = response(); await handler(request(), res);
-    assert.equal(res.statusCode, 201); assert.equal(res.body.accepted, true); assert.equal(res.body.notification, 'failed');
-    assert.equal(database.row().notification_status, 'failed');
+    assert.equal(res.statusCode, 201); assert.equal(res.body.accepted, true); assert.equal(res.body.notification, 'unknown');
+    assert.equal(database.row().notification_status, 'sending');
+    const retry = response(); await handler(request(), retry);
+    assert.equal(retry.statusCode, 200); assert.equal(retry.body.notification, 'unknown');
   } finally {
     emailModule.sendEmail = originalSendEmail; global.fetch = oldFetch;
     oldUrl === undefined ? delete process.env.SUPABASE_URL : process.env.SUPABASE_URL = oldUrl;
@@ -189,7 +191,7 @@ test('admin and customer emails have independent states and retry never duplicat
   const sends = [];
   emailModule.sendEmail = async (message, key) => {
     sends.push({ to: message.to, key });
-    if (key.endsWith('/customer') && sends.filter((item) => item.key === key).length === 1) return { sent: false, reason: 'smtp_unavailable' };
+    if (key.endsWith('/customer') && sends.filter((item) => item.key === key).length === 1) return { sent: false, reason: 'smtp_rejected' };
     return { sent: true, id: `mail-${sends.length}`, acceptedCount: 1, rejectedCount: 0, pendingCount: 0 };
   };
   delete require.cache[require.resolve('../api/lead-intake')]; const handler = require('../api/lead-intake');
@@ -243,8 +245,34 @@ test('customer receipt is factual and does not imply an order or contract', () =
   const message = handler.customerEmailFor(row);
   assert.equal(message.to, 'francisco@example.pt');
   assert.match(message.text, /UNEED-LEAD-TESTE/);
+  assert.match(message.text, /Recebemos o teu pedido/);
+  assert.match(message.text, /Pedido: Uneed/);
+  assert.doesNotMatch(message.text, /uneed_presence|uneed_360/);
   assert.match(message.text, /confirma apenas a receção/i);
   assert.match(message.text, /não constitui uma encomenda, adjudicação ou contrato/i);
+});
+
+test('customer receipt translates Presence and 360 configuration into commercial labels', () => {
+  delete require.cache[require.resolve('../api/lead-intake')]; const handler = require('../api/lead-intake');
+  const presence = Intake.normalize(base({ origin: 'presenca.uneed.pt', product: 'uneed_presence', configuration: { plan: 'start', presenceNeed: 'booking', addons: [] } }));
+  const presenceMessage = handler.customerEmailFor({ reference: 'PRESENCE-1', payload: presence, estimate: presence.estimate });
+  assert.match(presenceMessage.text, /Pedido: Uneed Presença/);
+  assert.match(presenceMessage.text, /Opção: Marcações online/);
+  assert.doesNotMatch(presenceMessage.text, /uneed_presence|booking/);
+
+  const threeSixty = Intake.normalize(base({ product: 'uneed_360', configuration: { model: 'subscription', modules: ['clientes', 'propostas'] } }));
+  const threeSixtyMessage = handler.customerEmailFor({ reference: '360-1', payload: threeSixty, estimate: threeSixty.estimate });
+  assert.match(threeSixtyMessage.text, /Pedido: Uneed 360º/);
+  assert.match(threeSixtyMessage.text, /Opção: Subscrição/);
+  assert.match(threeSixtyMessage.text, /Módulos indicados: Clientes e CRM, Propostas e orçamentos/);
+  assert.doesNotMatch(threeSixtyMessage.text, /uneed_360|clientes, propostas/);
+});
+
+test('general request receipt does not promise that an inapplicable price will be confirmed', () => {
+  delete require.cache[require.resolve('../api/lead-intake')]; const handler = require('../api/lead-intake');
+  const payload = Intake.normalize(base());
+  const message = handler.customerEmailFor({ reference: 'GENERAL-1', payload, estimate: payload.estimate });
+  assert.doesNotMatch(message.text, /valor|preço|confirmad/i);
 });
 
 test('object payload size is enforced even without Content-Length', async () => {

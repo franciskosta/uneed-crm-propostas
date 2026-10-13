@@ -72,9 +72,9 @@ async function sendEmail(message, idempotencyKey) {
         port,
         secure: String(process.env.SMTP_SECURE || port === 465).toLowerCase() !== "false",
         auth: { user, pass: password },
-        connectionTimeout: 8000,
-        greetingTimeout: 8000,
-        socketTimeout: 12000,
+        connectionTimeout: 5000,
+        greetingTimeout: 5000,
+        socketTimeout: 8000,
       });
     }
     const messageId = `<${idempotencyKey.replace(/[^a-z0-9/_-]/gi, "-").replaceAll("/", ".")}@uneed.pt>`;

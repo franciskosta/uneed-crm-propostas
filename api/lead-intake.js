@@ -132,7 +132,12 @@ module.exports = async function handler(req, res) {
     const payload = intake.normalize(input);
     const headerKey = String(req.headers["idempotency-key"] || "");
     if (headerKey && headerKey !== payload.idempotencyKey) intake.fail("idempotency_mismatch", "A chave de idempotência não coincide.", ["idempotencyKey"], 400);
-    if (payload.antiSpam.website) return send(res, 202, { ok: true, accepted: true, reference: "UNEED-RECEBIDO", notification: "pending" });
+    if (payload.antiSpam.website) intake.fail(
+      "anti_spam_triggered",
+      "A verificação anti-spam bloqueou o pedido. Recarregue a página e tente novamente.",
+      ["antiSpam.website"],
+      422,
+    );
     const storedPayload = { ...payload }; delete storedPayload.antiSpam;
     const existing = await db(cfg, `lead_intake_requests?select=id,reference,payload,estimate,notification_status,updated_at&origin=eq.${encodeURIComponent(payload.origin)}&idempotency_key=eq.${encodeURIComponent(payload.idempotencyKey)}&limit=1`);
     if (existing[0]) { const result = await existingResult(cfg, existing[0], storedPayload); return send(res, result.status, result.body); }

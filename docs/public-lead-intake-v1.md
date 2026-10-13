@@ -59,7 +59,7 @@ Regras comuns:
 - `contact.name` é obrigatório.
 - É obrigatório pelo menos um de `contact.email` ou `contact.phone`.
 - `idempotencyKey` é criado ao abrir/preparar o formulário, conservado durante retries e substituído apenas depois de uma resposta aceite. Repetir a mesma chave com o mesmo conteúdo devolve o mesmo pedido e volta a tentar uma notificação que tenha falhado, sem duplicar envios concorrentes. Reutilizar a chave com conteúdo diferente devolve `409 idempotency_conflict`; uma nova chave conserva um novo pedido, mesmo para o mesmo contacto.
-- `antiSpam.website` é honeypot e tem de ficar vazio.
+- `antiSpam.website` é o honeypot e tem de ficar vazio. Se vier preenchido, a API não grava nem notifica e devolve `422 anti_spam_triggered`; nunca devolve uma falsa confirmação de receção.
 - `consent.privacy` tem de ser `true` e a versão atual é `2026-10-13`.
 - A estimativa enviada pelo browser nunca é aceite como preço. O servidor recalcula-a a partir do catálogo.
 

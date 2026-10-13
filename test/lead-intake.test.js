@@ -99,6 +99,29 @@ test('public endpoint persists before notification failure and rejects unapprove
   }
 });
 
+test('honeypot never returns a false accepted receipt or writes a lead', async () => {
+  const oldFetch = global.fetch;
+  const oldUrl = process.env.SUPABASE_URL, oldSecret = process.env.SUPABASE_SECRET_KEY, oldOwner = process.env.CRM_OWNER_USER_ID;
+  process.env.SUPABASE_URL = 'https://db.example'; process.env.SUPABASE_SECRET_KEY = 'secret'; process.env.CRM_OWNER_USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const database = mockDatabase(); global.fetch = database.fetch;
+  delete require.cache[require.resolve('../api/lead-intake')]; const handler = require('../api/lead-intake');
+  try {
+    const res = response();
+    await handler(request(base({ antiSpam: { website: '1' } })), res);
+    assert.equal(res.statusCode, 422);
+    assert.equal(res.body.ok, false);
+    assert.equal(res.body.error.code, 'anti_spam_triggered');
+    assert.deepEqual(res.body.error.fields, ['antiSpam.website']);
+    assert.equal(database.calls.length, 0);
+  } finally {
+    global.fetch = oldFetch;
+    oldUrl === undefined ? delete process.env.SUPABASE_URL : process.env.SUPABASE_URL = oldUrl;
+    oldSecret === undefined ? delete process.env.SUPABASE_SECRET_KEY : process.env.SUPABASE_SECRET_KEY = oldSecret;
+    oldOwner === undefined ? delete process.env.CRM_OWNER_USER_ID : process.env.CRM_OWNER_USER_ID = oldOwner;
+    delete require.cache[require.resolve('../api/lead-intake')];
+  }
+});
+
 test('an idempotent retry retries a failed notice once and changed content conflicts', async () => {
   const oldFetch = global.fetch;
   const oldUrl = process.env.SUPABASE_URL, oldSecret = process.env.SUPABASE_SECRET_KEY, oldOwner = process.env.CRM_OWNER_USER_ID;

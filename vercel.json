@@ -3,6 +3,7 @@
   "outputDirectory": "dist",
   "crons": [{ "path": "/api/contact-alerts", "schedule": "0 8 * * *" }],
   "functions": {
+    "api/lead-intake.js": { "maxDuration": 15 },
     "api/kickoffs.js": { "maxDuration": 60 },
     "api/kickoff.js": { "maxDuration": 15 },
     "api/contact-alerts.js": { "maxDuration": 60 },

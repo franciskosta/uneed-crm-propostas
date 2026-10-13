@@ -24,6 +24,7 @@ const files = [
   "suporte.html",
   "styles.css",
   "app.js",
+  "lead-intake.js",
   "contact-alerts.js",
   "manual-reminders.js",
   "customer-model.js",

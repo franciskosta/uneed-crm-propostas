@@ -268,6 +268,7 @@ let isHydratingFromServer = true;
 let supabaseClientInstance = null;
 let supabaseUserId = null;
 let syncStatusTimer = null;
+let leadIntakeLoading = false;
 let state = loadState();
 migrateBrandDefaults();
 hydratePricingDefaults();
@@ -382,6 +383,28 @@ async function syncSupabaseState() {
     .upsert({ user_id: userId, data: state, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
   setSyncStatus(error ? "Erro ao sincronizar Supabase" : "Guardado no Supabase", error ? "error" : "success");
   if (!error) checkContactAlertEmails();
+  return !error;
+}
+
+async function loadLeadIntakeRequests({ persist = true, quiet = false } = {}) {
+  const client = getSupabaseClient();
+  if (!client || leadIntakeLoading || !window.UNEED_LEAD_INTAKE) return 0;
+  leadIntakeLoading = true;
+  try {
+    const { data, error } = await client
+      .from("lead_intake_requests")
+      .select("id,reference,origin,product,payload,estimate,status,notification_status,created_at")
+      .order("created_at", { ascending: false })
+      .limit(500);
+    if (error) { if (!quiet) console.warn("lead_intake_load_failed", error.code || error.message); return 0; }
+    const added = window.UNEED_LEAD_INTAKE.mergeRows(state, data || []);
+    if (!added.length) return 0;
+    window.UNEED_COMMERCIAL_CORE?.migrateState(state);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    if (persist) await syncSupabaseState();
+    renderInstagramProspecting();
+    return added.length;
+  } finally { leadIntakeLoading = false; }
 }
 
 let contactAlertCheckRunning = false;
@@ -409,6 +432,7 @@ setInterval(() => {
     if (prospect && reminders) reminders.innerHTML = renderManualReminderFlags(prospect);
   }
   checkContactAlertEmails();
+  if (document.visibilityState === "visible") loadLeadIntakeRequests({ persist: true, quiet: true }).catch(() => {});
 }, 60000);
 function renderContactAlert(prospect) {
   const alert = window.UNEED_CONTACT_ALERTS?.alertFor(prospect);
@@ -473,6 +497,7 @@ async function loadSupabaseState() {
   }
   if (!data?.data) {
     await syncSupabaseState();
+    await loadLeadIntakeRequests({ persist: true, quiet: true });
     setSyncStatus("Supabase ligado", "success");
     return true;
   }
@@ -482,13 +507,14 @@ async function loadSupabaseState() {
   state = data.data;
   migrateBrandDefaults();
   hydratePricingDefaults();
+  const importedLeadRequests = await loadLeadIntakeRequests({ persist: false, quiet: true });
   activeId = state.proposals[0]?.id || activeId;
   activeContractId = state.contracts?.[0]?.id || activeContractId;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   await loadSupportTickets();
   renderAll();
   isHydratingFromServer = false;
-  if (needsCommercialCorePersistence) await syncSupabaseState();
+  if (needsCommercialCorePersistence || importedLeadRequests) await syncSupabaseState();
   setSyncStatus("Supabase ligado", "success");
   return true;
 }
@@ -2893,6 +2919,28 @@ async function generateProspects() {
   }
 }
 
+function renderWebsiteRequest(prospect) {
+  const request = prospect.websiteRequest;
+  if (!request) return "";
+  const configuration = request.configuration || {}, estimate = request.estimate || {};
+  const product = request.product === "uneed_presence" ? "UNEED Presença" : request.product === "uneed_360" ? "UNEED 360º" : "UNEED";
+  const model = configuration.model === "purchase" ? "Compra" : configuration.model === "subscription" ? "Subscrição" : "A definir";
+  const modules = (configuration.modules || []).join(", ");
+  const addons = (configuration.addons || []).map((addon) => `${addon.name}${addon.quantity > 1 ? ` × ${addon.quantity}` : ""}${addon.languages?.length ? ` (${addon.languages.join(", ")})` : ""}`).join(", ");
+  const money = (value) => Number(value || 0).toLocaleString("pt-PT", { style: "currency", currency: "EUR" });
+  const price = estimate.priceStatus === "not_applicable" ? "Sem estimativa" : estimate.priceStatus === "requires_quote" ? "Sujeito a orçamento" : `${money(estimate.initial)} inicial · ${money(estimate.monthly)}/mês · sem IVA`;
+  return `<details class="prospect-message website-request-detail"><summary>Pedido recebido pelo site · ${escapeHtml(product)}</summary><div class="prospect-message-paragraphs">
+    <p><strong>Referência:</strong> ${escapeHtml(prospect.intakeReference || "")}</p>
+    <p><strong>Origem:</strong> ${escapeHtml(request.origin || "")}</p>
+    <p><strong>Contacto:</strong> ${escapeHtml(request.contact?.name || "")} · ${escapeHtml(request.contact?.email || "sem email")} · ${escapeHtml(request.contact?.phone || "sem telefone")}</p>
+    <p><strong>Negócio:</strong> ${escapeHtml(request.business?.name || "não indicado")} · ${escapeHtml(request.business?.sector || "área não indicada")}</p>
+    ${request.message ? `<p><strong>Mensagem:</strong> ${escapeHtml(request.message)}</p>` : ""}
+    ${request.product === "uneed_360" ? `<p><strong>Modelo:</strong> ${escapeHtml(model)}${modules ? ` · <strong>Módulos:</strong> ${escapeHtml(modules)}` : ""}</p>` : ""}
+    ${request.product === "uneed_presence" ? `<p><strong>Tipo de presença:</strong> ${escapeHtml(configuration.presenceNeed || "")} · <strong>Extras:</strong> ${escapeHtml(addons || "sem extras")}</p>` : ""}
+    <p><strong>Estimativa validada:</strong> ${escapeHtml(price)}</p>
+  </div></details>`;
+}
+
 function renderInstagramProspecting() {
   const board = qs("#instagramKanban");
   if (!board) return;
@@ -2911,6 +2959,10 @@ function renderInstagramProspecting() {
       prospect.name,
       prospect.instagramUrl,
       prospect.phone,
+      prospect.email,
+      prospect.intakeReference,
+      prospect.websiteRequest?.origin,
+      prospect.websiteRequest?.product,
       prospect.status,
       prospect.notes,
       prospect.district,
@@ -2957,7 +3009,7 @@ function renderInstagramProspecting() {
                         <span class="card-meta prospect-contact-summary">${escapeHtml(prospectContactSummary(prospect))}</span>
                         <span class="contact-alert-flag" aria-live="polite">${renderContactAlert(prospect)}</span>
                         <span class="manual-reminder-flags" aria-live="polite">${renderManualReminderFlags(prospect)}</span>
-                        <span class="card-meta">${escapeHtml(prospect.acquisitionStrategy === "high_ticket" ? "HIGH TICKET" : "PRESENÇA")}${prospect.score ? ` · Score ${escapeHtml(prospect.score)}` : ""}</span>
+                        <span class="card-meta">${escapeHtml(prospect.websiteRequest ? "PEDIDO SITE · " + (prospect.websiteRequest.product === "uneed_presence" ? "PRESENÇA" : prospect.websiteRequest.product === "uneed_360" ? "360º" : "UNEED") : prospect.acquisitionStrategy === "high_ticket" ? "HIGH TICKET" : "PRESENÇA")}${prospect.score ? ` · Score ${escapeHtml(prospect.score)}` : ""}</span>
                       </span>
                       <span class="prospect-score">${prospect.hasWebsite ? "Site" : "Sem site"}</span>
                       <span class="prospect-card-chevron" aria-hidden="true">⌄</span>
@@ -2976,6 +3028,7 @@ function renderInstagramProspecting() {
                     ${safeExternalUrl(prospect.website) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.website))}" target="_blank" rel="noopener">Abrir website</a>` : ""}
                     ${safeExternalUrl(prospect.mapsUrl) ? `<a class="prospect-link" href="${escapeAttr(safeExternalUrl(prospect.mapsUrl))}" target="_blank" rel="noopener">Google Maps</a>` : ""}
                     ${prospect.message ? renderProspectMessage(prospect) : ""}
+                    ${renderWebsiteRequest(prospect)}
                     ${renderProspectWhatsappFollowup(prospect)}
                     ${prospect.notes ? `<details class="prospect-message"><summary>Análise do lead</summary><p>${escapeHtml(prospect.notes)}</p></details>` : ""}
                     ${

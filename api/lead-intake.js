@@ -143,8 +143,8 @@ function customerEmailFor(row) {
   return {
     to: payload.contact.email,
     replyTo: process.env.KICKOFF_REPLY_TO || process.env.SMTP_USER || "geral@uneed.pt",
-    subject: `Recebemos o seu pedido — ${row.reference}`,
-    html: shell({ preview: `Confirmação de receção do pedido ${row.reference}`, eyebrow: "Pedido recebido", title: `Olá ${payload.contact.name}.`, intro: "Obrigado pelo teu contacto. Guardámos a informação que nos enviaste.", body }),
+    subject: `Recebemos o teu pedido — ${row.reference}`,
+    html: shell({ preview: `Confirmação de receção do pedido ${row.reference}`, eyebrow: "Pedido recebido", title: `Olá ${payload.contact.name}.`, intro: "Obrigado pelo teu contacto. Guardámos a informação que nos enviaste.", body, footerNote: "Se precisares, responde a este email." }),
     text: plain,
   };
 }

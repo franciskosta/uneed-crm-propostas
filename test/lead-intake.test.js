@@ -244,7 +244,10 @@ test('customer receipt is factual and does not imply an order or contract', () =
   const payload = Intake.normalize(base()); const row = { reference: 'UNEED-LEAD-TESTE', payload, estimate: payload.estimate };
   const message = handler.customerEmailFor(row);
   assert.equal(message.to, 'francisco@example.pt');
+  assert.equal(message.subject, 'Recebemos o teu pedido — UNEED-LEAD-TESTE');
   assert.match(message.text, /UNEED-LEAD-TESTE/);
+  assert.match(message.html, /Se precisares, responde a este email/);
+  assert.doesNotMatch(message.html, /Guarde este email/);
   assert.match(message.text, /Recebemos o teu pedido/);
   assert.match(message.text, /Pedido: Uneed/);
   assert.doesNotMatch(message.text, /uneed_presence|uneed_360/);

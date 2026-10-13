@@ -74,8 +74,11 @@ function mockDatabase(seed = null) {
     if (method === 'GET') return { ok: true, status: 200, json: async () => [] };
     if (method === 'POST') { stored ||= body; return { ok: true, status: 201, json: async () => [stored] }; }
     if (method === 'PATCH') {
-      const expected = new URL(url).searchParams.get('notification_status')?.replace('eq.', '');
-      if (expected && stored.notification_status !== expected) return { ok: true, status: 200, json: async () => [] };
+      const params = new URL(url).searchParams;
+      for (const field of ['admin_notification_status', 'customer_notification_status', 'notification_status']) {
+        const expected = params.get(field)?.replace('eq.', '');
+        if (expected && stored[field] !== expected) return { ok: true, status: 200, json: async () => [] };
+      }
       stored = { ...stored, ...body };
       return { ok: true, status: 200, json: async () => [stored] };
     }
@@ -137,7 +140,7 @@ test('an idempotent retry retries a failed notice once and changed content confl
   const oldUrl = process.env.SUPABASE_URL, oldSecret = process.env.SUPABASE_SECRET_KEY, oldOwner = process.env.CRM_OWNER_USER_ID;
   process.env.SUPABASE_URL = 'https://db.example'; process.env.SUPABASE_SECRET_KEY = 'secret'; process.env.CRM_OWNER_USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const normalized = Intake.normalize(base()); const storedPayload = { ...normalized }; delete storedPayload.antiSpam;
-  const database = mockDatabase({ id: '11111111-1111-4111-8111-111111111111', reference: 'UNEED-LEAD-1', payload: storedPayload, estimate: normalized.estimate, notification_status: 'failed', updated_at: '2026-10-13T10:00:00Z' });
+  const database = mockDatabase({ id: '11111111-1111-4111-8111-111111111111', reference: 'UNEED-LEAD-1', payload: storedPayload, estimate: normalized.estimate, notification_status: 'failed', admin_notification_status: 'failed', customer_notification_status: 'not_applicable', updated_at: '2026-10-13T10:00:00Z' });
   global.fetch = database.fetch;
   const emailModule = require('../kickoff-email'); const originalSendEmail = emailModule.sendEmail; let sends = 0;
   emailModule.sendEmail = async () => { sends += 1; return { sent: true, id: 'mail-1' }; };
@@ -176,6 +179,72 @@ test('a thrown notification error never turns a persisted lead into a failed req
     oldOwner === undefined ? delete process.env.CRM_OWNER_USER_ID : process.env.CRM_OWNER_USER_ID = oldOwner;
     delete require.cache[require.resolve('../api/lead-intake')];
   }
+});
+
+test('admin and customer emails have independent states and retry never duplicates an accepted email', async () => {
+  const oldFetch = global.fetch, oldUrl = process.env.SUPABASE_URL, oldSecret = process.env.SUPABASE_SECRET_KEY, oldOwner = process.env.CRM_OWNER_USER_ID;
+  process.env.SUPABASE_URL = 'https://db.example'; process.env.SUPABASE_SECRET_KEY = 'secret'; process.env.CRM_OWNER_USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const database = mockDatabase(); global.fetch = database.fetch;
+  const emailModule = require('../kickoff-email'); const originalSendEmail = emailModule.sendEmail;
+  const sends = [];
+  emailModule.sendEmail = async (message, key) => {
+    sends.push({ to: message.to, key });
+    if (key.endsWith('/customer') && sends.filter((item) => item.key === key).length === 1) return { sent: false, reason: 'smtp_unavailable' };
+    return { sent: true, id: `mail-${sends.length}`, acceptedCount: 1, rejectedCount: 0, pendingCount: 0 };
+  };
+  delete require.cache[require.resolve('../api/lead-intake')]; const handler = require('../api/lead-intake');
+  try {
+    const first = response(); await handler(request(), first);
+    assert.equal(first.statusCode, 201); assert.equal(first.body.accepted, true);
+    assert.deepEqual(first.body.notifications, { admin: 'sent', customer: 'failed' });
+    assert.equal(database.row().admin_notification_status, 'sent');
+    assert.equal(database.row().customer_notification_status, 'failed');
+    assert.equal(sends.filter((item) => item.key.endsWith('/admin')).length, 1);
+    assert.equal(sends.filter((item) => item.key.endsWith('/customer')).length, 1);
+
+    const retry = response(); await handler(request(), retry);
+    assert.equal(retry.statusCode, 200); assert.deepEqual(retry.body.notifications, { admin: 'sent', customer: 'sent' });
+    assert.equal(sends.filter((item) => item.key.endsWith('/admin')).length, 1);
+    assert.equal(sends.filter((item) => item.key.endsWith('/customer')).length, 2);
+  } finally {
+    emailModule.sendEmail = originalSendEmail; global.fetch = oldFetch;
+    oldUrl === undefined ? delete process.env.SUPABASE_URL : process.env.SUPABASE_URL = oldUrl;
+    oldSecret === undefined ? delete process.env.SUPABASE_SECRET_KEY : process.env.SUPABASE_SECRET_KEY = oldSecret;
+    oldOwner === undefined ? delete process.env.CRM_OWNER_USER_ID : process.env.CRM_OWNER_USER_ID = oldOwner;
+    delete require.cache[require.resolve('../api/lead-intake')];
+  }
+});
+
+test('a request without email only notifies UNEED and customer copy stays not applicable', async () => {
+  const oldFetch = global.fetch, oldUrl = process.env.SUPABASE_URL, oldSecret = process.env.SUPABASE_SECRET_KEY, oldOwner = process.env.CRM_OWNER_USER_ID;
+  process.env.SUPABASE_URL = 'https://db.example'; process.env.SUPABASE_SECRET_KEY = 'secret'; process.env.CRM_OWNER_USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const database = mockDatabase(); global.fetch = database.fetch;
+  const emailModule = require('../kickoff-email'); const originalSendEmail = emailModule.sendEmail; const sends = [];
+  emailModule.sendEmail = async (message, key) => { sends.push({ message, key }); return { sent: true, id: 'mail-admin', acceptedCount: 1 }; };
+  delete require.cache[require.resolve('../api/lead-intake')]; const handler = require('../api/lead-intake');
+  try {
+    const input = base({ contact: { name: 'Francisco', email: '', phone: '+351 934 419 375' } });
+    const res = response(); await handler(request(input), res);
+    assert.equal(res.statusCode, 201);
+    assert.deepEqual(res.body.notifications, { admin: 'sent', customer: 'not_applicable' });
+    assert.equal(sends.length, 1); assert.ok(sends[0].key.endsWith('/admin'));
+  } finally {
+    emailModule.sendEmail = originalSendEmail; global.fetch = oldFetch;
+    oldUrl === undefined ? delete process.env.SUPABASE_URL : process.env.SUPABASE_URL = oldUrl;
+    oldSecret === undefined ? delete process.env.SUPABASE_SECRET_KEY : process.env.SUPABASE_SECRET_KEY = oldSecret;
+    oldOwner === undefined ? delete process.env.CRM_OWNER_USER_ID : process.env.CRM_OWNER_USER_ID = oldOwner;
+    delete require.cache[require.resolve('../api/lead-intake')];
+  }
+});
+
+test('customer receipt is factual and does not imply an order or contract', () => {
+  delete require.cache[require.resolve('../api/lead-intake')]; const handler = require('../api/lead-intake');
+  const payload = Intake.normalize(base()); const row = { reference: 'UNEED-LEAD-TESTE', payload, estimate: payload.estimate };
+  const message = handler.customerEmailFor(row);
+  assert.equal(message.to, 'francisco@example.pt');
+  assert.match(message.text, /UNEED-LEAD-TESTE/);
+  assert.match(message.text, /confirma apenas a receção/i);
+  assert.match(message.text, /não constitui uma encomenda, adjudicação ou contrato/i);
 });
 
 test('object payload size is enforced even without Content-Length', async () => {

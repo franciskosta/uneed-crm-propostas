@@ -393,7 +393,7 @@ async function loadLeadIntakeRequests({ persist = true, quiet = false } = {}) {
   try {
     const { data, error } = await client
       .from("lead_intake_requests")
-      .select("id,reference,origin,product,payload,estimate,status,notification_status,created_at")
+      .select("id,reference,origin,product,payload,estimate,status,notification_status,admin_notification_status,customer_notification_status,created_at")
       .order("created_at", { ascending: false })
       .limit(500);
     if (error) { if (!quiet) console.warn("lead_intake_load_failed", error.code || error.message); return 0; }

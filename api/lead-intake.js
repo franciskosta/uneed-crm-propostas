@@ -59,7 +59,15 @@ function canonical(value) {
   return value;
 }
 function samePayload(stored, incoming) { return JSON.stringify(canonical(stored)) === JSON.stringify(canonical(incoming)); }
-function emailFor(row) {
+function validEmail(value) { return /^[^\s<>@,;]+@[^\s<>@,;]+\.[^\s<>@,;]+$/.test(String(value || "").trim()); }
+function estimateLine(estimate = {}) {
+  if (estimate.priceStatus === "requires_quote") return "O valor será confirmado numa proposta personalizada após análise.";
+  const parts = [];
+  if (Number(estimate.initial) > 0) parts.push(`${estimate.initial} € inicial`);
+  if (Number(estimate.monthly) > 0) parts.push(`${estimate.monthly} €/mês`);
+  return parts.length ? `Estimativa indicativa: ${parts.join(" · ")} + IVA.` : "O valor será confirmado após análise.";
+}
+function adminEmailFor(row) {
   const payload = row.payload, estimate = row.estimate;
   const addons = payload.configuration?.addons || [];
   const modules = payload.configuration?.modules || [];
@@ -85,40 +93,110 @@ function emailFor(row) {
   ].filter(Boolean).join("\n");
   return { to: process.env.LEAD_INTAKE_NOTIFICATION_TO || "geral@uneed.pt", replyTo: payload.contact.email || undefined, subject: `Novo pedido ${payload.product} — ${payload.business.name || payload.contact.name} — ${row.reference}`, html: shell({ preview: `Novo pedido ${row.reference}`, eyebrow: "Pedido comercial recebido", title: payload.business.name || payload.contact.name, intro: "O pedido já ficou guardado na área PROSPEÇÃO do CRM.", body }), text: plain };
 }
-function publicResult(row, duplicate = false) {
-  const status = row.notification_status === "sending" ? "pending" : row.notification_status || "pending";
-  return { ok: true, accepted: true, duplicate, requestId: row.id, reference: row.reference, notification: status, estimate: row.estimate };
+function customerEmailFor(row) {
+  const payload = row.payload;
+  const modules = payload.configuration?.modules || [];
+  const addons = payload.configuration?.addons || [];
+  const summary = [
+    `<strong>Referência:</strong> ${escapeHtml(row.reference)}`,
+    `<strong>Pedido:</strong> ${escapeHtml(payload.product)}`,
+    payload.business?.name ? `<strong>Negócio:</strong> ${escapeHtml(payload.business.name)}` : "",
+    payload.message ? `<strong>Mensagem:</strong> ${escapeHtml(payload.message)}` : "",
+    modules.length ? `<strong>Módulos indicados:</strong> ${escapeHtml(modules.join(", "))}` : "",
+    addons.length ? `<strong>Opções indicadas:</strong> ${escapeHtml(addons.map((addon) => `${addon.name} × ${addon.quantity}`).join(", "))}` : "",
+    `<strong>Valor:</strong> ${escapeHtml(estimateLine(row.estimate))}`,
+  ].filter(Boolean);
+  const body = `<div style="margin:22px 0;padding:20px;border:1px solid #e1e3ed;border-radius:16px;line-height:1.8;color:#4f566e">${summary.map((line) => `<p style="margin:0 0 8px">${line}</p>`).join("")}</div><div style="margin:22px 0;padding:20px;background:#f4f5fa;border-radius:16px;color:#4f566e;line-height:1.7"><strong style="color:#15164b">Próximo passo</strong><br>A equipa UNEED vai rever a informação e entrar em contacto consigo. Esta mensagem confirma apenas a receção do pedido; não constitui uma encomenda, adjudicação ou contrato.</div><p style="color:#4f566e;line-height:1.7">Se precisar de acrescentar alguma informação, responda a este email ou contacte <a href="mailto:geral@uneed.pt">geral@uneed.pt</a> · <a href="tel:+351934419375">+351 934 419 375</a>.</p>`;
+  const plain = [
+    `Olá ${payload.contact.name},`, "", "Recebemos o seu pedido.", `Referência: ${row.reference}`,
+    `Pedido: ${payload.product}`, payload.business?.name ? `Negócio: ${payload.business.name}` : "",
+    payload.message ? `Mensagem: ${payload.message}` : "", modules.length ? `Módulos indicados: ${modules.join(", ")}` : "",
+    addons.length ? `Opções indicadas: ${addons.map((addon) => `${addon.name} × ${addon.quantity}`).join(", ")}` : "",
+    estimateLine(row.estimate), "", "Próximo passo: a equipa UNEED vai rever a informação e entrar em contacto consigo.",
+    "Esta mensagem confirma apenas a receção do pedido; não constitui uma encomenda, adjudicação ou contrato.", "",
+    "UNEED · geral@uneed.pt · +351 934 419 375",
+  ].filter(Boolean).join("\n");
+  return {
+    to: payload.contact.email,
+    replyTo: process.env.KICKOFF_REPLY_TO || process.env.SMTP_USER || "geral@uneed.pt",
+    subject: `Recebemos o seu pedido — ${row.reference}`,
+    html: shell({ preview: `Confirmação de receção do pedido ${row.reference}`, eyebrow: "Pedido recebido", title: `Olá ${payload.contact.name}.`, intro: "Obrigado pelo seu contacto. Guardámos a informação que nos enviou.", body }),
+    text: plain,
+  };
 }
-async function attemptNotification(cfg, row) {
-  if (!row || !["pending", "failed"].includes(row.notification_status || "pending")) return row;
-  const expected = row.notification_status || "pending";
-  const claimed = await db(cfg, `lead_intake_requests?id=eq.${encodeURIComponent(row.id)}&notification_status=eq.${expected}`, {
-    method: "PATCH", body: { notification_status: "sending", updated_at: new Date().toISOString() }, prefer: "return=representation",
+const NOTIFICATIONS = {
+  admin: { status: "admin_notification_status", detail: "admin_notification_detail", email: adminEmailFor },
+  customer: { status: "customer_notification_status", detail: "customer_notification_detail", email: customerEmailFor },
+};
+function notificationStatus(row, kind) {
+  if (kind === "admin") return row.admin_notification_status || row.notification_status || "pending";
+  return row.customer_notification_status || "not_applicable";
+}
+function publicResult(row, duplicate = false) {
+  const normalized = (status) => status === "sending" ? "pending" : status;
+  const admin = normalized(notificationStatus(row, "admin"));
+  const customer = normalized(notificationStatus(row, "customer"));
+  return { ok: true, accepted: true, duplicate, requestId: row.id, reference: row.reference, notification: admin, notifications: { admin, customer }, estimate: row.estimate };
+}
+async function attemptNotification(cfg, row, kind) {
+  const definition = NOTIFICATIONS[kind];
+  const current = notificationStatus(row, kind);
+  if (!row || !definition || !["pending", "failed"].includes(current)) return row;
+  if (kind === "customer" && !validEmail(row.payload?.contact?.email)) return row;
+  const claimBody = { [definition.status]: "sending", updated_at: new Date().toISOString() };
+  if (kind === "admin") claimBody.notification_status = "sending";
+  const claimed = await db(cfg, `lead_intake_requests?id=eq.${encodeURIComponent(row.id)}&${definition.status}=eq.${current}`, {
+    method: "PATCH", body: claimBody, prefer: "return=representation",
   });
-  if (!claimed[0]) return { ...row, notification_status: "sending" };
+  if (!claimed[0]) return { ...row, [definition.status]: "sending" };
   let notice;
-  try { notice = await sendEmail(emailFor(claimed[0]), `lead-intake/${row.id}/admin`); }
+  try { notice = await sendEmail(definition.email(claimed[0]), `lead-intake/${row.id}/${kind}`); }
   catch (notificationError) { notice = { sent: false, reason: "email_unavailable", detail: notificationError.message }; }
-  const notificationStatus = notice?.sent ? "sent" : "failed";
+  const finalStatus = notice?.sent ? "sent" : "failed";
+  const updateBody = {
+    [definition.status]: finalStatus,
+    [definition.detail]: notice?.sent
+      ? { id: notice.id, acceptedCount: notice.acceptedCount ?? null, rejectedCount: notice.rejectedCount ?? null, pendingCount: notice.pendingCount ?? null }
+      : { reason: notice?.reason || "email_unavailable" },
+    updated_at: new Date().toISOString(),
+  };
+  if (kind === "admin") {
+    updateBody.notification_status = finalStatus;
+    updateBody.notification_detail = updateBody[definition.detail];
+  }
   try {
-    await db(cfg, `lead_intake_requests?id=eq.${encodeURIComponent(row.id)}&notification_status=eq.sending`, {
+    await db(cfg, `lead_intake_requests?id=eq.${encodeURIComponent(row.id)}&${definition.status}=eq.sending`, {
       method: "PATCH",
-      body: {
-        notification_status: notificationStatus,
-        notification_detail: notice?.sent
-          ? { id: notice.id, acceptedCount: notice.acceptedCount ?? null, rejectedCount: notice.rejectedCount ?? null, pendingCount: notice.pendingCount ?? null }
-          : { reason: notice?.reason || "email_unavailable" },
-        updated_at: new Date().toISOString(),
-      },
+      body: updateBody,
       prefer: "return=representation",
     });
-  } catch (notificationError) { console.error("lead_intake_notification_status", row.id, notificationError.message); }
-  if (!notice?.sent) console.error("lead_intake_email_failed", row.id, notice?.reason || "email_unavailable");
-  return { ...claimed[0], notification_status: notificationStatus };
+  } catch (notificationError) { console.error("lead_intake_notification_status", kind, row.id, notificationError.message); }
+  if (!notice?.sent) console.error("lead_intake_email_failed", kind, row.id, notice?.reason || "email_unavailable");
+  return { ...claimed[0], ...updateBody };
+}
+async function attemptNotifications(cfg, row) {
+  const kinds = ["admin", "customer"];
+  const results = await Promise.allSettled(kinds.map((kind) => attemptNotification(cfg, row, kind)));
+  const combined = { ...row };
+  for (let index = 0; index < results.length; index += 1) {
+    const kind = kinds[index], result = results[index];
+    if (result.status === "rejected") {
+      console.error("lead_intake_notification_attempt", kind, row.id, result.reason?.message || "unknown");
+      continue;
+    }
+    const definition = NOTIFICATIONS[kind];
+    combined[definition.status] = result.value[definition.status];
+    combined[definition.detail] = result.value[definition.detail];
+    if (kind === "admin") {
+      combined.notification_status = result.value.notification_status;
+      combined.notification_detail = result.value.notification_detail;
+    }
+  }
+  return combined;
 }
 async function existingResult(cfg, row, storedPayload, status = 200) {
   if (!row || !samePayload(row.payload, storedPayload)) intake.fail("idempotency_conflict", "Esta chave de idempotência já foi usada para outro pedido.", ["idempotencyKey"], 409);
-  const notified = await attemptNotification(cfg, row);
+  const notified = await attemptNotifications(cfg, row);
   return { status, body: publicResult(notified, true) };
 }
 
@@ -145,27 +223,30 @@ module.exports = async function handler(req, res) {
       422,
     );
     const storedPayload = { ...payload }; delete storedPayload.antiSpam;
-    const existing = await db(cfg, `lead_intake_requests?select=id,reference,payload,estimate,notification_status,updated_at&origin=eq.${encodeURIComponent(payload.origin)}&idempotency_key=eq.${encodeURIComponent(payload.idempotencyKey)}&limit=1`);
+    const existing = await db(cfg, `lead_intake_requests?select=id,reference,payload,estimate,notification_status,admin_notification_status,admin_notification_detail,customer_notification_status,customer_notification_detail,updated_at&origin=eq.${encodeURIComponent(payload.origin)}&idempotency_key=eq.${encodeURIComponent(payload.idempotencyKey)}&limit=1`);
     if (existing[0]) { const result = await existingResult(cfg, existing[0], storedPayload); return send(res, result.status, result.body); }
     const ipHash = digest(cfg, requesterIp(req));
     const contactHash = digest(cfg, `${payload.contact.email}|${payload.contact.phone.replace(/\D/g, "")}`);
     const hour = new Date(Date.now() - 3600000).toISOString(), day = new Date(Date.now() - 86400000).toISOString();
     if (await limited(cfg, "ip_hash", ipHash, hour, 8) || await limited(cfg, "ip_hash", ipHash, day, 30) || await limited(cfg, "contact_hash", contactHash, hour, 5)) return send(res, 429, { ok: false, error: { code: "rate_limited", message: "Foram recebidos vários pedidos. Aguarde e tente novamente." } });
     const owner = await ownerId(cfg), id = crypto.randomUUID(), createdAt = new Date().toISOString();
-    const row = { id, owner_id: owner, origin: payload.origin, product: payload.product, idempotency_key: payload.idempotencyKey, reference: reference(id, createdAt), payload: storedPayload, estimate: payload.estimate, status: "new", notification_status: "pending", ip_hash: ipHash, contact_hash: contactHash, created_at: createdAt, updated_at: createdAt };
+    const customerNotificationStatus = validEmail(payload.contact.email) ? "pending" : "not_applicable";
+    const row = { id, owner_id: owner, origin: payload.origin, product: payload.product, idempotency_key: payload.idempotencyKey, reference: reference(id, createdAt), payload: storedPayload, estimate: payload.estimate, status: "new", notification_status: "pending", admin_notification_status: "pending", customer_notification_status: customerNotificationStatus, ip_hash: ipHash, contact_hash: contactHash, created_at: createdAt, updated_at: createdAt };
     const inserted = await db(cfg, "lead_intake_requests?on_conflict=origin,idempotency_key", { method: "POST", body: row, prefer: "resolution=ignore-duplicates,return=representation" });
     if (!inserted[0]) {
-      const raced = await db(cfg, `lead_intake_requests?select=id,reference,payload,estimate,notification_status,updated_at&origin=eq.${encodeURIComponent(payload.origin)}&idempotency_key=eq.${encodeURIComponent(payload.idempotencyKey)}&limit=1`);
+      const raced = await db(cfg, `lead_intake_requests?select=id,reference,payload,estimate,notification_status,admin_notification_status,admin_notification_detail,customer_notification_status,customer_notification_detail,updated_at&origin=eq.${encodeURIComponent(payload.origin)}&idempotency_key=eq.${encodeURIComponent(payload.idempotencyKey)}&limit=1`);
       const result = await existingResult(cfg, raced[0], storedPayload);
       return send(res, result.status, result.body);
     }
     const saved = inserted[0];
-    const notified = await attemptNotification(cfg, saved);
+    const notified = await attemptNotifications(cfg, saved);
     return send(res, 201, publicResult(notified));
   } catch (raw) { return error(res, raw); }
 };
 
 module.exports.ALLOWED_ORIGINS = ALLOWED_ORIGINS;
 module.exports.MAX_BYTES = MAX_BYTES;
-module.exports.emailFor = emailFor;
+module.exports.adminEmailFor = adminEmailFor;
+module.exports.customerEmailFor = customerEmailFor;
+module.exports.validEmail = validEmail;
 module.exports.samePayload = samePayload;

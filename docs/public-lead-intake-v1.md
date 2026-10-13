@@ -62,7 +62,9 @@ Regras comuns:
 - `antiSpam.website` é o honeypot e tem de ficar vazio. Se vier preenchido, a API não grava nem notifica e devolve `422 anti_spam_triggered`; nunca devolve uma falsa confirmação de receção.
 - `consent.privacy` tem de ser `true` e a versão atual é `2026-10-13`.
 - A estimativa enviada pelo browser nunca é aceite como preço. O servidor recalcula-a a partir do catálogo.
-- `notification_status=sent` significa que o servidor SMTP aceitou pelo menos um destinatário; a API guarda contagens agregadas de aceites/rejeitados. A entrega final na caixa de correio continua dependente do servidor de destino.
+- O aviso interno e o recibo ao lead têm estados independentes (`admin_notification_status` e `customer_notification_status`). Uma falha não impede o outro envio nem invalida o lead.
+- Um estado `sent` significa que o servidor SMTP aceitou o destinatário; a API guarda apenas contagens agregadas de aceites/rejeitados. A entrega final na caixa de correio continua dependente do servidor de destino.
+- O recibo ao lead só é tentado quando existe um email válido. Pedidos antigos ficam `not_applicable` e não recebem mensagens retroativas.
 
 ### UNEED / pedido geral
 

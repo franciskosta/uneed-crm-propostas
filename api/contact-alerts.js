@@ -1,5 +1,5 @@
 const crypto = require("node:crypto");
-const { authenticate } = require("./_mission-runtime");
+const { authenticate } = require("../mission-runtime");
 const { alertFor } = require("../contact-alerts");
 function reminderId(owner, key) { const h = crypto.createHash("sha256").update(`contact-alert:${owner}:${key}`).digest("hex"); return `${h.slice(0,8)}-${h.slice(8,12)}-4${h.slice(13,16)}-a${h.slice(17,20)}-${h.slice(20,32)}`; }
 async function run(owner) {

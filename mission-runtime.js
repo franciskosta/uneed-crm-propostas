@@ -1,6 +1,6 @@
-const { SupabaseMissionRepository } = require("../uneed-os/supabase-repository");
-const { createMissionEngine } = require("../uneed-os/runtime");
-const { MissionRunner } = require("../uneed-os/runner");
+const { SupabaseMissionRepository } = require("./uneed-os/supabase-repository");
+const { createMissionEngine } = require("./uneed-os/runtime");
+const { MissionRunner } = require("./uneed-os/runner");
 
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const secretKey = process.env.SUPABASE_SECRET_KEY_V2 || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;

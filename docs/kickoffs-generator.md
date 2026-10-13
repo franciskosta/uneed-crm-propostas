@@ -9,7 +9,7 @@ O Supabase de produção é `kkmjocyhtcbmlmbhispo`. O conector só lista staging
 ## Reutilização / alterações
 
 - Catálogo do backend antigo extraído sem mudar preços para `kickoff-catalog.js`; usado por ambos os backends e pelo novo editor.
-- `api/kickoff-email.js` mantém SMTP/Nodemailer; apenas exporta também o template visual e escape para reutilização.
+- `kickoff-email.js` mantém SMTP/Nodemailer fora de `api/` para ser partilhado sem consumir uma função Vercel adicional; exporta também o template visual e escape para reutilização.
 - `customer-model.js` fornece os cálculos de IVA/retenção. Não cria faturação nem altera métricas.
 - Ficha de cliente abre o gerador com dados da proposta; High Ticket/Outros conserva o guia existente.
 - Novo separador Kickoffs, formulário de oferta, pesquisa/filtros, duplicação, pré-visualização interna, copiar link, enviar convite, validações, reenvios e histórico.

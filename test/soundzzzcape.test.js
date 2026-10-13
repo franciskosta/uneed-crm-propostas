@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 let currentUser;
-const runtime = require('../api/_mission-runtime');
+const runtime = require('../mission-runtime');
 runtime.authenticate = async () => currentUser;
 const handler = require('../api/soundzzzcape/[...route]');
 

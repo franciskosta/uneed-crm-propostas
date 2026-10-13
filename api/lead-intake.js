@@ -1,6 +1,6 @@
 const crypto = require("node:crypto");
 const intake = require("../lead-intake");
-const { sendEmail, shell, escapeHtml } = require("./kickoff-email");
+const { sendEmail, shell, escapeHtml } = require("../kickoff-email");
 
 const ALLOWED_ORIGINS = new Set(intake.ORIGINS.map((host) => `https://${host}`));
 const MAX_BYTES = 32 * 1024;

@@ -1,4 +1,4 @@
-const {shell,escapeHtml:h}=require('../api/kickoff-email');
+const {shell,escapeHtml:h}=require('../kickoff-email');
 const intake=require('../kickoff-intake');
 const money=n=>new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(n);
 function compose(row,link,payment,internal=false,invite=false) {

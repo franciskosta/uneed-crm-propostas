@@ -1,4 +1,4 @@
-const { runtime, authenticate, json, error } = require("../_mission-runtime");
+const { runtime, authenticate, json, error } = require("../../mission-runtime");
 
 module.exports = async function handler(req, res) {
   try {

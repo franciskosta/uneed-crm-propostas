@@ -24,7 +24,7 @@ test('production release includes prospecting, reminders and kickoff together', 
     const html=read(page);assert.match(html,/\/termos/);assert.match(html,/\/privacidade/);assert.match(html,/\/contactos/);assert.match(html,/\/reclamacoes/);assert.match(html,/233993843/);
   }
   assert.match(read('api/kickoffs.js'), /legalAcceptance=\{termsVersion:'2026-10-02',privacyVersion:'2026-10-02'/);
-  assert.match(read('api/kickoff-email.js'), /nodemailer/);
+  assert.match(read('kickoff-email.js'), /nodemailer/);
   assert.match(read('index.html'), /lead-intake\.js/);
   assert.match(read('build-vercel.js'), /lead-intake\.js/);
   assert.match(read('vercel.json'), /api\/lead-intake\.js/);

@@ -1,4 +1,4 @@
-const { authenticate } = require('../_mission-runtime');
+const { authenticate } = require('../../mission-runtime');
 const https = require('node:https');
 
 function relay(url, method, token, body) {

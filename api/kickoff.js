@@ -1,5 +1,5 @@
 const crypto = require("node:crypto");
-const { adminEmail, customerEmail, sendEmail } = require("./kickoff-email");
+const { adminEmail, customerEmail, sendEmail } = require("../kickoff-email");
 
 const { commercialCatalog, addonCatalog, allowedLanguages } = require('../kickoff-catalog');
 

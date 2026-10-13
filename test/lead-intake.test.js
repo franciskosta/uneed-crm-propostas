@@ -106,7 +106,7 @@ test('an idempotent retry retries a failed notice once and changed content confl
   const normalized = Intake.normalize(base()); const storedPayload = { ...normalized }; delete storedPayload.antiSpam;
   const database = mockDatabase({ id: '11111111-1111-4111-8111-111111111111', reference: 'UNEED-LEAD-1', payload: storedPayload, estimate: normalized.estimate, notification_status: 'failed', updated_at: '2026-10-13T10:00:00Z' });
   global.fetch = database.fetch;
-  const emailModule = require('../api/kickoff-email'); const originalSendEmail = emailModule.sendEmail; let sends = 0;
+  const emailModule = require('../kickoff-email'); const originalSendEmail = emailModule.sendEmail; let sends = 0;
   emailModule.sendEmail = async () => { sends += 1; return { sent: true, id: 'mail-1' }; };
   delete require.cache[require.resolve('../api/lead-intake')]; const handler = require('../api/lead-intake');
   try {
@@ -129,7 +129,7 @@ test('a thrown notification error never turns a persisted lead into a failed req
   const oldFetch = global.fetch, oldUrl = process.env.SUPABASE_URL, oldSecret = process.env.SUPABASE_SECRET_KEY, oldOwner = process.env.CRM_OWNER_USER_ID;
   process.env.SUPABASE_URL = 'https://db.example'; process.env.SUPABASE_SECRET_KEY = 'secret'; process.env.CRM_OWNER_USER_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
   const database = mockDatabase(); global.fetch = database.fetch;
-  const emailModule = require('../api/kickoff-email'); const originalSendEmail = emailModule.sendEmail;
+  const emailModule = require('../kickoff-email'); const originalSendEmail = emailModule.sendEmail;
   emailModule.sendEmail = async () => { throw new Error('provider down'); };
   delete require.cache[require.resolve('../api/lead-intake')]; const handler = require('../api/lead-intake');
   try {

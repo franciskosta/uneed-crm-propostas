@@ -1,6 +1,6 @@
 const M=require('../kickoffs/model');
 const {repository}=require('../kickoffs/store');
-const {sendEmail}=require('./kickoff-email');
+const {sendEmail}=require('../kickoff-email');
 const {compose}=require('../kickoffs/emails');
 const images=require('../kickoffs/images');
 const limits=new Map();

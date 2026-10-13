@@ -103,7 +103,13 @@ async function attemptNotification(cfg, row) {
   try {
     await db(cfg, `lead_intake_requests?id=eq.${encodeURIComponent(row.id)}&notification_status=eq.sending`, {
       method: "PATCH",
-      body: { notification_status: notificationStatus, notification_detail: notice?.sent ? { id: notice.id } : { reason: notice?.reason || "email_unavailable" }, updated_at: new Date().toISOString() },
+      body: {
+        notification_status: notificationStatus,
+        notification_detail: notice?.sent
+          ? { id: notice.id, acceptedCount: notice.acceptedCount ?? null, rejectedCount: notice.rejectedCount ?? null, pendingCount: notice.pendingCount ?? null }
+          : { reason: notice?.reason || "email_unavailable" },
+        updated_at: new Date().toISOString(),
+      },
       prefer: "return=representation",
     });
   } catch (notificationError) { console.error("lead_intake_notification_status", row.id, notificationError.message); }

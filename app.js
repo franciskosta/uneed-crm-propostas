@@ -408,8 +408,17 @@ async function loadLeadIntakeRequests({ persist = true, quiet = false } = {}) {
 }
 
 let contactAlertCheckRunning = false;
+const CONTACT_ALERT_BACKOFF_KEY = "uneed.crm.contact-alerts.retry-after";
+function contactAlertChecksPaused() {
+  try { return Number(localStorage.getItem(CONTACT_ALERT_BACKOFF_KEY) || 0) > Date.now(); }
+  catch { return false; }
+}
+function pauseContactAlertChecks(milliseconds) {
+  try { localStorage.setItem(CONTACT_ALERT_BACKOFF_KEY, String(Date.now() + milliseconds)); }
+  catch {}
+}
 async function checkContactAlertEmails() {
-  if (contactAlertCheckRunning || !(state.instagramProspects || []).some((p) => window.UNEED_CONTACT_ALERTS?.alertFor(p)?.due)) return;
+  if (contactAlertCheckRunning || contactAlertChecksPaused() || !(state.instagramProspects || []).some((p) => window.UNEED_CONTACT_ALERTS?.alertFor(p)?.due)) return;
   const client = getSupabaseClient();
   if (!client) return;
   contactAlertCheckRunning = true;
@@ -418,9 +427,11 @@ async function checkContactAlertEmails() {
     if (!token) return;
     const response = await fetch("/api/contact-alerts", { method: "POST", headers: { Authorization: `Bearer ${token}` } });
     const payload = await response.json();
+    if (!response.ok) pauseContactAlertChecks(payload.code === "notifications_not_configured" ? 12 * 3600000 : 5 * 60000);
+    else { try { localStorage.removeItem(CONTACT_ALERT_BACKOFF_KEY); } catch {} }
     const feedback = qs("#contactAlertEmailStatus");
     if (feedback) feedback.textContent = !response.ok ? "Alertas visíveis; envio de email indisponível. Verificar configuração de notificações." : payload.pendingReview ? "Há um envio de email por confirmar; requer revisão." : payload.sent ? `Enviados ${payload.sent} avisos para geral@uneed.pt.` : "Avisos de email verificados.";
-  } catch { const feedback = qs("#contactAlertEmailStatus"); if (feedback) feedback.textContent = "Não foi possível verificar os emails de alerta. Nova tentativa automática."; }
+  } catch { pauseContactAlertChecks(5 * 60000); const feedback = qs("#contactAlertEmailStatus"); if (feedback) feedback.textContent = "Não foi possível verificar os emails de alerta. Nova tentativa automática."; }
   finally { contactAlertCheckRunning = false; }
 }
 setInterval(() => {

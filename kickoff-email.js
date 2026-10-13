@@ -2,6 +2,14 @@ const nodemailer = require("nodemailer");
 
 let smtpTransporter;
 
+function smtpReceipt(result = {}) {
+  const acceptedCount = Array.isArray(result.accepted) ? result.accepted.length : 0;
+  const rejectedCount = Array.isArray(result.rejected) ? result.rejected.length : 0;
+  const pendingCount = Array.isArray(result.pending) ? result.pending.length : 0;
+  if (!acceptedCount) return { sent: false, reason: "smtp_rejected", acceptedCount, rejectedCount, pendingCount };
+  return { sent: true, id: result.messageId, acceptedCount, rejectedCount, pendingCount };
+}
+
 function escapeHtml(value) {
   return String(value || "").replace(/[&<>"']/g, (character) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -79,10 +87,10 @@ async function sendEmail(message, idempotencyKey) {
       text: message.text,
       messageId,
     });
-    return { sent: true, id: result.messageId };
+    return smtpReceipt(result);
   } catch (error) {
     return { sent: false, reason: "smtp_unavailable", detail: error.message };
   }
 }
 
-module.exports = { adminEmail, customerEmail, sendEmail, shell, escapeHtml };
+module.exports = { adminEmail, customerEmail, sendEmail, smtpReceipt, shell, escapeHtml };

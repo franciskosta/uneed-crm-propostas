@@ -5,7 +5,10 @@ function reminderId(owner, key) { const h = crypto.createHash("sha256").update(`
 async function run(owner) {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const secret = process.env.SUPABASE_SECRET_KEY_V2 || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !secret || !process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) throw new Error("Configurar SUPABASE, RESEND_API_KEY e EMAIL_FROM para ativar emails de contacto.");
+  if (!url || !secret || !process.env.RESEND_API_KEY || !process.env.EMAIL_FROM) throw Object.assign(
+    new Error("Configurar SUPABASE, RESEND_API_KEY e EMAIL_FROM para ativar emails de contacto."),
+    { code: "notifications_not_configured" },
+  );
   async function db(path, options = {}) {
     const r = await fetch(`${url}/rest/v1/${path}`, { ...options, headers: { apikey: secret, Authorization: `Bearer ${secret}`, "Content-Type": "application/json", Prefer: "return=representation", ...options.headers }, signal: AbortSignal.timeout(8000) });
     if (!r.ok) throw new Error(`contact_alert_database_${r.status}`);
@@ -55,7 +58,7 @@ module.exports = async function handler(req, res) {
       const user = await authenticate(req); if (!user) return res.status(401).json({ ok: false }); owner = user.id;
     } else return res.status(405).json({ ok: false });
     return res.status(200).json({ ok: true, ...await run(owner) });
-  } catch (error) { console.error("contact_alerts", error.message); return res.status(503).json({ ok: false, error: error.message }); }
+  } catch (error) { console.error("contact_alerts", error.message); return res.status(503).json({ ok: false, code: error.code || "notifications_unavailable", error: error.message }); }
 };
 module.exports.reminderId = reminderId;
 module.exports.run = run;

@@ -62,6 +62,7 @@ Regras comuns:
 - `antiSpam.website` é o honeypot e tem de ficar vazio. Se vier preenchido, a API não grava nem notifica e devolve `422 anti_spam_triggered`; nunca devolve uma falsa confirmação de receção.
 - `consent.privacy` tem de ser `true` e a versão atual é `2026-10-13`.
 - A estimativa enviada pelo browser nunca é aceite como preço. O servidor recalcula-a a partir do catálogo.
+- `notification_status=sent` significa que o servidor SMTP aceitou pelo menos um destinatário; a API guarda contagens agregadas de aceites/rejeitados. A entrega final na caixa de correio continua dependente do servidor de destino.
 
 ### UNEED / pedido geral
 

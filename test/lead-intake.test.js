@@ -49,6 +49,16 @@ test('different requests from the same contact remain different prospect cards',
   assert.notEqual(state.instagramProspects[0].sourceIntakeId, state.instagramProspects[1].sourceIntakeId);
 });
 
+test('SMTP receipt requires an accepted recipient and records only aggregate delivery evidence', () => {
+  const { smtpReceipt } = require('../kickoff-email');
+  assert.deepEqual(smtpReceipt({ messageId: 'm1', accepted: ['recipient@example.pt'], rejected: [], pending: [] }), {
+    sent: true, id: 'm1', acceptedCount: 1, rejectedCount: 0, pendingCount: 0,
+  });
+  assert.deepEqual(smtpReceipt({ messageId: 'm2', accepted: [], rejected: ['recipient@example.pt'] }), {
+    sent: false, reason: 'smtp_rejected', acceptedCount: 0, rejectedCount: 1, pendingCount: 0,
+  });
+});
+
 function response() {
   return { statusCode: 0, headers: {}, setHeader(k,v){this.headers[k]=v;}, status(code){this.statusCode=code;return this;}, json(body){this.body=body;return this;}, end(){return this;} };
 }

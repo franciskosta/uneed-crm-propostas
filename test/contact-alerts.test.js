@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { dueDate, alertFor, today } = require('../contact-alerts');
+const fs = require('node:fs');
 test('five business days skip weekends and survive month/year boundaries', () => {
   assert.equal(dueDate('2026-09-11'), '2026-09-18');
   assert.equal(dueDate('2026-09-12'), '2026-09-18');
@@ -28,6 +29,27 @@ test('notification identity is stable and changes with owner, contact stage or d
   assert.equal(reminderId('u1','p1:first:2026-09-11'), reminderId('u1','p1:first:2026-09-11'));
   assert.notEqual(reminderId('u1','p1:first:2026-09-11'), reminderId('u2','p1:first:2026-09-11'));
   assert.notEqual(reminderId('u1','p1:first:2026-09-11'), reminderId('u1','p1:follow:2026-09-11'));
+});
+test('unconfigured contact alerts expose a stable code and the CRM backs off repeated calls', async () => {
+  const handler = require('../api/contact-alerts');
+  const keys = ['SUPABASE_URL','VITE_SUPABASE_URL','SUPABASE_SECRET_KEY_V2','SUPABASE_SECRET_KEY','SUPABASE_SERVICE_ROLE_KEY','RESEND_API_KEY','EMAIL_FROM'];
+  const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  const previousCronSecret = process.env.CRON_SECRET;
+  keys.forEach((key) => delete process.env[key]);
+  const req = { method: 'GET', headers: { authorization: 'Bearer fixture' } };
+  process.env.CRON_SECRET = 'fixture';
+  const res = { statusCode: 0, status(code){ this.statusCode = code; return this; }, json(body){ this.body = body; return this; }, setHeader(){} };
+  try {
+    await handler(req, res);
+    assert.equal(res.statusCode, 503);
+    assert.equal(res.body.code, 'notifications_not_configured');
+    const source = fs.readFileSync(require.resolve('../app.js'), 'utf8');
+    assert.match(source, /CONTACT_ALERT_BACKOFF_KEY/);
+    assert.match(source, /12 \* 3600000/);
+  } finally {
+    keys.forEach((key) => previous[key] === undefined ? delete process.env[key] : process.env[key] = previous[key]);
+    previousCronSecret === undefined ? delete process.env.CRON_SECRET : process.env.CRON_SECRET = previousCronSecret;
+  }
 });
 test('repeated checks send one internal email and persist the sent receipt', async (t) => {
   const { run } = require('../api/contact-alerts');

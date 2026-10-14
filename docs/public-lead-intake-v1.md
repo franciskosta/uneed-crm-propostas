@@ -187,3 +187,13 @@ Nunca tratar uma falha de email como falha da submissão já persistida.
 - Cada pedido é importado para **PROSPEÇÃO** com `sourceIntakeId`; a reconciliação é idempotente.
 - Pedidos diferentes do mesmo contacto mantêm cartões/leads diferentes, podendo partilhar a mesma Company através das regras atuais de identidade.
 - O documento completo recebido, a configuração normalizada e a estimativa do servidor permanecem no pedido e no detalhe do cartão.
+
+## TOP Club — 14/10/2026
+
+`https://topclub.uneed.pt` é uma origem adicional do produto `uneed_presence`. Reutiliza armazenamento e os dois envios SMTP existentes, sem novas credenciais ou função Vercel. Aplicar `20261014183000_topclub_lead_origin.sql` antes do deploy (apenas alarga o CHECK de origem; não altera dados, RLS ou grants).
+
+O pedido inclui `storybrandBrief: {text, prompt, answers: string[7], approved: true}`. Os documentos são obrigatórios, limitados a 60.000 caracteres cada e as respostas a 4.000. O limite JSON é 192 KiB apenas para esta origem. Recusa incompletos e não trunca documentos. Guarda os documentos no payload, leva-os às notas/ficha da Prospeção e aos dois emails. Não envia dados para a OpenAI.
+
+Para TOP Club, `presenceNeed` admite também `enrollment` e `unsure`, ambos com base 39€/mês; backoffice está incluído, não pode ser cobrado novamente como addon. O extra `sistema_inscricoes` mantém-se a 9€ na oferta Presença habitual. Restantes preços são recalculados pelo mesmo catálogo. `customRequirements` força preço dependente de proposta para o âmbito adicional.
+
+A confirmação pública conserva `notifications.admin/customer`. `sent` significa aceitação SMTP, não prova de chegada à caixa. Não reenvia os emails já aceites em repetição idempotente. Não foram enviados emails reais nesta adaptação.

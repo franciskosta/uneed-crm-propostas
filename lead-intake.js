@@ -5,7 +5,7 @@
 })(typeof window !== "undefined" ? window : null, function leadIntakeFactory() {
   const SCHEMA_VERSION = "lead-intake-v1";
   const PRIVACY_VERSION = "2026-10-13";
-  const ORIGINS = Object.freeze(["uneed.pt", "360.uneed.pt", "presenca.uneed.pt"]);
+  const ORIGINS = Object.freeze(["uneed.pt", "360.uneed.pt", "presenca.uneed.pt", "topclub.uneed.pt"]);
   const PRODUCTS = Object.freeze(["uneed", "uneed_360", "uneed_presence"]);
   const MODULES_360 = Object.freeze(["clientes", "propostas", "obras", "agenda", "despesas", "documentos"]);
   const PRESENCE_NEEDS = Object.freeze(["booking", "catalogue", "quote", "contact", "institutional"]);
@@ -53,15 +53,15 @@
     const monthly = subscription ? 39 + modules.length * 19 : 0;
     return { configuration: { model, modules }, estimate: { currency: "EUR", vatIncluded: false, initial, monthly, firstYear: initial + 12 * monthly, priceStatus: subscription ? "estimated" : "recurring_requires_quote" } };
   }
-  function estimatePresence(configuration) {
+  function estimatePresence(configuration, topclub = false) {
     const plan = text(configuration.plan, 30) || "start";
     if (plan !== "start") fail("configuration_invalid", "Plano Presença desconhecido.", ["configuration.plan"], 409);
     const presenceNeed = text(configuration.presenceNeed, 40);
-    if (!PRESENCE_NEEDS.includes(presenceNeed)) fail("configuration_invalid", "Escolha o tipo de presença.", ["configuration.presenceNeed"], 409);
+    if (!(topclub ? [...PRESENCE_NEEDS, "enrollment", "unsure"] : PRESENCE_NEEDS).includes(presenceNeed)) fail("configuration_invalid", "Escolha o tipo de presença.", ["configuration.presenceNeed"], 409);
     const seen = new Set(), exclusive = new Set();
     const addons = (Array.isArray(configuration.addons) ? configuration.addons : []).slice(0, 30).map((item) => {
       const key = text(item?.key, 60), definition = PRESENCE_ADDONS[key];
-      if (!definition || seen.has(key)) fail("configuration_invalid", "A configuração contém extras desconhecidos ou repetidos.", ["configuration.addons"], 409);
+      if (!definition || seen.has(key) || (topclub && ["backoffice", "sistema_inscricoes", "pagina_extra"].includes(key))) fail("configuration_invalid", "A configuração contém extras desconhecidos ou repetidos.", ["configuration.addons"], 409);
       seen.add(key);
       if (definition.only && definition.only !== presenceNeed) fail("configuration_invalid", "Um extra não é compatível com o tipo de presença.", ["configuration.addons"], 409);
       if (definition.exclusive && exclusive.has(definition.exclusive)) fail("configuration_invalid", "Escolha apenas uma opção de cada grupo de extras.", ["configuration.addons"], 409);
@@ -88,7 +88,7 @@
     if (!/^[a-zA-Z0-9_-]{16,128}$/.test(idempotencyKey)) fields.push("idempotencyKey");
     if (!ORIGINS.includes(origin)) fields.push("origin");
     if (!PRODUCTS.includes(product)) fields.push("product");
-    const allowedProductOrigin = product === "uneed_presence" ? origin === "presenca.uneed.pt" : product === "uneed_360" ? ["uneed.pt", "360.uneed.pt"].includes(origin) : origin === "uneed.pt";
+    const allowedProductOrigin = product === "uneed_presence" ? ["presenca.uneed.pt", "topclub.uneed.pt"].includes(origin) : product === "uneed_360" ? ["uneed.pt", "360.uneed.pt"].includes(origin) : origin === "uneed.pt";
     if (!allowedProductOrigin) fields.push("product_origin");
     const contactInput = input.contact && typeof input.contact === "object" ? input.contact : {};
     const contact = { name: text(contactInput.name, 160), email: text(contactInput.email, 254).toLowerCase(), phone: text(contactInput.phone, 40) };
@@ -107,13 +107,27 @@
     const rawConfiguration = input.configuration && typeof input.configuration === "object" && !Array.isArray(input.configuration) ? input.configuration : {};
     let calculated = { configuration: { need: text(rawConfiguration.need, 80) }, estimate: { currency: "EUR", vatIncluded: false, initial: 0, monthly: 0, firstYear: 0, priceStatus: "not_applicable" } };
     if (product === "uneed_360") calculated = estimate360(rawConfiguration);
-    if (product === "uneed_presence") calculated = estimatePresence(rawConfiguration);
+    if (product === "uneed_presence") calculated = estimatePresence(rawConfiguration, origin === "topclub.uneed.pt");
+    let storybrandBrief;
+    if (origin === "topclub.uneed.pt") {
+      const brief = input.storybrandBrief;
+      const bounded = (value, max) => typeof value === "string" && value.trim().length > 0 && value.length <= max;
+      if (!brief || !bounded(brief.text, 60000) || !bounded(brief.prompt, 60000) || brief.approved !== true || !Array.isArray(brief.answers) || brief.answers.length !== 7 || !brief.answers.every(answer => bounded(answer, 4000))) fail("brief_required", "Envia os sete pontos e o briefing revisto.", ["storybrandBrief"]);
+      storybrandBrief = {text:brief.text, prompt:brief.prompt, answers:brief.answers, approved:true};
+      if (!contact.email) fail("validation_failed", "Indica um email para receber o briefing.", ["contact.email"]);
+    }
+    if (origin === "topclub.uneed.pt") {
+      const customRequirements = text(rawConfiguration.customRequirements,2000);
+      calculated.configuration.customRequirements = customRequirements;
+      if (customRequirements) calculated.estimate.priceStatus = "requires_quote";
+    }
     const claimed = clientEstimate(rawConfiguration.clientEstimate);
     const estimateMismatch = ["initial", "monthly", "firstYear"].some((key) => Math.abs(claimed[key] - calculated.estimate[key]) > 0.01);
     const contextInput = input.context && typeof input.context === "object" ? input.context : {};
     const utmInput = contextInput.utm && typeof contextInput.utm === "object" ? contextInput.utm : {};
     return {
       schemaVersion, idempotencyKey, origin, product, contact, business,
+      ...(storybrandBrief ? {storybrandBrief} : {}),
       message: text(input.message, 6000),
       configuration: calculated.configuration,
       clientEstimate: claimed,
@@ -125,7 +139,7 @@
   }
   function summary(payload) {
     if (payload.product === "uneed_360") return `UNEED 360º · ${payload.configuration.model === "purchase" ? "Compra" : payload.configuration.model === "subscription" ? "Subscrição" : "âmbito a definir"} · ${payload.configuration.modules.join(", ") || "sem módulos adicionais"}`;
-    if (payload.product === "uneed_presence") return `UNEED Presença · ${payload.configuration.presenceNeed} · ${payload.configuration.addons.map((addon) => `${addon.name}${addon.quantity > 1 ? ` × ${addon.quantity}` : ""}`).join(", ") || "sem extras"}`;
+    if (payload.product === "uneed_presence") return `${payload.origin === "topclub.uneed.pt" ? "Uneed Presença × TOP Club" : "UNEED Presença"} · ${payload.configuration.presenceNeed} · ${payload.configuration.addons.map((addon) => `${addon.name}${addon.quantity > 1 ? ` × ${addon.quantity}` : ""}`).join(", ") || "sem extras"}`;
     return `UNEED · ${payload.configuration.need || "pedido geral"}`;
   }
   function toProspect(row) {
@@ -139,8 +153,8 @@
       acquisitionStrategy: presence ? "uneed_presence" : "high_ticket", strategyId: presence ? "uneed_presence" : "high_ticket",
       serviceId: presence ? "uneed_presence" : null, questEligible: false, readiness: "not_researched", primaryChannel: contact.email ? "email" : "phone",
       hasWebsite: Boolean(business.website), hasBooking: false, hasWhatsappTree: false,
-      notes: [payload.message, summary(payload), `Referência: ${row.reference}`].filter(Boolean).join("\n\n"),
-      websiteRequest: { origin: payload.origin, product: payload.product, contact, business, message: payload.message || "", configuration: payload.configuration, estimate: row.estimate || payload.estimate, consent: payload.consent, context: payload.context, receivedAt: row.created_at },
+      notes: [payload.message, payload.storybrandBrief?.text, payload.storybrandBrief?.prompt, summary(payload), `Referência: ${row.reference}`].filter(Boolean).join("\n\n"),
+      websiteRequest: { origin: payload.origin, product: payload.product, contact, business, message: payload.message || "", configuration: payload.configuration, ...(payload.storybrandBrief ? {storybrandBrief:payload.storybrandBrief} : {}), estimate: row.estimate || payload.estimate, consent: payload.consent, context: payload.context, receivedAt: row.created_at },
       createdAt: row.created_at, updatedAt: row.created_at,
     };
   }

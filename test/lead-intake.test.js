@@ -284,3 +284,27 @@ test('object payload size is enforced even without Content-Length', async () => 
   await handler(request(base({ message: 'x'.repeat(handler.MAX_BYTES + 1) })), res);
   assert.equal(res.statusCode, 413); assert.equal(res.body.error.code, 'payload_too_large');
 });
+
+test('TOP Club receives complete StoryBrand and includes enrollment at 39 without changing Presence', () => {
+  const storybrandBrief={text:'Briefing completo com notas',prompt:'Prompt completo',answers:Array(7).fill('Resposta aprovada'),approved:true};
+  const input=base({origin:'topclub.uneed.pt',product:'uneed_presence',configuration:{plan:'start',presenceNeed:'enrollment',addons:[{key:'idioma_extra',languages:['EN','FR']}]},storybrandBrief});
+  const p=Intake.normalize(input);
+  assert.equal(p.estimate.monthly,49);assert.deepEqual(p.storybrandBrief,storybrandBrief);
+  const row={id:'test',reference:'UNEED-LEAD-TESTE',payload:p,estimate:p.estimate};
+  const handler=require('../api/lead-intake');
+  for (const mail of [handler.adminEmailFor(row),handler.customerEmailFor(row)]) {
+    assert.match(mail.text,/Briefing completo com notas/);assert.match(mail.text,/Prompt completo/);assert.match(mail.html,/TOP Club/);
+  }
+  const prospect=Intake.toProspect(row);assert.match(prospect.notes,/Briefing completo com notas/);assert.deepEqual(prospect.websiteRequest.storybrandBrief,storybrandBrief);
+  assert.equal(prospect.acquisitionStrategy,'uneed_presence');
+  assert.throws(()=>Intake.normalize({...input,storybrandBrief:{...storybrandBrief,answers:[]}}),/sete pontos/);
+  assert.throws(()=>Intake.normalize({...input,storybrandBrief:{...storybrandBrief,text:'x'.repeat(60001)}}),/briefing/);
+  assert.throws(()=>Intake.normalize({...input,configuration:{...input.configuration,addons:[{key:'backoffice'}]}}),/extras/);
+  const old=Intake.normalize(base({origin:'presenca.uneed.pt',product:'uneed_presence',configuration:{presenceNeed:'institutional',addons:[{key:'sistema_inscricoes'}]}}));
+  assert.equal(old.estimate.monthly,48);
+});
+
+test('TOP Club CORS permits its HTTPS origin only', async()=>{
+ const handler=require('../api/lead-intake');const res=response();await handler({method:'OPTIONS',headers:{origin:'https://topclub.uneed.pt'}},res);assert.equal(res.statusCode,204);assert.equal(res.headers['Access-Control-Allow-Origin'],'https://topclub.uneed.pt');
+ const denied=response();await handler({method:'OPTIONS',headers:{origin:'https://topclub.uneed.pt.evil.test'}},denied);assert.equal(denied.statusCode,403);
+});

@@ -63,7 +63,7 @@ function validEmail(value) { return /^[^\s<>@,;]+@[^\s<>@,;]+\.[^\s<>@,;]+$/.tes
 const PRODUCT_LABELS = Object.freeze({ uneed: "Uneed", uneed_360: "Uneed 360º", uneed_presence: "Uneed Presença" });
 const MODULE_LABELS = Object.freeze({ clientes: "Clientes e CRM", propostas: "Propostas e orçamentos", obras: "Obras e projetos", agenda: "Agenda", despesas: "Despesas", documentos: "Documentos" });
 const MODEL_LABELS = Object.freeze({ purchase: "Compra", subscription: "Subscrição" });
-const PRESENCE_NEED_LABELS = Object.freeze({ booking: "Marcações online", catalogue: "Catálogo", quote: "Pedidos de orçamento", contact: "Contactos e captação", institutional: "Website institucional" });
+const PRESENCE_NEED_LABELS = Object.freeze({ booking: "Marcações online", catalogue: "Catálogo", quote: "Pedidos de orçamento", contact: "Contactos e captação", institutional: "Website institucional", enrollment: "Inscrições", unsure: "Modalidade a definir contigo" });
 function estimateLine(estimate = {}) {
   if (estimate.priceStatus === "not_applicable") return "";
   const parts = [];
@@ -75,7 +75,7 @@ function estimateLine(estimate = {}) {
 }
 function customerSummary(payload) {
   const configuration = payload.configuration || {};
-  const product = PRODUCT_LABELS[payload.product] || "Uneed";
+  const product = payload.origin === "topclub.uneed.pt" ? "Uneed Presença × TOP Club" : PRODUCT_LABELS[payload.product] || "Uneed";
   if (payload.product === "uneed_360") {
     return {
       product,
@@ -88,7 +88,7 @@ function customerSummary(payload) {
   }
   return { product, variant: "Pedido geral", modules: [] };
 }
-function adminEmailFor(row) {
+function baseAdminEmailFor(row) {
   const payload = row.payload, estimate = row.estimate;
   const addons = payload.configuration?.addons || [];
   const modules = payload.configuration?.modules || [];
@@ -114,7 +114,7 @@ function adminEmailFor(row) {
   ].filter(Boolean).join("\n");
   return { to: process.env.LEAD_INTAKE_NOTIFICATION_TO || "geral@uneed.pt", replyTo: payload.contact.email || undefined, subject: `Novo pedido ${payload.product} — ${payload.business.name || payload.contact.name} — ${row.reference}`, html: shell({ preview: `Novo pedido ${row.reference}`, eyebrow: "Pedido comercial recebido", title: payload.business.name || payload.contact.name, intro: "O pedido já ficou guardado na área PROSPEÇÃO do CRM.", body }), text: plain };
 }
-function customerEmailFor(row) {
+function baseCustomerEmailFor(row) {
   const payload = row.payload;
   const readable = customerSummary(payload);
   const modules = readable.modules;
@@ -148,6 +148,17 @@ function customerEmailFor(row) {
     text: plain,
   };
 }
+function withTopclubBrief(message, row) {
+  if (row.payload.origin !== "topclub.uneed.pt" || !row.payload.storybrandBrief) return message;
+  const brief = row.payload.storybrandBrief;
+  const content = `BRIEFING TOP CLUB\n\n${brief.text}\n\nPROMPT PARA CRIAÇÃO\n\n${brief.prompt}`;
+  return {...message,
+    subject: message.subject.replace('Novo pedido uneed_presence', 'Novo briefing TOP Club'),
+    text: `${message.text}\n\n${content}`,
+    html: message.html.replace('</body>', `<section style="max-width:640px;margin:24px auto;padding:24px;background:white;color:#15164b;font-family:Arial,sans-serif"><h2>O teu briefing TOP Club</h2><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font-family:Arial,sans-serif;line-height:1.6">${escapeHtml(content)}</pre></section></body>`)};
+}
+function adminEmailFor(row) { return withTopclubBrief(baseAdminEmailFor(row),row); }
+function customerEmailFor(row) { return withTopclubBrief(baseCustomerEmailFor(row),row); }
 const NOTIFICATIONS = {
   admin: { status: "admin_notification_status", detail: "admin_notification_detail", email: adminEmailFor },
   customer: { status: "customer_notification_status", detail: "customer_notification_detail", email: customerEmailFor },
@@ -233,10 +244,11 @@ module.exports = async function handler(req, res) {
   if (req.method !== "POST") return send(res, 405, { ok: false, error: { code: "method_not_allowed", message: "Método não permitido." } });
   if (!allowed) return send(res, 403, { ok: false, error: { code: "origin_not_allowed", message: "Origem não autorizada." } });
   if (!String(req.headers["content-type"] || "").toLowerCase().startsWith("application/json")) return send(res, 415, { ok: false, error: { code: "content_type_invalid", message: "Envie JSON." } });
-  if (Number(req.headers["content-length"] || 0) > MAX_BYTES) return send(res, 413, { ok: false, error: { code: "payload_too_large", message: "Pedido demasiado grande." } });
+  const maxBytes = req.headers.origin === "https://topclub.uneed.pt" ? 192 * 1024 : MAX_BYTES;
+  if (Number(req.headers["content-length"] || 0) > maxBytes) return send(res, 413, { ok: false, error: { code: "payload_too_large", message: "Pedido demasiado grande." } });
   let input = req.body;
-  if (typeof input === "string") { if (Buffer.byteLength(input) > MAX_BYTES) return send(res, 413, { ok: false, error: { code: "payload_too_large", message: "Pedido demasiado grande." } }); try { input = JSON.parse(input); } catch { return send(res, 400, { ok: false, error: { code: "invalid_json", message: "JSON inválido." } }); } }
-  else { try { if (Buffer.byteLength(JSON.stringify(input ?? null)) > MAX_BYTES) return send(res, 413, { ok: false, error: { code: "payload_too_large", message: "Pedido demasiado grande." } }); } catch { return send(res, 400, { ok: false, error: { code: "invalid_json", message: "JSON inválido." } }); } }
+  if (typeof input === "string") { if (Buffer.byteLength(input) > maxBytes) return send(res, 413, { ok: false, error: { code: "payload_too_large", message: "Pedido demasiado grande." } }); try { input = JSON.parse(input); } catch { return send(res, 400, { ok: false, error: { code: "invalid_json", message: "JSON inválido." } }); } }
+  else { try { if (Buffer.byteLength(JSON.stringify(input ?? null)) > maxBytes) return send(res, 413, { ok: false, error: { code: "payload_too_large", message: "Pedido demasiado grande." } }); } catch { return send(res, 400, { ok: false, error: { code: "invalid_json", message: "JSON inválido." } }); } }
   try {
     const cfg = config();
     if (!cfg.url || !cfg.secret) throw Object.assign(new Error("Supabase não configurado."), { status: 503, code: "backend_not_configured" });

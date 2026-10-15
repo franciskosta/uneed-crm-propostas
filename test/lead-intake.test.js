@@ -293,7 +293,11 @@ test('TOP Club receives complete StoryBrand and includes enrollment at 39 withou
   const row={id:'test',reference:'UNEED-LEAD-TESTE',payload:p,estimate:p.estimate};
   const handler=require('../api/lead-intake');
   for (const mail of [handler.adminEmailFor(row),handler.customerEmailFor(row)]) {
-    assert.match(mail.text,/Briefing completo com notas/);assert.match(mail.text,/Prompt completo/);assert.match(mail.html,/TOP Club/);
+    assert.match(mail.text,/Briefing completo com notas/);assert.match(mail.text,/Prompt completo/);
+    assert.match(mail.html,/Briefing completo com notas/);assert.match(mail.html,/Prompt completo/);
+    assert.ok(mail.html.indexOf('Desce para os consultar.') < mail.html.indexOf('Referência:</strong>'));
+    assert.ok(mail.html.indexOf('Prompt completo') < mail.html.indexOf('UNEED · <a'));
+    assert.match(mail.text,/Desce para os consultar/);
   }
   const prospect=Intake.toProspect(row);assert.match(prospect.notes,/Briefing completo com notas/);assert.deepEqual(prospect.websiteRequest.storybrandBrief,storybrandBrief);
   assert.equal(prospect.acquisitionStrategy,'uneed_presence');

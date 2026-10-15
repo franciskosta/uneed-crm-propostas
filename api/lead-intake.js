@@ -88,7 +88,20 @@ function customerSummary(payload) {
   }
   return { product, variant: "Pedido geral", modules: [] };
 }
-function baseAdminEmailFor(row) {
+function topclubEmailContent(row) {
+  const brief = row.payload.origin === "topclub.uneed.pt" && row.payload.storybrandBrief;
+  if (!brief) return { intro: "", notice: "", html: "", text: "" };
+  const intro = "O briefing e o prompt completos estão mais abaixo. Desce para os consultar.";
+  const section = (title, text) => `<h2 style="margin:30px 0 14px;font-size:22px;line-height:1.3;color:#15164b">${title}</h2><div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.7;color:#4f566e;overflow-wrap:anywhere;word-break:break-word">${escapeHtml(text).replace(/\r?\n/g, "<br>")}</div>`;
+  return {
+    intro,
+    notice: `<div style="margin:8px 0 24px;padding:18px 20px;background:#f4f5fa;border-left:4px solid #e11236;border-radius:8px;font-size:16px;line-height:1.6;color:#15164b"><strong>O StoryBrand completo está neste email.</strong><br>${intro}</div>`,
+    html: `<div style="margin-top:30px;border-top:1px solid #e1e3ed">${section("Briefing TOP Club", brief.text)}${section("Prompt para criação", brief.prompt)}</div>`,
+    text: `BRIEFING TOP CLUB\n\n${brief.text}\n\nPROMPT PARA CRIAÇÃO\n\n${brief.prompt}`,
+  };
+}
+function adminEmailFor(row) {
+  const brief = topclubEmailContent(row);
   const payload = row.payload, estimate = row.estimate;
   const addons = payload.configuration?.addons || [];
   const modules = payload.configuration?.modules || [];
@@ -103,18 +116,20 @@ function baseAdminEmailFor(row) {
     addons.length ? `<strong>Extras:</strong> ${escapeHtml(addons.map((addon) => `${addon.name} × ${addon.quantity}`).join(", "))}` : "",
     `<strong>Estimativa do servidor:</strong> ${escapeHtml(`${estimate.initial} € inicial · ${estimate.monthly} €/mês · ${estimate.priceStatus}`)} + IVA`,
   ].filter(Boolean);
-  const body = `<div style="margin:22px 0;padding:20px;border:1px solid #e1e3ed;border-radius:16px;line-height:1.8;color:#4f566e">${lines.map((line) => `<p style="margin:0 0 8px">${line}</p>`).join("")}</div><p><a href="https://crm.uneed.pt/#instagram">Abrir PROSPEÇÃO no CRM</a></p>`;
+  const body = `${brief.notice}<div style="margin:22px 0;padding:20px;border:1px solid #e1e3ed;border-radius:16px;line-height:1.8;color:#4f566e">${lines.map((line) => `<p style="margin:0 0 8px">${line}</p>`).join("")}</div><p><a href="https://crm.uneed.pt/#instagram">Abrir PROSPEÇÃO no CRM</a></p>${brief.html}`;
   const plain = [
+    brief.intro,
     `Novo pedido comercial — ${row.reference}`, `Origem: ${payload.origin}`, `Produto: ${payload.product}`,
     `Contacto: ${payload.contact.name} · ${payload.contact.phone || "sem telefone"} · ${payload.contact.email || "sem email"}`,
     `Negócio: ${payload.business.name || "não indicado"} · ${payload.business.sector || "área não indicada"}`,
     `Mensagem: ${payload.message || "sem mensagem"}`,
     modules.length ? `Módulos: ${modules.join(", ")}` : "", addons.length ? `Extras: ${addons.map((addon) => `${addon.name} × ${addon.quantity}`).join(", ")}` : "",
-    `Estimativa do servidor: ${estimate.initial} € inicial · ${estimate.monthly} €/mês · ${estimate.priceStatus} + IVA`, "", "CRM: https://crm.uneed.pt/#instagram",
+    `Estimativa do servidor: ${estimate.initial} € inicial · ${estimate.monthly} €/mês · ${estimate.priceStatus} + IVA`, "", "CRM: https://crm.uneed.pt/#instagram", brief.text,
   ].filter(Boolean).join("\n");
-  return { to: process.env.LEAD_INTAKE_NOTIFICATION_TO || "geral@uneed.pt", replyTo: payload.contact.email || undefined, subject: `Novo pedido ${payload.product} — ${payload.business.name || payload.contact.name} — ${row.reference}`, html: shell({ preview: `Novo pedido ${row.reference}`, eyebrow: "Pedido comercial recebido", title: payload.business.name || payload.contact.name, intro: "O pedido já ficou guardado na área PROSPEÇÃO do CRM.", body }), text: plain };
+  return { to: process.env.LEAD_INTAKE_NOTIFICATION_TO || "geral@uneed.pt", replyTo: payload.contact.email || undefined, subject: `${brief.text ? "Novo briefing TOP Club" : `Novo pedido ${payload.product}`} — ${payload.business.name || payload.contact.name} — ${row.reference}`, html: shell({ preview: `Novo pedido ${row.reference}`, eyebrow: "Pedido comercial recebido", title: payload.business.name || payload.contact.name, intro: "O pedido já ficou guardado na área PROSPEÇÃO do CRM.", body }), text: plain };
 }
-function baseCustomerEmailFor(row) {
+function customerEmailFor(row) {
+  const brief = topclubEmailContent(row);
   const payload = row.payload;
   const readable = customerSummary(payload);
   const modules = readable.modules;
@@ -130,15 +145,16 @@ function baseCustomerEmailFor(row) {
     addons.length ? `<strong>Opções indicadas:</strong> ${escapeHtml(addons.map((addon) => `${addon.name} × ${addon.quantity}`).join(", "))}` : "",
     price ? `<strong>Valor:</strong> ${escapeHtml(price)}` : "",
   ].filter(Boolean);
-  const body = `<div style="margin:22px 0;padding:20px;border:1px solid #e1e3ed;border-radius:16px;line-height:1.8;color:#4f566e">${summary.map((line) => `<p style="margin:0 0 8px">${line}</p>`).join("")}</div><div style="margin:22px 0;padding:20px;background:#f4f5fa;border-radius:16px;color:#4f566e;line-height:1.7"><strong style="color:#15164b">Próximo passo</strong><br>A equipa Uneed vai rever a informação e entrar em contacto contigo. Este email confirma apenas a receção do pedido; não constitui uma encomenda, adjudicação ou contrato.</div><p style="color:#4f566e;line-height:1.7">Se precisares de acrescentar alguma informação, responde a este email ou contacta <a href="mailto:geral@uneed.pt">geral@uneed.pt</a> · <a href="tel:+351934419375">+351 934 419 375</a>.</p>`;
+  const body = `${brief.notice}<div style="margin:22px 0;padding:20px;border:1px solid #e1e3ed;border-radius:16px;line-height:1.8;color:#4f566e">${summary.map((line) => `<p style="margin:0 0 8px">${line}</p>`).join("")}</div><div style="margin:22px 0;padding:20px;background:#f4f5fa;border-radius:16px;color:#4f566e;line-height:1.7"><strong style="color:#15164b">Próximo passo</strong><br>A equipa Uneed vai rever a informação e entrar em contacto contigo. Este email confirma apenas a receção do pedido; não constitui uma encomenda, adjudicação ou contrato.</div><p style="color:#4f566e;line-height:1.7">Se precisares de acrescentar alguma informação, responde a este email ou contacta <a href="mailto:geral@uneed.pt">geral@uneed.pt</a> · <a href="tel:+351934419375">+351 934 419 375</a>.</p>${brief.html}`;
   const plain = [
+    brief.intro,
     `Olá ${payload.contact.name}.`, "", "Recebemos o teu pedido.", `Referência: ${row.reference}`,
     `Pedido: ${readable.product}`, `Opção: ${readable.variant}`, payload.business?.name ? `Negócio: ${payload.business.name}` : "",
     payload.message ? `Mensagem: ${payload.message}` : "", modules.length ? `Módulos indicados: ${modules.join(", ")}` : "",
     addons.length ? `Opções indicadas: ${addons.map((addon) => `${addon.name} × ${addon.quantity}`).join(", ")}` : "",
     price, "", "Próximo passo: a equipa Uneed vai rever a informação e entrar em contacto contigo.",
     "Este email confirma apenas a receção do pedido; não constitui uma encomenda, adjudicação ou contrato.", "",
-    "Uneed · geral@uneed.pt · +351 934 419 375",
+    brief.text, "Uneed · geral@uneed.pt · +351 934 419 375",
   ].filter(Boolean).join("\n");
   return {
     to: payload.contact.email,
@@ -148,17 +164,6 @@ function baseCustomerEmailFor(row) {
     text: plain,
   };
 }
-function withTopclubBrief(message, row) {
-  if (row.payload.origin !== "topclub.uneed.pt" || !row.payload.storybrandBrief) return message;
-  const brief = row.payload.storybrandBrief;
-  const content = `BRIEFING TOP CLUB\n\n${brief.text}\n\nPROMPT PARA CRIAÇÃO\n\n${brief.prompt}`;
-  return {...message,
-    subject: message.subject.replace('Novo pedido uneed_presence', 'Novo briefing TOP Club'),
-    text: `${message.text}\n\n${content}`,
-    html: message.html.replace('</body>', `<section style="max-width:640px;margin:24px auto;padding:24px;background:white;color:#15164b;font-family:Arial,sans-serif"><h2>O teu briefing TOP Club</h2><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font-family:Arial,sans-serif;line-height:1.6">${escapeHtml(content)}</pre></section></body>`)};
-}
-function adminEmailFor(row) { return withTopclubBrief(baseAdminEmailFor(row),row); }
-function customerEmailFor(row) { return withTopclubBrief(baseCustomerEmailFor(row),row); }
 const NOTIFICATIONS = {
   admin: { status: "admin_notification_status", detail: "admin_notification_detail", email: adminEmailFor },
   customer: { status: "customer_notification_status", detail: "customer_notification_detail", email: customerEmailFor },
